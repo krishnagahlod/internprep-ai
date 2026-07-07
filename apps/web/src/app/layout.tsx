@@ -15,10 +15,10 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "InternPrep AI - IITB Placement Assistant",
+  title: "InternPrep AI - IITB Internship Assistant",
   description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students. Master your non-core interviews with precision.",
   openGraph: {
-    title: "InternPrep AI - IITB Placement Assistant",
+    title: "InternPrep AI - IITB Internship Assistant",
     description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students.",
     type: "website",
   },

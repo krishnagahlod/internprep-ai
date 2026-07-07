@@ -343,7 +343,7 @@ def run_workshop_turn(original_bullet: str, section_type: str, target_role: str,
     
     try:
         res_text = cerebras_client.generate_chat_completion(
-            model=os.getenv("INTERVIEW_MODEL", "llama-3.3-70b"), # using standard Cerebras model
+            model=os.getenv("INTERVIEW_MODEL", "gpt-oss-120b"), # using standard Cerebras model
             messages=chat_messages,
             temperature=0.3,
             max_tokens=800,
