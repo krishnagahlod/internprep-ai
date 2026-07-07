@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -129,10 +129,7 @@ export default function DashboardPage() {
             </div>
             <div className="hidden lg:flex items-center gap-4">
               <ThemeToggle />
-              <div className="hidden md:flex items-center text-sm font-medium text-muted-foreground bg-white/60 dark:bg-neutral-900/60 backdrop-blur-md px-4 py-2 rounded-full border border-black/5 dark:border-white/5 shadow-sm">
-                <Clock className="h-4 w-4 mr-2" />
-                Day 1 Prep: 54 days left
-              </div>
+
             </div>
           </motion.div>
           
