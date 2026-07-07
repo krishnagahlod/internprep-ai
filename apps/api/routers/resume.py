@@ -1,11 +1,12 @@
 import io
 import json
 import asyncio
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request
 from pdfminer.high_level import extract_text
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
+from dependencies import limiter
 from agents.resume_analyzer import analyze_resume_text, run_workshop_turn
 
 router = APIRouter(prefix="/resume", tags=["resume"])
@@ -31,13 +32,22 @@ class WorkshopResponse(BaseModel):
     final_bullet: Optional[str] = None
 
 @router.post("/analyze", response_model=AnalysisResponse)
+@limiter.limit("3/hour")
 async def analyze_resume(
+    request: Request,
     file: UploadFile = File(...),
     target_role: str = Form("consulting")
 ):
+    # Strict PDF Validation
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 5MB.")
+        
     try:
         pdf_bytes = await file.read()
         text = extract_text(io.BytesIO(pdf_bytes))
@@ -59,7 +69,7 @@ async def analyze_resume(
         )
     
     except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Analysis timed out. The resume might be too long or the AI engine is overloaded. Please try again.")
+        raise HTTPException(status_code=503, detail="Analysis timed out. The resume might be too long or the AI engine is overloaded. Please try again.")
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Failed to parse the AI engine's response into structural data.")
     except Exception as e:
@@ -68,16 +78,17 @@ async def analyze_resume(
         raise HTTPException(status_code=500, detail=f"Error analyzing resume: {str(e)}")
 
 @router.post("/workshop", response_model=WorkshopResponse)
-async def resume_workshop(request: WorkshopRequest):
+@limiter.limit("20/hour")
+async def resume_workshop(request: Request, body: WorkshopRequest):
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(
                 run_workshop_turn,
-                request.original_bullet,
-                request.section_type,
-                request.target_role,
-                [{"role": m.role, "content": m.content} for m in request.messages],
-                request.overall_context
+                body.original_bullet,
+                body.section_type,
+                body.target_role,
+                [{"role": m.role, "content": m.content} for m in body.messages],
+                body.overall_context
             ),
             timeout=90.0
         )

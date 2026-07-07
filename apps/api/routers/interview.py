@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
 from agents.case_interviewer import generate_case_response, generate_hint, get_random_case
 from services.rag import retrieve_context
 from supabase import create_client
+from dependencies import limiter
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
@@ -46,9 +47,10 @@ class EndSessionRequest(BaseModel):
     session_id: str
 
 @router.post("/start_case", response_model=StartCaseResponse)
-async def start_case_endpoint(request: StartCaseRequest):
+@limiter.limit("3/hour")
+async def start_case_endpoint(request: Request, body: StartCaseRequest):
     try:
-        random_case_dict = get_random_case(request.case_type)
+        random_case_dict = get_random_case(body.case_type)
         if not random_case_dict:
             raise Exception("No cases found for the given criteria.")
             
@@ -76,8 +78,8 @@ async def start_case_endpoint(request: StartCaseRequest):
                 "status": "in_progress",
                 "case_state": {"current_phase": next_phase, "case_id": random_case_dict.get("id")}
             }
-            if request.user_id:
-                insert_data["user_id"] = request.user_id
+            if body.user_id:
+                insert_data["user_id"] = body.user_id
                 
             res = supabase.table("interview_sessions").insert(insert_data).execute()
             if res.data:
@@ -103,47 +105,48 @@ async def start_case_endpoint(request: StartCaseRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+@limiter.limit("50/hour")
+async def chat_endpoint(request: Request, body: ChatRequest):
     try:
-        history = [{"role": m.role, "content": m.content} for m in request.messages]
+        history = [{"role": m.role, "content": m.content} for m in body.messages]
         
         bot_reply, new_phase = generate_case_response(
             history=history,
-            current_phase=request.current_phase,
-            context=request.case_context or "",
-            scratchpad=request.scratchpad
+            current_phase=body.current_phase,
+            context=body.case_context or "",
+            scratchpad=body.scratchpad
         )
         
-        if supabase and request.session_id != "temp_session_id":
+        if supabase and body.session_id != "temp_session_id":
             # Save user message
             latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
             if latest_user_msg:
                 supabase.table("session_messages").insert({
-                    "session_id": request.session_id,
+                    "session_id": body.session_id,
                     "role": "user",
                     "content": latest_user_msg,
-                    "phase": request.current_phase
+                    "phase": body.current_phase
                 }).execute()
                 
             # Save bot message
             supabase.table("session_messages").insert({
-                "session_id": request.session_id,
+                "session_id": body.session_id,
                 "role": "assistant",
                 "content": bot_reply,
                 "phase": new_phase
             }).execute()
             
             # Update session state if phase changed
-            if new_phase != request.current_phase:
+            if new_phase != body.current_phase:
                 # Fetch existing case_state
-                sess = supabase.table("interview_sessions").select("case_state").eq("id", request.session_id).execute()
+                sess = supabase.table("interview_sessions").select("case_state").eq("id", body.session_id).execute()
                 if sess.data:
                     case_state = sess.data[0].get("case_state", {})
                     case_state["current_phase"] = new_phase
                     supabase.table("interview_sessions").update({
                         "case_state": case_state,
-                        "scratchpad_content": request.scratchpad
-                    }).eq("id", request.session_id).execute()
+                        "scratchpad_content": body.scratchpad
+                    }).eq("id", body.session_id).execute()
         
         return ChatResponse(response=bot_reply, new_phase=new_phase)
     except Exception as e:

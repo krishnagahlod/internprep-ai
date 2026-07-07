@@ -378,6 +378,10 @@ export default function ResumePage() {
               >
                 {isUploading ? "Executing Analysis (~45s)" : "Analyze Document"}
               </Button>
+              <p className="text-center text-xs text-muted-foreground mt-4 opacity-70">
+                <ShieldAlert className="inline-block w-3 h-3 mr-1 mb-0.5" />
+                Your resume is processed in real-time and is never permanently stored or shared.
+              </p>
             </div>
           ) : (
             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">

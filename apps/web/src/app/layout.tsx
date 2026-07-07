@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
@@ -14,8 +15,13 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "InternPrep AI - Elite Interview Coach",
-  description: "AI-powered interview preparation platform. Master your non-core interviews with precision.",
+  title: "InternPrep AI - IITB Placement Assistant",
+  description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students. Master your non-core interviews with precision.",
+  openGraph: {
+    title: "InternPrep AI - IITB Placement Assistant",
+    description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -37,6 +43,7 @@ export default function RootLayout({
         >
           {children}
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );

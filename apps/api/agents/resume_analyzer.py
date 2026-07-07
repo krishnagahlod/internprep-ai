@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from supabase import create_client, Client
 from services.gemini_client import gemini_client
+from services.cerebras_client import cerebras_client
 import google.generativeai as genai
 
 # Configure Supabase
@@ -331,20 +332,24 @@ def run_workshop_turn(original_bullet: str, section_type: str, target_role: str,
         }}
         """
         
-    chat = gemini_client.start_chat(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), history=[])
-    chat.history.append({"role": "user", "parts": [system_prompt]})
-    chat.history.append({"role": "model", "parts": ["Understood. I will respond in the requested JSON format."]})
+    chat_messages = [{"role": "system", "content": system_prompt}]
     
     for msg in messages[:-1]:
-        role = "user" if msg["role"] == "user" else "model"
-        chat.history.append({"role": role, "parts": [msg["content"]]})
+        role = "user" if msg["role"] == "user" else "assistant"
+        chat_messages.append({"role": role, "content": msg["content"]})
         
     last_user_msg = messages[-1]["content"] if messages else "Hi, I need help."
+    chat_messages.append({"role": "user", "content": last_user_msg})
     
     try:
-        config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
-        res = chat.send_message(last_user_msg, generation_config=config)
-        return json.loads(clean_json(res.text))
+        res_text = cerebras_client.generate_chat_completion(
+            model=os.getenv("INTERVIEW_MODEL", "llama-3.3-70b"), # using standard Cerebras model
+            messages=chat_messages,
+            temperature=0.3,
+            max_tokens=800,
+            response_format={"type": "json_object"}
+        )
+        return json.loads(clean_json(res_text))
     except Exception as e:
         print(f"Workshop API Error: {e}")
         return {

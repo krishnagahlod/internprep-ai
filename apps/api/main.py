@@ -28,6 +28,13 @@ app.include_router(interview.router)
 app.include_router(feedback.router)
 app.include_router(gratitude.router)
 
+from dependencies import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "AI Interview Coach API is running"}
@@ -36,4 +43,4 @@ if __name__ == "__main__":
     import uvicorn
     import os
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
