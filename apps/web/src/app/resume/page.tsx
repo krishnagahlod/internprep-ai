@@ -584,6 +584,9 @@ export default function ResumePage() {
                   Continue to Mock Interview <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
+              <div className="flex justify-center pb-8">
+                <CreatorBadge />
+              </div>
             </div>
           )}
         </div>
@@ -678,9 +681,6 @@ export default function ResumePage() {
             </Button>
           </form>
         </div>
-        {analysisResult && (
-          <CreatorBadge />
-        )}
       </div>
     </div>
   )

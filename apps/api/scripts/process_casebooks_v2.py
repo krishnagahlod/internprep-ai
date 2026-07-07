@@ -22,7 +22,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         print(f"Supabase init error: {e}")
 
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/casebooks"))
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/casebooks"))
 
 def extract_toc(pdf_path, max_pages=25):
     """Extracts first max_pages and asks Groq to find the Table of Contents for actual cases."""
