@@ -181,7 +181,13 @@ export default function DashboardPage() {
             </motion.div>
 
             {/* Resources Card */}
-            <motion.div variants={itemVariants} className="md:col-span-1 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors" onClick={() => window.open("https://reach.gymkhana.iitb.ac.in/internships", "_blank")}>
+            <motion.a 
+              href="https://reach.gymkhana.iitb.ac.in/internships"
+              target="_blank"
+              rel="noopener noreferrer"
+              variants={itemVariants} 
+              className="md:col-span-1 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors"
+            >
               <div className="flex items-start justify-between">
                 <div className="h-12 w-12 rounded-2xl bg-gray-50 dark:bg-neutral-800 flex items-center justify-center border border-gray-200 dark:border-neutral-700 group-hover:bg-gray-100 dark:group-hover:bg-slate-700 transition-colors shadow-sm">
                   <Compass className="h-6 w-6 text-gray-700" />
@@ -192,7 +198,7 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-bold mb-1 font-outfit">IITB Resources</h2>
                 <p className="text-muted-foreground text-xs">Official Gymkhana DB</p>
               </div>
-            </motion.div>
+            </motion.a>
 
             {/* Settings/Progress Placeholder */}
             <motion.div variants={itemVariants} className="md:col-span-1 glass-card rounded-3xl p-6 flex flex-col justify-between border-dashed border-gray-300 dark:border-neutral-700 bg-transparent hover:bg-white/30 dark:hover:bg-slate-800/40 cursor-pointer group transition-colors">
