@@ -1,0 +1,194 @@
+# Few-Shot RAG Resume Intelligence — Implementation Plan
+
+## Background & Context
+
+We have two powerful assets to build from:
+
+1. **37 verified Day 1 consulting resumes** from IIT Bombay seniors who secured internships at McKinsey, Bain, BCG, LEK, PwC US Advisory, Accenture, NRI, and HUL — stored in `data/resumes/consult/`.
+2. **"Resume Making Session" best practices guide** (54 pages) from seniors — stored in `data/resumes/Resume Making Session.pdf`.
+
+The best practices guide encodes explicit structural rules that we must bake into the AI's critique engine as hard constraints:
+
+| Rule | Source (Page) |
+|------|------|
+| Each bullet: **Impact Word → What? → Effect → How?** | p9 |
+| Avoid 2-line sub-points; every sub-point should complete the line | p8 |
+| Organize sub-points: sequentially, most impactful first | p8 |
+| Quantify with numbers/percentages everywhere possible | p11, p20, p22 |
+| Bold only tool/library/algorithm names, not entire phrases | p12 |
+| No full stops at end of sentences | p11 |
+| Don't repeat action verbs across bullets | p9 |
+| POR flow: Team & budget size → Your role → New initiatives → Effect of work | p26 |
+| Professional Experience: What → Responsibilities → How → Impact → Awards | p22 |
+| Projects: Problem statement → Methodology → Results (with metrics) | p24, p39 |
+| Use STAR framework (Situation, Task, Action, Result) | p40 |
+| Eye-tracking: recruiter spends ~7 seconds; most recent experience gets most attention | p47 |
+| Interpersonal skills >>> Technical skills for non-core roles | p48 |
+| "Weave your story" — resume should have a coherent narrative thread | p52 |
+
+**Critical Design Constraint:** The system must **never** copy or suggest using specific facts, projects, or achievements from the golden resumes. It extracts only the **structural framing patterns** — action verbs, metric placement, impact quantification style, and sentence architecture — and uses those as benchmarks for critique.
+
+---
+
+## Proposed Changes
+
+### Phase 1: Supabase Schema
+
+#### [NEW] `golden_resume_bullets` table
+
+```sql
+CREATE TABLE golden_resume_bullets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bullet_text TEXT NOT NULL,
+  resume_source TEXT NOT NULL,          -- filename of the source resume
+  company_placed TEXT,                  -- McKinsey, Bain, BCG, etc. (extracted from filename)
+  section_type TEXT NOT NULL,           -- 'experience', 'project', 'por', 'scholastic', 'extracurricular'
+  structural_skeleton TEXT NOT NULL,    -- e.g., "Action Verb + Context + Quantified Impact (% / INR / team size)"
+  action_verb TEXT,                     -- the leading verb: "Spearheaded", "Engineered", etc.
+  has_metrics BOOLEAN DEFAULT false,    -- whether the bullet contains quantified impact
+  metric_type TEXT,                     -- 'percentage', 'currency', 'team_size', 'count', 'time', null
+  quality_tier TEXT DEFAULT 'gold',     -- 'gold' for verified Day 1 resumes
+  embedding VECTOR(768),               -- gemini-embedding-001 vector
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index for fast similarity search
+CREATE INDEX ON golden_resume_bullets 
+  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 20);
+```
+
+#### [NEW] `match_golden_bullets` RPC function
+
+```sql
+CREATE OR REPLACE FUNCTION match_golden_bullets (
+  query_embedding VECTOR(768),
+  match_count INT DEFAULT 3,
+  filter_section_type TEXT DEFAULT NULL
+) RETURNS TABLE (
+  id UUID,
+  bullet_text TEXT,
+  structural_skeleton TEXT,
+  action_verb TEXT,
+  section_type TEXT,
+  company_placed TEXT,
+  similarity FLOAT
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    g.id, g.bullet_text, g.structural_skeleton, g.action_verb,
+    g.section_type, g.company_placed,
+    1 - (g.embedding <=> query_embedding) AS similarity
+  FROM golden_resume_bullets g
+  WHERE (filter_section_type IS NULL OR g.section_type = filter_section_type)
+  ORDER BY g.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;
+```
+
+---
+
+### Phase 2: Data Ingestion Pipeline
+
+#### [NEW] `apps/api/scripts/process_resumes.py`
+
+This script will:
+
+1. **Loop** through every PDF in `data/resumes/consult/`.
+2. **Extract** raw text using `PyMuPDF` (fitz).
+3. **Send** the raw text to **Gemini 2.5 Flash** with a structured extraction prompt that asks it to:
+   - Isolate every individual bullet point (ignoring headers, dates, titles).
+   - For each bullet, return:
+     - `bullet_text`: The exact original text.
+     - `section_type`: One of `experience`, `project`, `por`, `scholastic`, `extracurricular`.
+     - `structural_skeleton`: A generalized pattern like `"[Action Verb] + [What was done] + [Quantified Result using %/INR/team size]"`.
+     - `action_verb`: The leading verb.
+     - `has_metrics`: Boolean.
+     - `metric_type`: Category of metric used.
+4. **Extract** `company_placed` from the filename (e.g., `DevArora_McKinsey_1pg.pdf` → `McKinsey`).
+5. **Embed** each bullet using `gemini-embedding-001` (768 dimensions, matching existing `kb_chunks`).
+6. **Upsert** into the `golden_resume_bullets` table in Supabase.
+7. Process one resume at a time with a `time.sleep(2)` between API calls to respect rate limits.
+
+#### [NEW] `apps/api/scripts/ingest_best_practices.py`
+
+This script will:
+
+1. Extract the text from the best practices PDF.
+2. Use Gemini to distill it into a structured JSON of explicit rules (the table above, plus any additional ones found).
+3. Save the result to `data/resumes/best_practices_rules.json` — a local file that gets loaded into memory at server startup and injected into every resume analysis prompt.
+
+---
+
+### Phase 3: RAG-Enhanced Resume Analyzer
+
+#### [MODIFY] `apps/api/agents/resume_analyzer.py`
+
+The current analyzer sends a single zero-shot prompt. The new version will:
+
+1. **Parse the user's resume** by sending it to Gemini to extract individual bullet points (same extraction prompt as the ingestion pipeline).
+2. **For each user bullet**, generate an embedding using `gemini-embedding-001`.
+3. **Query Supabase** using the `match_golden_bullets` RPC to retrieve the top 3 most semantically similar golden bullets, filtered by matching `section_type`.
+4. **Construct a few-shot augmented prompt** that includes:
+   - The **Best Practices Rules** (loaded from `best_practices_rules.json`) as hard system constraints.
+   - For each user bullet: the 3 retrieved golden examples as structural benchmarks.
+   - Explicit instructions: *"Study the STRUCTURE of these examples — the action verbs, the metric placement, the sentence architecture. Do NOT reference the specific facts, projects, or companies in these examples. Critique the user's bullet by comparing its structural quality against these benchmarks."*
+5. **Send the augmented prompt** to Gemini 2.5 Flash and return the structured JSON.
+
+#### [MODIFY] `apps/api/routers/resume.py`
+
+- Add proper error handling for the new multi-step pipeline.
+- Add a timeout wrapper since the RAG pipeline involves multiple API calls.
+
+---
+
+### Phase 4: Enhanced Output Schema
+
+The current `BulletAnalysis` schema is good but needs expansion:
+
+```python
+class BulletAnalysis(BaseModel):
+    original_bullet: str
+    section_type: str                    # experience, project, por, etc.
+    is_vague: bool
+    critique: str                        # sharp, specific critique
+    structural_issues: List[str]         # e.g., ["missing metrics", "weak action verb", "2-line point"]
+    best_practice_violations: List[str]  # rules from the guide that this bullet breaks
+    golden_comparison: str               # "Notice how Day 1 candidates frame similar bullets: [structural pattern]"
+    suggested_rewrite: str               # a rewritten version using the golden structure (with placeholder facts)
+    predicted_questions: List[str]       # cross-questions an interviewer would ask
+    mapped_company_category: str
+```
+
+The `suggested_rewrite` will use the user's own facts but restructure them using the golden framing pattern. For example:
+- **User wrote:** "Worked on marketing project for college fest"
+- **Rewrite:** "Spearheaded the marketing strategy for [College Fest], driving a [X]% increase in footfall across [N] events by deploying [specific channel/tactic]"
+
+---
+
+### Phase 5: Frontend Enhancements
+
+#### [MODIFY] `apps/web/src/app/resume/page.tsx`
+
+- Add a new `structural_issues` pill display showing broken rules (e.g., red tags: "Missing Metrics", "Weak Verb", "2-Line Point").
+- Add a `suggested_rewrite` collapsible section under each bullet showing the AI's restructured version.
+- Add a `golden_comparison` section that shows the structural pattern from Day 1 candidates (without their actual content).
+- Add a summary statistics bar at the top: "X/Y bullets have metrics", "Z structural violations found".
+
+---
+
+## Verification Plan
+
+### Automated Tests
+1. Run `process_resumes.py` and verify rows are inserted into `golden_resume_bullets` table.
+2. Run `ingest_best_practices.py` and verify `best_practices_rules.json` is created.
+3. Upload a test resume through the API and verify the response contains `golden_comparison` and `suggested_rewrite` fields.
+
+### Manual Verification
+1. Upload a real resume through the frontend and visually inspect that:
+   - Critiques reference structural patterns, not specific senior projects.
+   - Suggested rewrites preserve the user's facts but restructure them.
+   - Best practice violations are correctly flagged.
+2. Verify the heatmap renders the new fields correctly.

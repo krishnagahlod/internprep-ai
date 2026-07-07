@@ -1,0 +1,66 @@
+{
+  "experience": {
+    "rules": [
+      "Must follow STAR format strictly: Situation -> Task -> Action -> Result",
+      "Lead with a strong, non-repetitive action verb (Spearheaded, Engineered, Orchestrated — not 'Worked on' or 'Helped')",
+      "Quantify impact with at least one hard metric (%, ₹, hours, users) positioned towards the end of the sentence",
+      "Mention tools/technologies/frameworks used explicitly",
+      "Keep to exactly 1 line per sub-point (no 2-line or 1.5-line points)",
+      "For internships: specify team size, project scope, and business impact",
+      "Include the client/industry context when the company name alone doesn't convey scale"
+    ],
+    "iitb_conventions": [
+      "Day 1 resumes usually have 1-2 experience entries (internships) with 3-4 sub-points each",
+      "Focus heavily on business outcomes and scale (e.g. 'driving $2M revenue' or 'affecting 10k users')"
+    ]
+  },
+  "project": {
+    "rules": [
+      "Must follow Action + Methodology + Result structure",
+      "Explicitly mention the tech stack (languages, libraries, hardware) used",
+      "Quantify the performance improvement or result (e.g., 'achieved 95% accuracy', 'reduced latency by 200ms')",
+      "If it's a course project, mention the course name or professor briefly but focus on the work",
+      "No vague statements like 'learned a lot' or 'successfully completed'"
+    ],
+    "iitb_conventions": [
+      "Usually 3-4 key projects listed, often mixing course projects and independent/BTP projects",
+      "Technical depth is prioritized over business impact in this section"
+    ]
+  },
+  "por": {
+    "rules": [
+      "Quantify the scale of responsibility (team size, budget managed, event footfall, number of colleges)",
+      "Describe unique initiatives taken, not just standard responsibilities",
+      "Focus on leadership and organizational impact (e.g. 'Mentored a team of 15', 'Managed a budget of ₹5 Lakhs')",
+      "For TA/Mentor roles: specify batch size and measurable outcome of your mentoring"
+    ],
+    "iitb_conventions": [
+      "Usually 2-4 PORs listed (e.g., Core Committee Member, Institute Secretary, Teaching Assistant)",
+      "Emphasis is on demonstrating leadership, teamwork, and ability to handle scale"
+    ]
+  },
+  "scholastic": {
+    "rules": [
+      "State the rank/percentile clearly (e.g., 'All India Rank 45 among 1.5 Lakh candidates')",
+      "Mention the specific olympiad, scholarship, or exam",
+      "Do not use full sentences; use punchy phrases",
+      "Include year of achievement"
+    ],
+    "iitb_conventions": [
+      "Typically 3-5 bullet points",
+      "Includes JEE Advanced rank, KVPY, NTSE, Olympiads, and Institute Academic Awards (e.g., AP grade, Institute Academic Prize)"
+    ]
+  },
+  "extracurricular": {
+    "rules": [
+      "Highlight competitive success (e.g., 'Secured 1st position among 50 teams')",
+      "Include inter-IIT, national, or international level achievements",
+      "Mention specific skills demonstrated (e.g., debating, sports, cultural arts)",
+      "Quantify participation scale if applicable"
+    ],
+    "iitb_conventions": [
+      "Often categorized into Sports, Cultural, and Technical",
+      "Inter-IIT achievements and Inter-Hostel (GC) achievements are highly valued"
+    ]
+  }
+}

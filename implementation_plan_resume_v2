@@ -1,0 +1,234 @@
+# Resume Intelligence v2 — Upgrade Plan
+
+## Status of Previous Plan
+
+Before adding new features, here's what's done and what still needs finishing:
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Phase 1: Supabase Schema (`golden_resume_bullets` table + `match_golden_bullets` RPC) | ✅ Done | Executed in Supabase |
+| Phase 2a: `ingest_best_practices.py` → `best_practices_rules.json` | ✅ Done | 19 rules extracted |
+| Phase 2b: `process_resumes.py` → populate golden bullets | ❌ **FAILED** | Vector dimension mismatch (see Bugfix #1 below) |
+| Phase 3: RAG-enhanced `resume_analyzer.py` | ✅ Done | Few-shot RAG with golden bullets + best practices |
+| Phase 4: Enhanced `BulletAnalysis` schema | ✅ Done | Added `structural_issues`, `best_practice_violations`, `golden_comparison`, `suggested_rewrite` |
+| Phase 5a: Frontend — structural issues pills, golden comparison, suggested rewrite | ✅ Done | Rendering correctly |
+| Phase 5b: Frontend — summary statistics bar at top | ❌ **Not done** | Need to add "X/Y bullets have metrics", "Z violations found" |
+| Router hardening — error handling + timeout wrapper | ❌ **Not done** | `resume.py` router still has basic try/catch |
+
+---
+
+## Bugfix #1: Vector Dimension Mismatch (CRITICAL)
+
+> [!CAUTION]
+> The `gemini-embedding-001` model outputs **3072-dimensional** vectors, but our `golden_resume_bullets` table and `match_golden_bullets` RPC were created with `VECTOR(768)`. This caused every single insert to fail. Zero golden bullets were saved.
+
+### Fix
+
+#### [MODIFY] Supabase SQL — Run in SQL Editor
+
+```sql
+-- Drop the old table and recreate with correct dimensions
+DROP FUNCTION IF EXISTS match_golden_bullets;
+DROP INDEX IF EXISTS golden_resume_bullets_embedding_idx;
+DROP TABLE IF EXISTS golden_resume_bullets;
+
+CREATE TABLE golden_resume_bullets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  bullet_text TEXT NOT NULL,
+  resume_source TEXT NOT NULL,
+  company_placed TEXT,
+  target_role TEXT DEFAULT 'consulting',   -- NEW: role tagging
+  section_type TEXT NOT NULL,
+  structural_skeleton TEXT NOT NULL,
+  action_verb TEXT,
+  has_metrics BOOLEAN DEFAULT false,
+  metric_type TEXT,
+  quality_tier TEXT DEFAULT 'gold',
+  embedding VECTOR(3072),                   -- FIXED: 3072 dimensions
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX ON golden_resume_bullets USING ivfflat (embedding vector_cosine_ops) WITH (lists = 20);
+
+ALTER TABLE golden_resume_bullets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read for golden_resume_bullets" ON golden_resume_bullets FOR SELECT USING (true);
+CREATE POLICY "Service role insert for golden_resume_bullets" ON golden_resume_bullets FOR INSERT WITH CHECK (true);
+
+-- Recreate the RPC with role filtering
+CREATE OR REPLACE FUNCTION match_golden_bullets (
+  query_embedding VECTOR(3072),
+  match_count INT DEFAULT 3,
+  filter_section_type TEXT DEFAULT NULL,
+  filter_target_role TEXT DEFAULT NULL
+) RETURNS TABLE (
+  id UUID,
+  bullet_text TEXT,
+  structural_skeleton TEXT,
+  action_verb TEXT,
+  section_type TEXT,
+  company_placed TEXT,
+  target_role TEXT,
+  similarity FLOAT
+)
+LANGUAGE plpgsql AS $func$
+BEGIN
+  RETURN QUERY
+  SELECT
+    g.id, g.bullet_text, g.structural_skeleton, g.action_verb,
+    g.section_type, g.company_placed, g.target_role,
+    1 - (g.embedding <=> query_embedding) AS similarity
+  FROM golden_resume_bullets g
+  WHERE (filter_section_type IS NULL OR g.section_type = filter_section_type)
+    AND (filter_target_role IS NULL OR g.target_role = filter_target_role)
+  ORDER BY g.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$func$;
+```
+
+#### [MODIFY] `apps/api/agents/resume_analyzer.py`
+- Update the `embed_text` function. The current code uses `genai.embed_content(model='models/gemini-embedding-001', ...)`. This returns 3072-dim vectors which now matches the fixed table.
+
+#### [MODIFY] `apps/api/scripts/process_resumes.py`
+- Add a `target_role` field to each insert (detected from the subfolder name, e.g., `consult` → `consulting`, `finance` → `finance`).
+- Change the script to scan **all subfolders** under `data/resumes/`, not just `consult/`.
+
+---
+
+## Upgrade #1: Multi-Domain Role-Specific RAG
+
+### Problem
+Currently the ingestion script only processes `data/resumes/consult/`. When you add `finance/`, `pm/`, `fmcg/` subfolders, we need the pipeline to:
+1. Auto-detect the target role from the subfolder name.
+2. Tag every golden bullet with `target_role`.
+3. When a user uploads a resume and selects their target role on the frontend, the RAG engine filters golden bullets by that role.
+
+### Changes
+
+#### [MODIFY] `apps/api/scripts/process_resumes.py`
+- Scan `data/resumes/*/` (all subfolders except the best practices PDF).
+- Map subfolder names to roles: `consult` → `consulting`, `finance` → `finance`, `pm` → `product`, `fmcg` → `fmcg`.
+- Pass `target_role` into each Supabase insert.
+
+#### [MODIFY] `apps/api/agents/resume_analyzer.py`
+- Accept an optional `target_role` parameter in `analyze_resume_text()`.
+- Pass `filter_target_role` to the `match_golden_bullets` RPC.
+- If no role is specified, search across all roles (current behavior).
+
+#### [MODIFY] `apps/api/routers/resume.py`
+- Accept an optional `target_role` query parameter on the `/analyze` endpoint.
+- Pass it through to the analyzer.
+
+#### [MODIFY] `apps/web/src/app/resume/page.tsx`
+- Add a role selector dropdown above the upload zone: "What role are you targeting?" with options: Consulting, Finance, Product, FMCG, Analytics, General.
+- Send the selected role as a query parameter with the upload request.
+
+---
+
+## Upgrade #2: Interactive Resume Workshop Chat
+
+### Concept
+After the initial static analysis, the user can click on any flagged bullet to enter a **1-on-1 workshop chat** with the AI. The AI acts as a "Metrics Extractor" — it asks targeted questions to pull out the hidden numbers and context that the user forgot to include, then generates a polished bullet in real-time.
+
+### Example Flow
+```
+AI: "You wrote 'Organized marketing campaign for college fest.' Let me help you strengthen this.
+     How many people attended the fest?"
+User: "Around 10,000"
+AI: "What was the total budget you managed?"
+User: "5 lakhs"
+AI: "How many team members did you lead?"
+User: "12 people across 3 sub-teams"
+AI: "Here's your upgraded bullet:
+     'Spearheaded a 12-member marketing team across 3 verticals for [Fest Name], 
+      orchestrating a ₹5L campaign that drove 10,000+ footfall — a 25% YoY increase'"
+```
+
+### Changes
+
+#### [NEW] `apps/api/routers/resume.py` — Add `/resume/workshop` endpoint
+
+```python
+@router.post("/workshop")
+async def resume_workshop(request: WorkshopRequest):
+    """
+    Stateful chat endpoint for the interactive resume bullet workshop.
+    Takes the original bullet, conversation history, and returns the AI's next response.
+    """
+```
+
+- Accepts: `{ original_bullet: str, section_type: str, messages: Message[], target_role?: str }`
+- Returns: `{ response: str, is_final_bullet: bool, final_bullet?: str }`
+- The AI is prompted to:
+  1. Ask targeted questions about scope, scale, tools, impact, team size.
+  2. After 3-5 exchanges, synthesize a final polished bullet.
+  3. The prompt includes the Best Practices rules as constraints and the golden structural skeletons as templates.
+
+#### [MODIFY] `apps/web/src/app/resume/page.tsx`
+- Add a "Workshop This Bullet" button on each flagged bullet card.
+- When clicked, open a slide-in chat panel (similar to the interview chat) anchored to that specific bullet.
+- The chat panel shows the original bullet at the top and a conversational input at the bottom.
+- When the AI returns `is_final_bullet: true`, display the polished bullet with a "Copy to Clipboard" button.
+
+---
+
+## Upgrade #3: Action Verb Dictionary (When PDF Available)
+
+### Concept
+When you upload an action verb PDF (e.g., Harvard/Stanford/IITB action verbs), we ingest it into a structured dictionary keyed by category.
+
+### Changes
+
+#### [NEW] `apps/api/scripts/ingest_action_verbs.py`
+- Parse the action verb PDF.
+- Use Gemini to extract verbs organized by category (Leadership, Analysis, Communication, etc.).
+- Save to `data/resumes/action_verb_dictionary.json`.
+
+#### [MODIFY] `apps/api/agents/resume_analyzer.py`
+- Load the dictionary at startup.
+- For each user bullet, check if the leading verb is in the "weak verbs" list (helped, worked, managed, did, was).
+- If yes, suggest 3 specific elite replacements from the matching category.
+- Add a new field to `BulletAnalysis`: `verb_suggestion: { current: str, replacements: List[str], category: str }`.
+
+---
+
+## Remaining Gaps from Previous Plan
+
+### Gap 1: Router Error Handling & Timeout
+
+#### [MODIFY] `apps/api/routers/resume.py`
+- Wrap the `analyze_resume_text()` call in an `asyncio.wait_for()` with a 120-second timeout.
+- Add granular error handling: separate `json.JSONDecodeError` (malformed AI response) from `ConnectionError` (Supabase down) from general exceptions.
+- Return user-friendly error messages for each case.
+
+### Gap 2: Summary Statistics Bar
+
+#### [MODIFY] `apps/web/src/app/resume/page.tsx`
+- Add a statistics row between the "Overall Architecture" card and the "Intelligence Heatmap" section.
+- Display computed stats from `analysisResult.bullets`:
+  - Total bullets analyzed
+  - Bullets with metrics vs without
+  - Total structural violations
+  - Total best practice violations
+  - A simple "Resume Health Score" (percentage of non-vague bullets)
+
+---
+
+## Execution Order
+
+1. **Bugfix #1** — Fix vector dimensions (SQL + scripts) — *Must happen first, everything depends on it*
+2. **Re-run ingestion** — Process all 37 consulting resumes with fixed dimensions
+3. **Gap 1** — Router hardening
+4. **Gap 2** — Summary stats bar on frontend
+5. **Upgrade #1** — Multi-domain RAG (script + analyzer + frontend dropdown)
+6. **Upgrade #2** — Interactive Workshop chat (new endpoint + frontend panel)
+7. **Upgrade #3** — Action verb dictionary (whenever PDF is provided)
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **Vector dimension fix:** Please run the SQL block from "Bugfix #1" in the Supabase SQL Editor so I can re-run the ingestion. The old table with 768 dimensions needs to be dropped and recreated with 3072.
+> 2. **Action Verb PDF:** Whenever you find and upload an action verb PDF to `data/resumes/`, let me know and I'll integrate it immediately.
+> 3. **Workshop Chat placement:** Should the workshop chat open as a slide-in panel from the right side, or should it navigate to a full dedicated page (like the interview page)?

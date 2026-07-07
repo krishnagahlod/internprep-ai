@@ -1,0 +1,155 @@
+# Robust Casebook Extraction — Implementation Plan
+
+## Problem Summary
+
+We have 9 casebooks containing ~1,665 total pages of consulting interview content. The current extraction is deeply flawed:
+- Only **3 of 9** books were extracted (69 cases total)
+- The `kb_chunks` table has 15 rows with mostly **empty content** (`[]`)
+- 6 books are completely missing — some due to OCR issues, others due to the old script only scanning pages 40–60
+
+## Key Decisions (Per Your Answers)
+
+1. **Re-extract everything from scratch** — delete all old data, use the improved pipeline for consistency
+2. **Store ALL content types** with proper tagging — cases, guesstimates, frameworks, best practices, industry primers
+3. **Skip `Case in Point`** (fully image-based, 185 pages) for now — process the other 8 text-extractable books first
+
+---
+
+## Architecture: Two-Phase Hybrid Pipeline
+
+### Phase 1: Text Extraction (Local — Zero API Cost)
+
+For each PDF:
+- Use **PyMuPDF** to extract text page-by-page
+- Tag each page with its page number (critical for traceability)
+- Concatenate pages into logical windows (~8,000 chars each with 500 char overlap)
+- For books where PyMuPDF returns empty text on certain pages, flag those pages for Gemini Vision OCR in a separate pass (not needed for any of the 8 books we're processing now)
+
+### Phase 2: Content Classification & Extraction (AI — Groq GPT-OSS-120B)
+
+Each text window is sent to **Groq** (not Gemini — saves quota) with a sophisticated prompt that:
+
+1. **Classifies** the content into one of these types:
+   - `case_transcript` — A full or partial case interview (interviewer ↔ candidate dialogue, problem, solution)
+   - `guesstimate` — An estimation problem with a structured solution
+   - `framework` — Consulting framework explanation (profitability, market entry, MECE, etc.)
+   - `best_practice` — Interview tips, dos/don'ts, common mistakes, behavioral advice
+   - `industry_primer` — Background knowledge on an industry (telecom, pharma, FMCG, etc.)
+   - `filler` — Table of contents, acknowledgments, copyright, blank pages → **skip**
+
+2. **Extracts** structured data based on the classification:
+
+   **For `case_transcript`:**
+   ```json
+   {
+     "title": "Client Profitability Decline",
+     "case_type": "Profitability",
+     "industry": "FMCG",
+     "difficulty": "medium",
+     "problem_statement": "Your client is a snacking company...",
+     "solution_transcript": "Full interviewer-candidate dialogue...",
+     "key_learnings": ["Always check both revenue AND cost sides", ...],
+     "frameworks_used": ["Profitability Tree", "Value Chain"]
+   }
+   ```
+
+   **For `guesstimate`:**
+   ```json
+   {
+     "title": "Number of ATMs in Mumbai",
+     "problem_statement": "Estimate the number of ATMs...",
+     "solution_transcript": "Step 1: Population of Mumbai...",
+     "approach_type": "top_down"
+   }
+   ```
+
+   **For `framework` / `best_practice` / `industry_primer`:**
+   ```json
+   {
+     "title": "The Profitability Framework",
+     "content": "Full text of the framework explanation...",
+     "tags": ["profitability", "revenue", "cost"]
+   }
+   ```
+
+---
+
+## Database Changes
+
+### Existing Tables — Actions
+
+| Table | Action |
+|-------|--------|
+| `cases` | **Delete all 69 rows**, re-populate with cleaner extractions |
+| `kb_chunks` | **Delete all 15 rows**, re-populate with proper content and embeddings |
+
+### Table Usage
+
+| Content Type | Target Table | `round_type` / Tags |
+|---|---|---|
+| `case_transcript` | `cases` (structured) + `kb_chunks` (embedded for RAG) | `round_type = 'case'` |
+| `guesstimate` | `cases` (structured) + `kb_chunks` (embedded for RAG) | `round_type = 'guesstimate'` |
+| `framework` | `kb_chunks` only | `round_type = 'framework'` |
+| `best_practice` | `kb_chunks` only | `round_type = 'best_practice'` |
+| `industry_primer` | `kb_chunks` only | `round_type = 'industry_primer'` |
+
+> [!IMPORTANT]
+> The `cases` table has columns: `title`, `problem_statement`, `solution_transcript`, `case_type`, `pdf_source`, `book_name`, `page_number`. The AI interviewer (`case_interviewer.py`) uses `get_random_case()` to fetch a random case and uses its `solution_transcript` as the gold standard. So cases MUST have rich, complete solution transcripts.
+
+> [!NOTE]
+> For `kb_chunks`, we use `all-mpnet-base-v2` (768d embeddings) to stay consistent with the existing schema and the `case_interviewer.py` RAG query. No schema migration needed.
+
+---
+
+## Processing Strategy Per Book
+
+| Book | Pages | Text? | Estimated Cases | Strategy |
+|------|-------|-------|-----------------|----------|
+| 1. Case-Interviews-Cracked | 208 | ✅ Yes | ~30 cases + guesstimates | Groq extraction |
+| 2. Case in Point | 185 | ❌ Image-only | ~15 cases | **SKIP for now** |
+| 3. DayOne | 205 | ✅ Yes | ~20 cases | Groq extraction |
+| 4. Victor-Cheng-Case-Interview-Secrets | 139 | ✅ Yes | ~10 cases + heavy frameworks | Groq extraction |
+| CCG Casebook | 128 | ✅ Yes (6 img pages) | ~15 cases | Groq + skip image pages |
+| IIM Calcutta CaseBook 2025-26 | 457 | ✅ Yes (11 img pages) | ~50+ cases | Groq + skip image pages |
+| IIMB Casebook | 283 | ✅ Yes | ~30 cases | Groq extraction |
+| SRCC Compendium | 260 | ✅ Yes (6 img pages) | ~25 cases | Groq + skip image pages |
+| casebookiima | 206* | ✅ Yes | ~25 cases | Groq extraction |
+
+**Total estimated: ~220+ cases + guesstimates + dozens of knowledge chunks**
+
+---
+
+## API Efficiency Strategy
+
+- **Groq (GPT-OSS-120B):** Handles ALL text extraction and classification — generous free-tier limits
+- **Gemini:** NOT used at all for these 8 books (reserved for `Case in Point` later)  
+- **Embeddings:** `all-mpnet-base-v2` runs locally via `sentence-transformers` — zero API cost
+- **Rate limiting:** 3-second sleep between Groq calls, 5 retries with exponential backoff on 429s
+- **Chunking:** ~8,000 char windows mean ~5-10 API calls per book (vs. 100+ page-by-page)
+
+---
+
+## Proposed File Changes
+
+### [MODIFY] [process_casebooks.py](file:///c:/Interview%20Preparation%20Platform/apps/api/scripts/process_casebooks.py)
+
+Complete rewrite with:
+- Two-phase pipeline (local text → Groq classification)
+- Smart windowing with overlap
+- Content-type-aware extraction prompts  
+- Dual-table insertion (cases + kb_chunks)
+- Progress tracking and resume-from-failure support
+- Skip logic for `Case in Point`
+
+---
+
+## Verification Plan
+
+### Automated
+- Run the script and tail logs to verify each book is processed
+- Query `cases` table to confirm ~220+ rows with non-empty `solution_transcript`
+- Query `kb_chunks` to confirm proper content and `round_type` tagging
+- Spot-check 3-4 random cases to verify quality of extracted dialogues
+
+### Manual
+- Test the Case Interview feature on the frontend to confirm the AI interviewer properly uses the new cases

@@ -1,0 +1,163 @@
+# Interview Intelligence Engine v2 — Implementation Plan
+
+## Background & Current State
+
+The current interview system is functional but has significant limitations compared to the production-grade Resume Intelligence Engine we just shipped. After a thorough audit, here's what we're working with:
+
+| Asset | Status |
+|---|---|
+| **Cases Database** | 204 cases across 9 casebooks (IIM-C, IIM-A, IIM-B, CCG, SRCC, DayOne, etc.) |
+| **Case Types** | 78 Profitability, 32 Market Entry, 12 Growth, 10 Pricing, + 40 mixed types |
+| **Solution Transcripts** | Avg 3,239 chars, range 385–8,567 chars per case |
+| **Cerebras API Keys** | 3 keys available for high-speed inference |
+| **Gemini API Keys** | 4 keys available for analysis & embeddings |
+| **KB Chunks** | Only 74 chunks (very sparse — not being used by the interview flow) |
+| **Session/Feedback Tables** | Defined in schema but **0 rows** — sessions are never persisted |
+
+### Key Weaknesses Identified
+
+1. **No State Machine**: The LLM is told about 5 phases in a system prompt but the backend has **zero** phase tracking. It's just a single prompt dump → the LLM frequently drifts, skips phases, or gives away answers.
+2. **Single API Key**: Uses a hardcoded `CEREBRAS_API_KEY_3`. No rotation, no retry on 429s.
+3. **No Adaptive RAG**: The 204 gold-standard solution transcripts are passed in bulk to the system prompt. There's no intelligent retrieval of *relevant* case patterns.
+4. **Feedback is Mock**: The `feedback/page.tsx` renders **hardcoded mock data**. The actual `generate_interview_feedback` function exists but is never called from the interview flow.
+5. **No Session Persistence**: No interview session is ever saved to Supabase. A page refresh = all progress lost.
+6. **Scratchpad Not Synced**: The Excalidraw canvas content is never actually extracted and sent to the backend (the `scratchpad` field is always an empty string `""`).
+7. **No Case Selection**: Users can't choose a case type (Profitability, Market Entry, etc.) or difficulty. It's always random.
+8. **No Phase Progress UI**: The user has no idea what phase they're in or how far along they are.
+
+---
+
+## Proposed Changes
+
+### Phase 1: Backend Infrastructure
+
+---
+
+#### [NEW] `apps/api/services/cerebras_client.py`
+A multi-key Cerebras client mirroring our `GeminiClient` pattern:
+- Discovers `CEREBRAS_API_KEY_1`, `CEREBRAS_API_KEY_2`, `CEREBRAS_API_KEY_3` from env
+- Round-robin key rotation with automatic cooldown on 429 errors
+- Centralized `chat_completion()` method used by both `case_interviewer.py` and `feedback_generator.py`
+- Configurable timeout, temperature, max_tokens per call
+
+---
+
+#### [MODIFY] `apps/api/agents/case_interviewer.py` — Phase-Aware State Machine
+The biggest architectural change. Instead of a single monolithic system prompt, we introduce a **server-side phase tracker**:
+
+```
+PHASES: introduction → clarifying → structuring → quantitative → brainstorming → synthesis → complete
+```
+
+**How it works:**
+1. Backend maintains a `current_phase` string in the session state.
+2. After each LLM response, a lightweight **Phase Classifier** prompt (fast, ~50 tokens) analyzes the latest exchange and determines if the phase should advance.
+3. The system prompt sent to the LLM is **dynamically assembled** based on the current phase — only the rules for the *active* phase are injected, reducing prompt bloat and drift.
+4. Phase-specific data injection:
+   - **Introduction**: Only the problem statement (no solution)
+   - **Structuring**: Problem + framework evaluation criteria from the gold standard
+   - **Quantitative**: Problem + the specific data tables/numbers from the gold standard, revealed only when the candidate asks
+   - **Brainstorming**: Problem + key recommendations from the gold standard for comparison
+   - **Synthesis**: Full context for evaluation
+
+**Benefits**: The LLM no longer needs to track phase logic itself. The backend enforces it, making the interview dramatically more consistent and realistic.
+
+---
+
+#### [MODIFY] `apps/api/agents/feedback_generator.py` — Deep Analysis
+Replace the simplistic 7-dimension scorer with a **two-stage evaluation**:
+
+1. **Timeline Analysis** (New): Walks through the transcript message-by-message and tags each candidate turn with:
+   - Phase it occurred in
+   - Whether it was a strong/neutral/weak move
+   - Specific annotation (e.g., "Missed a key cost bucket", "Excellent clarifying question")
+   
+2. **Dimensional Scoring** (Enhanced): The 7 dimensions remain but are now scored with:
+   - Specific evidence quotes from the transcript
+   - Comparison against the gold-standard solution (what the ideal candidate did vs. what this candidate did)
+   - Concrete "next time, do X" action items per dimension
+
+3. **Overall Strategic Advice**: Beyond just "strengths/improvements", generate:
+   - A Day 1 readiness score (0-100)
+   - Recommended case types to practice next (based on weak areas)
+   - Estimated preparation hours remaining
+
+---
+
+#### [MODIFY] `apps/api/routers/interview.py` — Session Lifecycle
+Add proper session management:
+
+- **`POST /interview/start_case`** (changed from GET): Accepts optional `case_type` and `difficulty` filters. Creates an `interview_session` row in Supabase and returns a `session_id`.
+- **`POST /interview/chat`**: Now requires `session_id`. Each message pair is persisted to `session_messages`. Phase transitions are tracked in `interview_sessions.case_state`.
+- **`POST /interview/end_session`** (New): Triggers feedback generation, saves to `session_feedback`, marks session as complete. Returns the full feedback JSON.
+
+---
+
+#### [MODIFY] `apps/api/routers/feedback.py` — Integrated Flow
+- Reads feedback from `session_feedback` table by `session_id` instead of generating on-the-fly from raw messages.
+- Uses the new `GeminiClient` (Gemini is better for long-context analytical tasks) instead of the old single-key `genai.configure()`.
+
+---
+
+### Phase 2: Frontend Enhancements
+
+---
+
+#### [MODIFY] `apps/web/src/app/interview/page.tsx` — Major UI Upgrade
+
+1. **Case Selection Modal**: Before the interview starts, show a modal letting the user pick:
+   - Case Type (Profitability, Market Entry, Growth, Pricing, Market Sizing, M&A, or Random)
+   - Difficulty (if we tag cases — otherwise skip for now)
+   
+2. **Phase Progress Indicator**: A horizontal stepper bar at the top of the chat panel showing:
+   ```
+   [Introduction] → [Clarifying] → [Structuring] → [Quantitative] → [Brainstorming] → [Synthesis]
+   ```
+   The current phase is highlighted. Completed phases have a checkmark. This gives the user a clear sense of where they are.
+
+3. **Scratchpad Sync**: Actually extract text from the Excalidraw canvas and send it with each message. This lets the interviewer reference the candidate's framework diagrams.
+
+4. **End Session Flow**: The "End Session" button now calls `POST /interview/end_session`, waits for feedback generation, then navigates to `/feedback?session_id=...` with the real data.
+
+---
+
+#### [MODIFY] `apps/web/src/app/feedback/page.tsx` — Live Feedback Dashboard
+
+1. **Remove all mock data**. Fetch real feedback from the backend using the `session_id` query param.
+2. **Timeline View** (New): A vertical timeline showing each of the candidate's turns, color-coded by strength (green/yellow/red), with the AI's annotations visible on hover.
+3. **Radar Chart**: Reuse the SVG Radar Chart component from the resume page to visualize the 7 dimensions.
+4. **Action Items**: Prominently display the "What to practice next" recommendations with links back to start a new interview filtered by the recommended case type.
+
+---
+
+#### [MODIFY] `apps/web/src/stores/auth-store.ts` — Session State
+Add `currentSessionId: string | null` and `currentPhase: string` to the Zustand store so the interview page can track the active session across re-renders.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Case Difficulty Tagging**: The `cases` table doesn't have a `difficulty` column. Should I:
+> - (A) Add a `difficulty` column and use Gemini to auto-classify all 204 cases as Easy/Medium/Hard based on their solution transcripts?
+> - (B) Skip difficulty filtering for now and just let users filter by case type?
+
+> [!IMPORTANT]
+> **Scratchpad Extraction**: Excalidraw's internal state is complex (JSON with coordinates, shapes, text elements). The approach I'm planning is to extract just the `text` elements from the Excalidraw scene. Is that sufficient, or do you want us to also capture a screenshot/image of the canvas and send it to a vision model?
+
+> [!IMPORTANT]
+> **Interview Timer**: Many real case interviews are timed (30-45 minutes). Should I add a visible countdown timer to the interview page? If yes, what duration?
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Start a new case session via API, verify `session_id` is returned and a row exists in `interview_sessions`
+- Send 5+ chat messages, verify phase transitions occur correctly
+- Call end_session, verify feedback is generated and persisted to `session_feedback`
+
+### Manual Verification
+- Walk through a full interview from case selection → chat → end session → feedback page
+- Verify phase indicator updates correctly
+- Verify scratchpad content appears in the interviewer's context

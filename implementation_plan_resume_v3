@@ -1,0 +1,222 @@
+# Resume Intelligence Engine v2 — Comprehensive Overhaul
+
+A complete upgrade of the resume analysis pipeline to make it production-grade, deeply IITB-focused, and powered by a robust multi-key Gemini backend.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Multi-Key Gemini Fallback**: You mentioned you'll add keys as `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, etc. The plan implements a round-robin + retry-on-429 strategy across all discovered keys. Please confirm you'll add at least 2-3 keys to `.env` before we test at scale.
+
+> [!IMPORTANT]
+> **Radar Chart Library**: The scoring dashboard needs a radar/spider chart. I'll use a lightweight SVG-based approach drawn directly in React (no extra dependency). If you'd prefer a library like `recharts`, let me know.
+
+> [!WARNING]
+> **Analysis Time**: With adaptive RAG (7-10 golden bullets per weak bullet, across 25-40 bullet resumes), each analysis will make ~30-40 embedding calls + 1 large LLM call. This will take ~45-90 seconds. The current 120s timeout should still work, but the UX will need better progress feedback (streaming status updates). The plan accounts for this.
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Section-specific rules**: I will create a structured `section_rules.json` file with dedicated rules for each IITB resume section (Experience, Projects, POR, Scholastic, Extracurricular). Should I derive these from the existing `best_practices_rules.json` + IITB norms I know, or do you have a specific document/session notes you'd like me to reference?
+
+---
+
+## Proposed Changes
+
+### 1. Multi-Key Gemini Fallback System
+
+#### [NEW] [gemini_client.py](file:///c:/Interview%20Preparation%20Platform/apps/api/services/gemini_client.py)
+
+A centralized Gemini client manager that replaces the single `genai.configure()` call:
+
+- **Auto-discovers keys**: Scans `.env` for `GEMINI_API_KEY`, `GEMINI_API_KEY_1`, `GEMINI_API_KEY_2`, etc.
+- **Round-robin dispatch**: Distributes requests across keys evenly to avoid hitting any single key's RPM limit.
+- **Retry-on-429**: If a key returns a rate limit error, automatically retries with the next key in the pool.
+- **Exponential backoff**: After exhausting all keys, backs off with jitter before retrying the full pool.
+- **Health tracking**: Marks keys as temporarily "cooling down" after a 429, skips them for a configurable window (e.g., 60s).
+- Exposes two functions:
+  - `generate_content(prompt, config)` — for analysis calls
+  - `embed_text(text)` — for embedding calls (uses `gemini-embedding-001`)
+
+#### [MODIFY] [resume_analyzer.py](file:///c:/Interview%20Preparation%20Platform/apps/api/agents/resume_analyzer.py)
+
+- Remove the top-level `genai.configure()` and `model = genai.GenerativeModel(...)`.
+- Import and use `generate_content()` and `embed_text()` from `gemini_client.py` instead.
+- All existing functions (`extract_user_bullets`, `analyze_resume_text`, `run_workshop_turn`) will be updated to use the new client.
+
+#### [MODIFY] [.env](file:///c:/Interview%20Preparation%20Platform/apps/api/.env)
+
+- Document the multi-key format: `GEMINI_API_KEY_1=...`, `GEMINI_API_KEY_2=...`, etc.
+- The existing `GEMINI_API_KEY` will be treated as key #0 (backward compatible).
+
+---
+
+### 2. Section-Specific IITB Rules Engine
+
+#### [NEW] [section_rules.json](file:///c:/Interview%20Preparation%20Platform/data/resumes/section_rules.json)
+
+A structured JSON file with dedicated rules per IITB resume section:
+
+```json
+{
+  "experience": {
+    "rules": [
+      "Must follow STAR format: Situation → Task → Action → Result",
+      "Lead with a strong, non-repetitive action verb (Spearheaded, Engineered, Orchestrated — not 'Worked on')",
+      "Quantify impact with at least one hard metric (%, ₹, hours, users)",
+      "Mention tools/technologies/frameworks used",
+      "Keep to exactly 1 line per sub-point (no 2-line or 1.5-line points)",
+      "For internships: specify team size, project scope, and business impact",
+      "Include the client/industry context when the company name alone doesn't convey scale"
+    ],
+    "iitb_conventions": [
+      "Most Day 1 resumes have 1-2 experience entries with 3-4 sub-points each",
+      "Internship descriptions should highlight cross-functional exposure"
+    ]
+  },
+  "project": { ... },
+  "por": { ... },
+  "scholastic": { ... },
+  "extracurricular": { ... }
+}
+```
+
+Each section will have:
+- `rules`: Strict structural rules to enforce
+- `iitb_conventions`: IITB-specific norms (e.g., typical section lengths, ordering conventions)
+
+#### [MODIFY] [best_practices_rules.json](file:///c:/Interview%20Preparation%20Platform/data/resumes/best_practices_rules.json)
+
+- Keep as the **global** rules file (applies to all sections).
+- The section-specific rules will be **additive** — the LLM prompt will include both global rules + the section's specific rules for each bullet.
+
+---
+
+### 3. Enhanced Analysis Schema & Adaptive RAG
+
+#### [MODIFY] [resume_analyzer.py](file:///c:/Interview%20Preparation%20Platform/apps/api/agents/resume_analyzer.py)
+
+**New analysis fields per bullet:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `severity` | `"critical" \| "major" \| "minor" \| "good"` | Replaces the binary `is_vague` |
+| `confidence` | `float (0-1)` | How confident the AI is in the critique |
+| `action_verb_rating` | `"weak" \| "moderate" \| "strong"` | Rates the current action verb |
+| `action_verb_alternatives` | `string[]` | 3 stronger alternative verbs |
+| `metrics_hint` | `string \| null` | Specific metric the student should find (e.g., "What % revenue increase did the campaign drive?") |
+| `suggested_rewrite` | `string` | (Existing — enhanced with better structural quality) |
+
+**New overall analysis fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `section_summaries` | `Record<string, {score, summary, bullet_count}>` | Per-section mini-report |
+| `radar_scores` | `{quantification, action_verbs, structure, section_balance, star_compliance, formatting}` | 0-100 per dimension |
+| `section_ordering_advice` | `string` | Advice on which sections to reorder/promote |
+| `day1_comparison` | `string` | How the resume compares to the average Day 1 placed resume |
+
+**Adaptive RAG logic:**
+
+The system will use a **two-pass approach**:
+1. **Pass 1 (Quick Scan)**: Extract bullets + do a lightweight initial classification (via a fast Gemini call) to determine which bullets are "weak" vs "strong".
+2. **Pass 2 (Deep RAG)**: For each bullet:
+   - **Weak/vague bullets** → Fetch 7-10 golden bullets from the DB (more structural context)
+   - **Strong bullets** → Fetch 3 golden bullets (lighter context, still provides comparison)
+   - Section-specific golden bullets are prioritized, but cross-section high-similarity matches are included as fallback.
+
+#### [MODIFY] [resume.py (router)](file:///c:/Interview%20Preparation%20Platform/apps/api/routers/resume.py)
+
+- Update the `AnalysisResponse` schema to include the new fields.
+- Add a `progress` SSE (Server-Sent Events) endpoint or, more simply, break the analysis into stages with status messages. For the MVP, we'll keep the existing single POST but increase the timeout and add better error handling.
+
+---
+
+### 4. Frontend Enhancements
+
+#### [MODIFY] [page.tsx (resume)](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/resume/page.tsx)
+
+**A. Copy buttons on every suggested rewrite:**
+- Add a clipboard icon button next to each `suggested_rewrite` field.
+- On click, copy the plain text (strip markdown formatting) to clipboard.
+- Show a brief "Copied!" toast/animation.
+
+**B. Severity badges replacing binary vague/not-vague:**
+- Replace the single red/green left-edge indicator with a 4-level severity badge:
+  - 🔴 **Critical** — Red badge, red left edge
+  - 🟠 **Major** — Amber badge, amber left edge
+  - 🟡 **Minor** — Yellow badge, yellow left edge
+  - 🟢 **Good** — Green badge, green left edge
+
+**C. New per-bullet fields displayed:**
+- **Action Verb Meter**: A small colored pill showing the verb rating + 3 alternatives on hover.
+- **Metrics Hint**: A yellow callout box saying "💡 Try to quantify: [hint]" when the bullet lacks metrics.
+- **Confidence Score**: A small badge (e.g., "95% confident") next to the critique.
+
+**D. Section-level summaries:**
+- Group bullets by `section_type` with collapsible headers.
+- Each section header shows: section name, bullet count, section score (from `section_summaries`), and a 1-line summary.
+
+**E. Radar Chart (Scoring Dashboard):**
+- A new component at the top of the analysis results (below the 4 stat cards).
+- Shows a spider/radar chart with 6 axes: Quantification, Action Verbs, Structure, Section Balance, STAR Compliance, Formatting.
+- Built with pure SVG in React (no external chart library dependency).
+- Includes the `day1_comparison` text below the chart.
+
+**F. Section Ordering Advice:**
+- A new card between the radar chart and the Intelligence Heatmap.
+- Displays the AI's section reordering/promotion advice.
+
+---
+
+### 5. Enhanced Overall Resume Workshop
+
+#### [MODIFY] [resume_analyzer.py](file:///c:/Interview%20Preparation%20Platform/apps/api/agents/resume_analyzer.py)
+
+Update the `run_workshop_turn` function when `section_type == "overall"`:
+- Include the full analysis results (section summaries, radar scores) in the system prompt.
+- The AI acts as a strategic resume advisor, not just a bullet-level editor.
+- Can advise on section ordering, which bullets to drop, which to expand, and overall narrative strategy.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# Test the multi-key fallback system
+python -c "from services.gemini_client import GeminiClient; c = GeminiClient(); print(c.list_keys())"
+
+# Test the full analysis pipeline
+python -c "
+from agents.resume_analyzer import analyze_resume_text
+result = analyze_resume_text('sample resume text...', 'consulting')
+import json
+data = json.loads(result)
+assert 'radar_scores' in data
+assert 'section_summaries' in data
+assert all(b.get('severity') in ['critical','major','minor','good'] for b in data['bullets'])
+print('All assertions passed')
+"
+```
+
+### Manual Verification
+- Upload 2-3 real IITB resumes through the UI and verify:
+  - All bullets are extracted and evaluated
+  - Radar chart renders correctly
+  - Copy buttons work on all suggested rewrites
+  - Section grouping and severity badges display properly
+  - Overall Workshop mode includes strategic advice
+  - Multi-key fallback works under simulated rate limiting
+
+---
+
+## Summary of File Changes
+
+| File | Action | Description |
+|------|--------|-------------|
+| `services/gemini_client.py` | NEW | Multi-key Gemini client with round-robin, retry, health tracking |
+| `data/resumes/section_rules.json` | NEW | Section-specific IITB resume rules |
+| `agents/resume_analyzer.py` | MODIFY | New schema fields, adaptive RAG, two-pass analysis, enhanced workshop |
+| `routers/resume.py` | MODIFY | Updated response schema |
+| `apps/web/src/app/resume/page.tsx` | MODIFY | Copy buttons, severity badges, radar chart, section grouping, new fields |
+| `.env` | MODIFY | Multi-key format documentation |
