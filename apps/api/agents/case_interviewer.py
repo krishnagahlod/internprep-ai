@@ -4,7 +4,7 @@ import json
 from services.cerebras_client import cerebras_client
 from supabase import create_client, Client
 
-MODEL = "gpt-oss-120b"
+MODEL = "llama3.3-70b"
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
