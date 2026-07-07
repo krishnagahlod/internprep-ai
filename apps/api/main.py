@@ -11,6 +11,12 @@ app = FastAPI(title="AI Interview Coach API", version="1.0.0")
 
 # Mount static files to serve the PDFs directly to the frontend
 casebooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/casebooks"))
+try:
+    os.makedirs(casebooks_dir, exist_ok=True)
+except OSError:
+    # Fallback for containerized environments (like Railway) where ../../ escapes the /app boundary
+    casebooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/casebooks"))
+    os.makedirs(casebooks_dir, exist_ok=True)
 app.mount("/casebooks", StaticFiles(directory=casebooks_dir), name="casebooks")
 
 # Configure CORS for Next.js frontend
