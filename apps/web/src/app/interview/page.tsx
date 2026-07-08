@@ -34,7 +34,7 @@ const PHASES = [
 
 export default function InterviewEnginePage() {
   const router = useRouter()
-  const { targetCompany, currentSessionId, currentPhase, setCurrentSessionId, setCurrentPhase } = useAuthStore()
+  const { targetCompany, currentSessionId, currentPhase, setCurrentSessionId, setCurrentPhase, isGuest, guestInterviewCount, incrementGuestInterview, user } = useAuthStore()
   
   const [messages, setMessages] = useState<Message[]>([])
   const [caseContext, setCaseContext] = useState<string>("")
@@ -97,6 +97,12 @@ export default function InterviewEnginePage() {
 
   // Start Case logic
   const handleStartCase = async () => {
+    if (isGuest && guestInterviewCount >= 1) {
+      alert("You've reached your free guest limit (1 mock interview). Please sign up to continue using InternPrep AI.")
+      router.push("/login")
+      return
+    }
+
     setShowSetupModal(false)
     setIsTyping(true)
     try {
@@ -105,7 +111,8 @@ export default function InterviewEnginePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          case_type: selectedCaseType
+          case_type: selectedCaseType,
+          user_id: user?.id
         })
       })
       if (response.ok) {
@@ -117,6 +124,9 @@ export default function InterviewEnginePage() {
         setCurrentSessionId(data.session_id)
         setCurrentPhase(data.initial_phase)
         setIsTimerRunning(true)
+        if (isGuest) {
+          incrementGuestInterview()
+        }
       } else {
         setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin the case?" }])
       }
@@ -198,7 +208,8 @@ export default function InterviewEnginePage() {
           messages: messages,
           current_phase: currentPhase,
           scratchpad: "", // Not sending scratchpad text
-          case_context: caseContext
+          case_context: caseContext,
+          case_source: caseSource
         }),
       })
 
@@ -233,7 +244,8 @@ export default function InterviewEnginePage() {
           messages: newMessages,
           current_phase: currentPhase,
           scratchpad: "", // Not extracting canvas text as requested
-          case_context: caseContext
+          case_context: caseContext,
+          case_source: caseSource
         }),
       })
 

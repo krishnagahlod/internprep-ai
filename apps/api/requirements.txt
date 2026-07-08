@@ -14,3 +14,4 @@ groq
 sentence-transformers
 pymupdf
 slowapi
+tenacity

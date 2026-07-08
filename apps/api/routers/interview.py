@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     current_phase: str
     scratchpad: str
     case_context: Optional[str] = None
+    case_source: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -110,10 +111,20 @@ async def chat_endpoint(request: Request, body: ChatRequest):
     try:
         history = [{"role": m.role, "content": m.content} for m in body.messages]
         
+        dynamic_context = ""
+        latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
+        if body.case_source and latest_user_msg:
+            from services.rag import retrieve_context
+            dynamic_context = retrieve_context(latest_user_msg, source=body.case_source, top_k=2)
+            
+        combined_context = body.case_context or ""
+        if dynamic_context:
+            combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
+        
         bot_reply, new_phase = generate_case_response(
             history=history,
             current_phase=body.current_phase,
-            context=body.case_context or "",
+            context=combined_context,
             scratchpad=body.scratchpad
         )
         
@@ -157,7 +168,18 @@ async def chat_endpoint(request: Request, body: ChatRequest):
 async def hint_endpoint(request: ChatRequest):
     try:
         history = [{"role": m.role, "content": m.content} for m in request.messages]
-        hint_reply = generate_hint(history=history, context=request.case_context or "")
+        
+        dynamic_context = ""
+        latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
+        if request.case_source and latest_user_msg:
+            from services.rag import retrieve_context
+            dynamic_context = retrieve_context(latest_user_msg, source=request.case_source, top_k=2)
+            
+        combined_context = request.case_context or ""
+        if dynamic_context:
+            combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
+            
+        hint_reply = generate_hint(history=history, context=combined_context)
         return HintResponse(hint=hint_reply)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

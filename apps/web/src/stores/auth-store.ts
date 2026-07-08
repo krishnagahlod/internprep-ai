@@ -22,6 +22,8 @@ interface AuthState {
   targetCompany: string | null;
   currentSessionId: string | null;
   currentPhase: string;
+  guestResumeCount: number;
+  guestInterviewCount: number;
   
   // Actions
   setGuestMode: () => void;
@@ -30,6 +32,8 @@ interface AuthState {
   setTargetCompany: (company: string) => void;
   setCurrentSessionId: (id: string | null) => void;
   setCurrentPhase: (phase: string) => void;
+  incrementGuestResume: () => void;
+  incrementGuestInterview: () => void;
   clearState: () => void;
 }
 
@@ -42,6 +46,8 @@ export const useAuthStore = create<AuthState>()(
       targetCompany: null,
       currentSessionId: null,
       currentPhase: 'introduction',
+      guestResumeCount: 0,
+      guestInterviewCount: 0,
       
       setGuestMode: () => set({ isGuest: true, user: null }),
       setUser: (user) => set({ user, isGuest: false }),
@@ -49,7 +55,9 @@ export const useAuthStore = create<AuthState>()(
       setTargetCompany: (targetCompany) => set({ targetCompany }),
       setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
       setCurrentPhase: (currentPhase) => set({ currentPhase }),
-      clearState: () => set({ isGuest: false, user: null, resumeText: null, targetCompany: null, currentSessionId: null, currentPhase: 'introduction' }),
+      incrementGuestResume: () => set((state) => ({ guestResumeCount: state.guestResumeCount + 1 })),
+      incrementGuestInterview: () => set((state) => ({ guestInterviewCount: state.guestInterviewCount + 1 })),
+      clearState: () => set({ isGuest: false, user: null, resumeText: null, targetCompany: null, currentSessionId: null, currentPhase: 'introduction', guestResumeCount: 0, guestInterviewCount: 0 }),
     }),
     {
       name: 'internprep-auth-storage', // name of the item in the storage (must be unique)

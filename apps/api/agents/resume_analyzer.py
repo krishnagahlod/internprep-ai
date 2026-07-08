@@ -7,6 +7,7 @@ from supabase import create_client, Client
 from services.gemini_client import gemini_client
 from services.cerebras_client import cerebras_client
 import google.generativeai as genai
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Configure Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -81,6 +82,7 @@ class ResumeAnalysisResult(BaseModel):
     section_summaries: Dict[str, SectionSummary]
     bullets: List[BulletAnalysis]
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
     """Extracts raw bullets from the user's resume for independent analysis."""
     prompt = f"""
@@ -104,6 +106,7 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
         print(f"Extraction error: {e}")
         return []
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def classify_bullet_strengths(bullets: List[Dict[str, str]]) -> Dict[str, str]:
     """Fast pass to classify bullet strengths (weak vs strong) to guide RAG depth."""
     if not bullets: return {}
@@ -128,6 +131,7 @@ def classify_bullet_strengths(bullets: List[Dict[str, str]]) -> Dict[str, str]:
         print(f"Classification error: {e}")
         return {str(i): "weak" for i in range(len(bullets))}
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> str:
     """
     Analyzes resume text using Two-Pass Adaptive RAG against Golden Resumes and Best Practices.
@@ -251,7 +255,14 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     
     return clean_json(response.text)
 
-def run_workshop_turn(original_bullet: str, section_type: str, target_role: str, messages: List[Dict[str, str]], overall_context: str = None) -> Dict[str, Any]:
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def run_workshop_turn(
+    original_bullet: str, 
+    section_type: str, 
+    target_role: str, 
+    messages: List[Dict[str, str]], 
+    overall_context: str = None
+) -> Dict[str, Any]:
     """
     Executes a single turn of the Resume Workshop chat.
     If section_type == 'overall', uses full analysis context for strategic advice.

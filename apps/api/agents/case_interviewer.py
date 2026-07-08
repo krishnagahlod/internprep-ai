@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Tuple
 import json
 from services.cerebras_client import cerebras_client
 from supabase import create_client, Client
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 MODEL = "gpt-oss-120b"
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or os.getenv("SUPABASE_URL")
@@ -21,6 +22,7 @@ def get_next_phase(current_phase: str) -> str:
     except ValueError:
         return "introduction"
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def check_phase_advance(history: List[Dict[str, str]], current_phase: str) -> bool:
     """Uses a fast LLM call to determine if the candidate has satisfied the current phase's exit criteria."""
     if current_phase == "complete" or len(history) < 2:
@@ -140,16 +142,14 @@ def get_phase_instructions(phase: str, case_context: str) -> str:
     Act purely as the interviewer. Respond ONLY to the candidate's latest message based on the rules for this specific phase.
     """
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def generate_case_response(
     history: List[Dict[str, str]], 
     current_phase: str, 
     context: str, 
     scratchpad: str
 ) -> Tuple[str, str]:
-    """
-    Generates a response using the phase-aware state machine.
-    Returns (bot_reply, new_phase).
-    """
+    """Generates the next step in the interview."""
     # 1. Check if we should advance phase
     new_phase = current_phase
     if check_phase_advance(history, current_phase):
@@ -196,6 +196,7 @@ def get_random_case(case_type: str = None) -> Dict[str, Any]:
         print(f"Error fetching case: {e}")
     return {}
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def generate_hint(history: List[Dict[str, str]], context: str) -> str:
     """Generates a Socratic hint using Cerebras Client."""
     system_prompt = f"""

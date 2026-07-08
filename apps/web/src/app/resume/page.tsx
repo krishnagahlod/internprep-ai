@@ -98,7 +98,7 @@ export default function ResumePage() {
   const [finalWorkshopBullet, setFinalWorkshopBullet] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { setResumeText, user } = useAuthStore()
+  const { setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
   const router = useRouter()
 
   useEffect(() => {
@@ -136,6 +136,11 @@ export default function ResumePage() {
   const handleUpload = async () => {
     if (!file) return
 
+    if (isGuest && guestResumeCount >= 2) {
+      setError("You've reached your free guest limit (2 resumes). Please sign up to continue using InternPrep AI.")
+      return
+    }
+
     setIsUploading(true)
     setError(null)
     setProgress(10)
@@ -167,6 +172,9 @@ export default function ResumePage() {
       setResumeText(data.raw_text)
       setAnalysisResult(data.analysis)
       setProgress(100)
+      if (isGuest) {
+        incrementGuestResume()
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.")
       setProgress(0)
