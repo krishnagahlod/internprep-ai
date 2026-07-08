@@ -6,7 +6,7 @@ import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Mic, Send, PenTool, ArrowLeft, Loader2, Volume2, VolumeX, Lightbulb, FileText, Bot, User, Play, Clock, CheckCircle2 } from "lucide-react"
+import { Mic, Send, PenTool, ArrowLeft, Loader2, Volume2, VolumeX, Lightbulb, FileText, Bot, User, Play, Clock, CheckCircle2, ExternalLink } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import dynamic from "next/dynamic"
 
