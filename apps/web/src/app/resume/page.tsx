@@ -98,7 +98,7 @@ export default function ResumePage() {
   const [finalWorkshopBullet, setFinalWorkshopBullet] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { setResumeText } = useAuthStore()
+  const { setResumeText, user } = useAuthStore()
   const router = useRouter()
 
   useEffect(() => {
@@ -144,6 +144,9 @@ export default function ResumePage() {
       const formData = new FormData()
       formData.append("file", file)
       formData.append("target_role", targetRole)
+      if (user?.id) {
+        formData.append("user_id", user.id)
+      }
 
       setProgress(30)
       
@@ -552,10 +555,9 @@ export default function ResumePage() {
                                               <Button 
                                                 variant="ghost" 
                                                 size="sm" 
-                                                className="h-6 px-2 text-xs opacity-0 group-hover/rewrite:opacity-100 transition-opacity"
                                                 onClick={() => copyToClipboard(bullet.suggested_rewrite)}
                                               >
-                                                <Copy className="h-3 w-3 mr-1" /> Copy
+                                                <Copy className="h-3 w-3 mr-1" /> Copy to Apply
                                               </Button>
                                             </div>
                                             <p className="text-sm font-medium text-foreground">{renderFormattedText(bullet.suggested_rewrite)}</p>

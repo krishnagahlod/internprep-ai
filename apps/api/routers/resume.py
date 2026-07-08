@@ -36,7 +36,8 @@ class WorkshopResponse(BaseModel):
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...),
-    target_role: str = Form("consulting")
+    target_role: str = Form("consulting"),
+    user_id: Optional[str] = Form(None)
 ):
     # Strict PDF Validation
     if not file.filename.endswith(".pdf"):
@@ -62,6 +63,19 @@ async def analyze_resume(
         )
         
         analysis_dict = json.loads(analysis_json_str)
+        
+        # Save to database if user is authenticated
+        from agents.resume_analyzer import supabase
+        if supabase and user_id:
+            try:
+                supabase.table("resume_analyses").insert({
+                    "user_id": user_id,
+                    "resume_text": text,
+                    "target_role": target_role,
+                    "analysis_data": analysis_dict
+                }).execute()
+            except Exception as e:
+                print(f"Error saving resume analysis to Supabase: {e}")
         
         return AnalysisResponse(
             raw_text=text,

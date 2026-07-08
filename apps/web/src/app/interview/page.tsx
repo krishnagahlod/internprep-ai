@@ -557,11 +557,23 @@ export default function InterviewEnginePage() {
           ) : (
             <div className="h-full w-full relative animate-in fade-in duration-500">
               {caseSource ? (
-                <iframe 
-                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}#page=${pageNumber}`} 
-                  className="w-full h-full border-0 relative z-10 bg-white dark:bg-neutral-900"
-                  title="Source PDF"
-                />
+                <div className="w-full h-full relative">
+                  <div className="absolute top-4 right-8 z-50">
+                    <Button 
+                      variant="secondary" 
+                      size="sm" 
+                      className="shadow-md bg-white/90 dark:bg-black/90 hover:bg-white dark:hover:bg-black border border-slate-200 dark:border-neutral-800"
+                      onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`, "_blank")}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-2" /> Open PDF in New Tab
+                    </Button>
+                  </div>
+                  <iframe 
+                    src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}#page=${pageNumber}`} 
+                    className="w-full h-full border-0 relative z-10 bg-white dark:bg-neutral-900"
+                    title="Source PDF"
+                  />
+                </div>
               ) : caseContext ? (
                 <div className="h-full overflow-y-auto p-12 lg:p-16">
                   <div className="prose prose-slate dark:prose-invert max-w-3xl mx-auto prose-headings:font-bold prose-headings:tracking-tight prose-p:text-slate-600 dark:prose-p:text-slate-400 prose-p:leading-relaxed text-[15px]">

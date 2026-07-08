@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -201,13 +201,13 @@ export default function DashboardPage() {
             </motion.a>
 
             {/* Settings/Progress Placeholder */}
-            <motion.div variants={itemVariants} className="md:col-span-1 glass-card rounded-3xl p-6 flex flex-col justify-between border-dashed border-gray-300 dark:border-neutral-700 bg-transparent hover:bg-white/30 dark:hover:bg-slate-800/40 cursor-pointer group transition-colors">
-              <div className="h-12 w-12 rounded-2xl bg-white/50 dark:bg-neutral-800/50 flex items-center justify-center border border-gray-200 dark:border-neutral-700 shadow-sm group-hover:scale-110 transition-transform">
-                <Settings className="h-6 w-6 text-gray-500" />
+            <motion.div variants={itemVariants} className="md:col-span-1 glass-card rounded-3xl p-6 flex flex-col justify-between border border-gray-300 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/40 hover:bg-white/80 dark:hover:bg-slate-800/60 cursor-pointer group transition-colors" onClick={() => router.push("/history")}>
+              <div className="h-12 w-12 rounded-2xl bg-white/80 dark:bg-neutral-800/80 flex items-center justify-center border border-gray-200 dark:border-neutral-700 shadow-sm group-hover:scale-110 transition-transform">
+                <Clock className="h-6 w-6 text-gray-700 dark:text-gray-300" />
               </div>
               <div>
-                <h2 className="text-xl font-bold mb-1 font-outfit">Preferences</h2>
-                <p className="text-muted-foreground text-xs">Configure AI copilot</p>
+                <h2 className="text-xl font-bold mb-1 font-outfit">History</h2>
+                <p className="text-muted-foreground text-xs">Track your progress</p>
               </div>
             </motion.div>
 

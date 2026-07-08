@@ -9,10 +9,18 @@ import os
 
 app = FastAPI(title="AI Interview Coach API", version="1.0.0")
 
-# Mount static files to serve the PDFs directly to the frontend
+class CORSStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Content-Disposition"] = "inline"
+        return response
+
 casebooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/casebooks"))
 os.makedirs(casebooks_dir, exist_ok=True)
-app.mount("/casebooks", StaticFiles(directory=casebooks_dir), name="casebooks")
+app.mount("/casebooks", CORSStaticFiles(directory=casebooks_dir), name="casebooks")
 
 # Configure CORS for Next.js frontend
 app.add_middleware(
