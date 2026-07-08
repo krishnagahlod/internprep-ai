@@ -29,7 +29,7 @@ export default function HistoryPage() {
       try {
         // Fetch resumes
         const { data: resumes } = await supabase
-          .table("resume_analyses")
+          .from("resume_analyses")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
@@ -39,7 +39,7 @@ export default function HistoryPage() {
 
         // Fetch interviews
         const { data: interviews } = await supabase
-          .table("interview_sessions")
+          .from("interview_sessions")
           .select("*, session_feedback(*)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
