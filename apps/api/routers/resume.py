@@ -59,7 +59,7 @@ async def analyze_resume(
         # Run analyzer with timeout wrapper
         analysis_json_str = await asyncio.wait_for(
             asyncio.to_thread(analyze_resume_text, text, target_role),
-            timeout=180.0
+            timeout=300.0
         )
         
         analysis_dict = json.loads(analysis_json_str)

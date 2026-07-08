@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import concurrent.futures
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from supabase import create_client, Client
@@ -154,19 +155,20 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     print(f"Found {len(user_bullets)} user bullets. Running strength classification...")
     strengths = classify_bullet_strengths(user_bullets)
     
-    print("Fetching adaptive RAG context...")
-    rag_context = ""
-    for idx, ub in enumerate(user_bullets):
+    print("Fetching adaptive RAG context concurrently...")
+    
+    def fetch_rag_for_bullet(args):
+        idx, ub = args
         bullet_text = ub.get('bullet_text', '')
         section_type = ub.get('section_type', 'experience')
-        if len(bullet_text) < 15: continue
+        if len(bullet_text) < 15: return ""
         
         strength = strengths.get(str(idx), "weak")
         match_count = 3 if strength == "strong" else 7
         
-        embedding = gemini_client.embed_text(bullet_text)
-        if embedding:
-            try:
+        try:
+            embedding = gemini_client.embed_text(bullet_text)
+            if embedding:
                 rpc_res = supabase.rpc('match_golden_bullets', {
                     'query_embedding': embedding,
                     'match_count': match_count,
@@ -176,13 +178,20 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
                 
                 matches = rpc_res.data
                 if matches:
-                    rag_context += f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
-                    rag_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
+                    local_context = f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
+                    local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
                     for m in matches:
-                        rag_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
-                        rag_context += f"  Text: {m['bullet_text']}\n"
-            except Exception as e:
-                print(f"Supabase RPC error: {e}")
+                        local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
+                        local_context += f"  Text: {m['bullet_text']}\n"
+                    return local_context
+        except Exception as e:
+            print(f"Supabase RPC error: {e}")
+        return ""
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        rag_results = list(executor.map(fetch_rag_for_bullet, enumerate(user_bullets)))
+    
+    rag_context = "".join(rag_results)
 
     # Format Rules
     global_rules_text = "\n".join([f"- {r}" for r in BEST_PRACTICES])
