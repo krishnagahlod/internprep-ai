@@ -312,7 +312,7 @@ export default function ResumePage() {
     if (!acc[key]) acc[key] = [];
     acc[key].push(bullet);
     return acc;
-  }, {});
+  }, {}) || {};
 
   // If in severity mode, sort the keys so critical is first
   const severityOrder = ["critical", "major", "minor", "good"];
@@ -529,7 +529,7 @@ export default function ResumePage() {
                 </div>
                 
                 <div className="space-y-8">
-                  {Object.entries(groupedBullets).map(([section, bullets]: [string, any]) => {
+                  {Object.entries(groupedBullets || {}).map(([section, bullets]: [string, any]) => {
                     const isExpanded = expandedSections[section];
                     const summary = analysisResult.section_summaries?.[section];
                     
