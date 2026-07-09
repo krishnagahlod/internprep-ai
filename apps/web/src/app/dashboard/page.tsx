@@ -91,6 +91,22 @@ export default function DashboardPage() {
             <TrendingUp className="mr-3 h-4 w-4" />
             Analytics
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/history")}>
+            <Clock className="mr-3 h-4 w-4" />
+            History
+          </Button>
+          
+          <div className="pt-4 pb-2">
+            <div className="h-px bg-border/50 w-full" />
+          </div>
+          
+          <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="w-full">
+            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50">
+              <Compass className="mr-3 h-4 w-4" />
+              IITB Resources
+              <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
+            </Button>
+          </a>
         </nav>
 
         <div className="mt-auto">
@@ -122,14 +138,20 @@ export default function DashboardPage() {
         </header>
 
         <div className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto w-full z-10">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-10 flex items-end justify-between">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 font-outfit text-foreground drop-shadow-sm">Good {new Date().getHours() < 12 ? 'morning' : 'evening'}, {isGuest ? 'Guest' : 'Candidate'}</h1>
               <p className="text-muted-foreground text-lg">Your AI copilot is ready. What are we practicing today?</p>
             </div>
-            <div className="hidden lg:flex items-center gap-4">
-              <ThemeToggle />
-
+            <div className="flex items-center gap-4">
+              <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="hidden md:flex">
+                <Button variant="outline" size="sm" className="rounded-full bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm border-dashed">
+                  <Compass className="mr-2 h-4 w-4" /> IITB Resources <ExternalLink className="ml-1 h-3 w-3" />
+                </Button>
+              </a>
+              <div className="hidden lg:block">
+                <ThemeToggle />
+              </div>
             </div>
           </motion.div>
           
@@ -180,25 +202,22 @@ export default function DashboardPage() {
               </div>
             </motion.div>
 
-            {/* Resources Card */}
-            <motion.a 
-              href="https://reach.gymkhana.iitb.ac.in/internships"
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* Analytics Card */}
+            <motion.div 
               variants={itemVariants} 
               className="md:col-span-1 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors"
+              onClick={() => router.push("/dashboard/analytics")}
             >
               <div className="flex items-start justify-between">
-                <div className="h-12 w-12 rounded-2xl bg-gray-50 dark:bg-neutral-800 flex items-center justify-center border border-gray-200 dark:border-neutral-700 group-hover:bg-gray-100 dark:group-hover:bg-slate-700 transition-colors shadow-sm">
-                  <Compass className="h-6 w-6 text-gray-700" />
+                <div className="h-12 w-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/50 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors shadow-sm">
+                  <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <ExternalLink className="h-4 w-4 text-muted-foreground opacity-50 group-hover:opacity-100 group-hover:text-primary transition-all" />
               </div>
               <div>
-                <h2 className="text-xl font-bold mb-1 font-outfit">IITB Resources</h2>
-                <p className="text-muted-foreground text-xs">Official Gymkhana DB</p>
+                <h2 className="text-xl font-bold mb-1 font-outfit">Analytics</h2>
+                <p className="text-muted-foreground text-xs">Performance insights</p>
               </div>
-            </motion.a>
+            </motion.div>
 
             {/* Settings/Progress Placeholder */}
             <motion.div variants={itemVariants} className="md:col-span-1 glass-card rounded-3xl p-6 flex flex-col justify-between border border-gray-300 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/40 hover:bg-white/80 dark:hover:bg-slate-800/60 cursor-pointer group transition-colors" onClick={() => router.push("/history")}>
