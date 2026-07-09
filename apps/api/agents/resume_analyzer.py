@@ -203,6 +203,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
     # Format Rules
     global_rules_text = "\n".join([f"- {r}" for r in BEST_PRACTICES])
     section_rules_text = json.dumps(SECTION_RULES, indent=2)
+    user_bullets_json = json.dumps(user_bullets, indent=2)
 
     final_prompt = f"""
     You are an elite IIT Bombay Day 1 Resume Reviewer.
@@ -220,6 +221,9 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
     ### USER RESUME TEXT (Raw):
     {resume_text}
     
+    ### USER BULLETS TO EVALUATE:
+    {user_bullets_json}
+    
     ### ADAPTIVE RAG CONTEXT (User Bullets mapped to Day 1 Golden Examples):
     {rag_context}
     
@@ -232,7 +236,8 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
     
     Also generate overall feedback, radar scores (0-100), section summaries, Day 1 comparison, and ordering advice.
     
-    CRITICAL: You MUST evaluate EVERY SINGLE bullet present in the RAG CONTEXT (there are {len(user_bullets)} bullets). 
+    CRITICAL: You MUST evaluate EVERY SINGLE bullet present in the "USER BULLETS TO EVALUATE" section (there are {len(user_bullets)} bullets). 
+    Do NOT rely solely on the RAG context, as some bullets might not have matched golden examples. You MUST output exactly {len(user_bullets)} bullet evaluations.
     Do NOT stop early.
     
     Return ONLY valid JSON exactly matching this schema:
