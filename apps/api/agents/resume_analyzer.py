@@ -98,7 +98,7 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
     """
     try:
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), prompt, generation_config=config)
+        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), prompt, generation_config=config)
         data = json.loads(clean_json(res.text))
         if isinstance(data, list): return data
         if "bullets" in data: return data["bullets"]
@@ -122,7 +122,7 @@ def classify_bullet_strengths(bullets: List[Dict[str, str]]) -> Dict[str, str]:
     """
     try:
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), prompt, generation_config=config)
+        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), prompt, generation_config=config)
         data = json.loads(clean_json(res.text))
         result = {}
         for item in data:
@@ -149,7 +149,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         Resume: {resume_text}
         """
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
-        response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), prompt, generation_config=config)
+        response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), prompt, generation_config=config)
         return clean_json(response.text)
 
     print(f"Found {len(user_bullets)} user bullets. Running strength classification...")
@@ -270,7 +270,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     """
 
     config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
-    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), final_prompt, generation_config=config)
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), final_prompt, generation_config=config)
     
     return clean_json(response.text)
 
