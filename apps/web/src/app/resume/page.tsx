@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress"
 import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 import { BulletDiff } from "@/components/resume/bullet-diff"
 
 // Helper SVG Radar Chart
@@ -427,10 +427,10 @@ export default function ResumePage() {
               </div>
             </div>
           ) : (
-            <PanelGroup direction="horizontal" className="h-[calc(100vh-100px)] min-h-[800px] border-t border-black/10 dark:border-white/10 mt-6 pt-6">
+            <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-100px)] min-h-[800px] border-t border-black/10 dark:border-white/10 mt-6 pt-6">
               
               {/* PDF Viewer Panel */}
-              <Panel defaultSize={40} minSize={25} className="pr-4 hidden md:block">
+              <ResizablePanel defaultSize={40} minSize={25} className="pr-4 hidden md:block">
                 <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border-black/10 dark:border-white/10 p-2">
                   {pdfUrl ? (
                     <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
@@ -438,13 +438,11 @@ export default function ResumePage() {
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground">PDF Preview Unavailable</div>
                   )}
                 </div>
-              </Panel>
+              </ResizablePanel>
               
-              <PanelResizeHandle className="w-2 cursor-col-resize flex items-center justify-center group hidden md:flex">
-                <div className="w-1 h-12 bg-black/10 dark:bg-white/10 rounded-full group-hover:bg-primary/50 transition-colors" />
-              </PanelResizeHandle>
+              <ResizableHandle withHandle className="w-2 cursor-col-resize flex items-center justify-center group hidden md:flex" />
 
-              <Panel defaultSize={60} className="pl-4 overflow-y-auto pr-2 custom-scrollbar">
+              <ResizablePanel defaultSize={60} className="pl-4 overflow-y-auto pr-2 custom-scrollbar">
                 <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
               {/* Summary Stats */}
               <div className="grid grid-cols-4 gap-4">
@@ -678,12 +676,12 @@ export default function ResumePage() {
                   Continue to Mock Interview <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
-              <div className="flex justify-center pb-8">
-                <CreatorBadge />
+                <div className="flex justify-center pb-8">
+                  <CreatorBadge />
+                </div>
               </div>
-            </div>
-          </Panel>
-        </PanelGroup>
+            </ResizablePanel>
+          </ResizablePanelGroup>
           )}
         </div>
       </div>
