@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { Suspense, useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { createClient } from "@/lib/supabase/client"
@@ -33,7 +33,7 @@ const PHASES = [
   { id: "synthesis", label: "Synthesis" }
 ]
 
-export default function InterviewEnginePage() {
+function InterviewEngine() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionIdParam = searchParams.get("id")
@@ -653,5 +653,17 @@ export default function InterviewEnginePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function InterviewEnginePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-neutral-950">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
+      </div>
+    }>
+      <InterviewEngine />
+    </Suspense>
   )
 }
