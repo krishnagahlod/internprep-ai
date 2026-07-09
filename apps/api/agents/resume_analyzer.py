@@ -240,7 +240,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         "overall_feedback": "string",
         "day1_comparison": "string",
         "section_ordering_advice": "string",
-        "radar_scores_reasoning": "string (Chain of Thought reasoning for why you are assigning the specific scores below)",
+        "radar_scores_reasoning": ["string (reasoning for Quantification)", "string (reasoning for Action Verbs)", "..."],
         "radar_scores": {{
             "quantification": number, "action_verbs": number, "structure": number,
             "section_balance": number, "star_compliance": number, "formatting": number
@@ -287,18 +287,21 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         summary: str
         bullet_count: int
         
-    class BulletFeedback(typing.TypedDict):
-        id: str
+    class BulletFeedback(typing.TypedDict, total=False):
         original_bullet: str
         section_type: str
         severity: str
+        confidence: float
+        critique: str
         action_verb_rating: str
         action_verb_alternatives: list[str]
+        structural_issues: list[str]
+        best_practice_violations: list[str]
         metrics_hint: str
+        golden_comparison: str
         suggested_rewrite: str
-        feedback: str
-        grammar_issues: list[str]
-        formatting_issues: list[str]
+        predicted_questions: list[str]
+        mapped_company_category: str
 
     class SectionSummaries(typing.TypedDict, total=False):
         experience: SectionSummary
@@ -311,7 +314,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         overall_feedback: str
         day1_comparison: str
         section_ordering_advice: str
-        radar_scores_reasoning: str
+        radar_scores_reasoning: list[str]
         radar_scores: RadarScores
         section_summaries: SectionSummaries
         bullets: list[BulletFeedback]

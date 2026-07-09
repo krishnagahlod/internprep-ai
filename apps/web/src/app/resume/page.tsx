@@ -480,9 +480,13 @@ export default function ResumePage() {
                         AI Evaluation Reasoning
                         <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
                       </summary>
-                      <p className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text">
-                        {analysisResult.radar_scores_reasoning}
-                      </p>
+                      <ul className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text space-y-2 list-disc pl-4">
+                        {Array.isArray(analysisResult.radar_scores_reasoning) 
+                          ? analysisResult.radar_scores_reasoning.map((reason, i) => (
+                              <li key={i}>{reason}</li>
+                            ))
+                          : <li>{analysisResult.radar_scores_reasoning}</li>}
+                      </ul>
                     </details>
                   )}
                 </div>
