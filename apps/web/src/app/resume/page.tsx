@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain } from "lucide-react"
+import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels"
+import { BulletDiff } from "@/components/resume/bullet-diff"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -89,6 +91,8 @@ export default function ResumePage() {
   const [error, setError] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<any | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<"section" | "severity">("section")
   
   // Workshop State
   const [activeWorkshopBullet, setActiveWorkshopBullet] = useState<any | null>(null)
@@ -126,8 +130,10 @@ export default function ResumePage() {
       if (selectedFile.type !== "application/pdf") {
         setError("Please upload a PDF file.")
         setFile(null)
+        setPdfUrl(null)
       } else {
         setFile(selectedFile)
+        setPdfUrl(URL.createObjectURL(selectedFile))
         setError(null)
       }
     }
@@ -300,11 +306,22 @@ export default function ResumePage() {
 
   // Group bullets
   const groupedBullets = analysisResult?.bullets?.reduce((acc: any, bullet: any) => {
-    const sec = bullet.section_type || "other";
-    if (!acc[sec]) acc[sec] = [];
-    acc[sec].push(bullet);
+    const key = viewMode === "section" 
+      ? (bullet.section_type || "other") 
+      : (bullet.severity || "good");
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(bullet);
     return acc;
   }, {});
+
+  // If in severity mode, sort the keys so critical is first
+  const severityOrder = ["critical", "major", "minor", "good"];
+  const sortedGroupKeys = Object.keys(groupedBullets || {}).sort((a, b) => {
+    if (viewMode === "severity") {
+      return severityOrder.indexOf(a) - severityOrder.indexOf(b);
+    }
+    return 0; // Keep original section order
+  });
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex">
@@ -410,8 +427,25 @@ export default function ResumePage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <PanelGroup direction="horizontal" className="h-[calc(100vh-100px)] min-h-[800px] border-t border-black/10 dark:border-white/10 mt-6 pt-6">
               
+              {/* PDF Viewer Panel */}
+              <Panel defaultSize={40} minSize={25} className="pr-4 hidden md:block">
+                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border-black/10 dark:border-white/10 p-2">
+                  {pdfUrl ? (
+                    <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">PDF Preview Unavailable</div>
+                  )}
+                </div>
+              </Panel>
+              
+              <PanelResizeHandle className="w-2 cursor-col-resize flex items-center justify-center group hidden md:flex">
+                <div className="w-1 h-12 bg-black/10 dark:bg-white/10 rounded-full group-hover:bg-primary/50 transition-colors" />
+              </PanelResizeHandle>
+
+              <Panel defaultSize={60} className="pl-4 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
               {/* Summary Stats */}
               <div className="grid grid-cols-4 gap-4">
                 <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
@@ -470,13 +504,30 @@ export default function ResumePage() {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
                   <h2 className="text-2xl font-bold">Deep Bullet Analysis</h2>
-                  <div className="flex gap-4 text-xs font-mono">
-                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Critical</span>
-                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /> Major</span>
-                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400" /> Minor</span>
+                  
+                  {/* View Mode Toggle */}
+                  <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-lg border border-black/10 dark:border-white/10">
+                    <button
+                      onClick={() => setViewMode("section")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "section" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      <Columns className="w-3 h-3" /> Group by Section
+                    </button>
+                    <button
+                      onClick={() => setViewMode("severity")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "severity" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      <List className="w-3 h-3" /> Triage by Severity
+                    </button>
                   </div>
+                </div>
+                
+                <div className="flex gap-4 text-xs font-mono mb-6">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Critical</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /> Major</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400" /> Minor</span>
                 </div>
                 
                 <div className="space-y-8">
@@ -573,6 +624,25 @@ export default function ResumePage() {
                                         <p className="text-sm"><strong>Quantification Hint:</strong> {bullet.metrics_hint}</p>
                                       </div>
                                     )}
+                                    
+                                    {bullet.suggested_rewrite && (
+                                      <div className="mb-4">
+                                        <div className="flex justify-between items-center mb-2">
+                                          <div className="flex items-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400">
+                                            <Lightbulb className="h-4 w-4" /> Day 1 Rewrite Strategy
+                                          </div>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-6 text-xs px-2"
+                                            onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
+                                          >
+                                            <Copy className="h-3 w-3 mr-1" /> Copy Text
+                                          </Button>
+                                        </div>
+                                        <BulletDiff original={bullet.original_bullet} rewrite={bullet.suggested_rewrite} />
+                                      </div>
+                                    )}
 
                                     {bullet.golden_comparison && (
                                       <div className="p-4 rounded-xl mb-4 bg-primary/5 border border-primary/20">
@@ -581,22 +651,6 @@ export default function ResumePage() {
                                           Day 1 Structural Benchmark
                                         </p>
                                         <p className="text-sm text-primary/80 mb-3 italic">"{bullet.golden_comparison}"</p>
-                                        
-                                        {bullet.suggested_rewrite && (
-                                          <div className="mt-3 pt-3 border-t border-primary/10 relative group/rewrite">
-                                            <div className="flex justify-between items-center mb-1">
-                                              <p className="text-xs font-bold uppercase tracking-widest text-foreground/50">Suggested Reframing</p>
-                                              <Button 
-                                                variant="ghost" 
-                                                size="sm" 
-                                                onClick={() => copyToClipboard(bullet.suggested_rewrite)}
-                                              >
-                                                <Copy className="h-3 w-3 mr-1" /> Copy to Apply
-                                              </Button>
-                                            </div>
-                                            <p className="text-sm font-medium text-foreground">{renderFormattedText(bullet.suggested_rewrite)}</p>
-                                          </div>
-                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -628,6 +682,8 @@ export default function ResumePage() {
                 <CreatorBadge />
               </div>
             </div>
+          </Panel>
+        </PanelGroup>
           )}
         </div>
       </div>
