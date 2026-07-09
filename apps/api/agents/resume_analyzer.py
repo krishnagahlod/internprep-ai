@@ -220,6 +220,9 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     Analyze the user's resume bullet by bullet. Provide a deep structural critique using the new schema.
     Provide severity (critical, major, minor, good), an action verb rating (weak, moderate, strong) with alternatives, and a metrics hint if they lack quantification.
     Generate a suggested_rewrite that preserves their facts but upgrades the structural skeleton.
+    
+    CRITICAL LENGTH CONSTRAINT: The suggested_rewrite MUST be extremely close in length to the original_bullet (ideally exactly the same number of words/characters). IIT Bombay resumes require exactly 1-line per bullet with no empty space. Do NOT generate a rewrite that is significantly longer or shorter than the original, otherwise it will ruin their formatting.
+    
     Also generate overall feedback, radar scores (0-100), section summaries, Day 1 comparison, and ordering advice.
     
     CRITICAL: You MUST evaluate EVERY SINGLE bullet present in the RAG CONTEXT (there are {len(user_bullets)} bullets). 
@@ -342,7 +345,8 @@ def run_workshop_turn(
         2. Ask 1-2 sharp, targeted questions to extract missing metrics (e.g., "What was the budget?").
         3. Keep your questions very concise.
         4. Once you have extracted enough metrics, synthesize the final, polished bullet point that adheres strictly to the Golden structural examples and Best Practice rules.
-        5. When you provide the final bullet, set `is_final_bullet` to true and put the polished bullet string in `final_bullet`.
+        5. CRITICAL LENGTH CONSTRAINT: The final polished bullet MUST be extremely close in length (character/word count) as the original bullet to ensure it perfectly fits on 1 line without wrapping or leaving empty space.
+        6. When you provide the final bullet, set `is_final_bullet` to true and put the polished bullet string in `final_bullet`.
 
         Respond in JSON format:
         {{
