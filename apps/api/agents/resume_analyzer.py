@@ -148,7 +148,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         Return ONLY valid JSON exactly matching the ResumeAnalysisResult schema.
         Resume: {resume_text}
         """
-        config = genai.GenerationConfig(response_mime_type="application/json")
+        config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
         response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), prompt, generation_config=config)
         return clean_json(response.text)
 
@@ -269,7 +269,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     }}
     """
 
-    config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
+    config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
     response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), final_prompt, generation_config=config)
     
     return clean_json(response.text)

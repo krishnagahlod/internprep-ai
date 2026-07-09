@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,6 +34,9 @@ const PHASES = [
 
 export default function InterviewEnginePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionIdParam = searchParams.get("id")
+  const supabase = createClient()
   const { targetCompany, currentSessionId, currentPhase, setCurrentSessionId, setCurrentPhase, isGuest, guestInterviewCount, incrementGuestInterview, user } = useAuthStore()
   
   const [messages, setMessages] = useState<Message[]>([])
@@ -57,6 +60,38 @@ export default function InterviewEnginePage() {
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
+
+  // Resume Session logic
+  useEffect(() => {
+    const resumeSession = async () => {
+      if (sessionIdParam && user) {
+        setShowSetupModal(false)
+        setIsTyping(true)
+        try {
+          const { data: session, error } = await supabase
+            .from("interview_sessions")
+            .select("*")
+            .eq("id", sessionIdParam)
+            .single()
+            
+          if (session && !error) {
+            setCaseContext(session.case_state?.case_context || "")
+            setCaseSource(session.case_state?.case_source || "")
+            setMessages(session.messages || [])
+            setCurrentSessionId(session.id)
+            setCurrentPhase(session.case_state?.current_phase || "introduction")
+            setIsTimerRunning(true)
+            // Ideally we'd restore elapsed time if we tracked it in the DB, but 0 is fine for now
+          }
+        } catch (e) {
+          console.error("Failed to resume session", e)
+        } finally {
+          setIsTyping(false)
+        }
+      }
+    }
+    resumeSession()
+  }, [sessionIdParam, user])
 
   // Drag to resize handler
   useEffect(() => {
@@ -345,7 +380,7 @@ export default function InterviewEnginePage() {
              if (window.speechSynthesis) window.speechSynthesis.cancel()
              router.push("/dashboard")
           }} className="text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-all duration-300 rounded-lg h-9 px-3">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Exit
+            <ArrowLeft className="h-4 w-4 mr-2" /> Save & Exit
           </Button>
           <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700" />
           
@@ -372,12 +407,26 @@ export default function InterviewEnginePage() {
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Timer */}
-          <div className="hidden md:flex items-center mr-4 text-slate-600 dark:text-neutral-400 font-mono text-sm font-semibold bg-slate-100 dark:bg-neutral-800 px-3 py-1.5 rounded-md border border-slate-200 dark:border-neutral-700">
-            <Clock className="h-4 w-4 mr-2 opacity-70" />
-            {formatTime(elapsedSeconds)}
+          {/* Timer & Pause */}
+          <div className="hidden md:flex items-center text-slate-600 dark:text-neutral-400 font-mono text-sm font-semibold bg-slate-100 dark:bg-neutral-800 rounded-md border border-slate-200 dark:border-neutral-700 overflow-hidden">
+            <div className="px-3 py-1.5 flex items-center border-r border-slate-200 dark:border-neutral-700">
+              <Clock className="h-4 w-4 mr-2 opacity-70" />
+              {formatTime(elapsedSeconds)}
+            </div>
+            <button 
+              onClick={() => setIsTimerRunning(!isTimerRunning)} 
+              className="px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors flex items-center"
+              title={isTimerRunning ? "Pause Interview" : "Resume Interview"}
+            >
+              {isTimerRunning ? (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+            </button>
           </div>
 
+          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           <ThemeToggle />
           <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           
@@ -416,7 +465,7 @@ export default function InterviewEnginePage() {
           </Button>
           
           <Button size="sm" className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-neutral-900 text-xs font-semibold h-9 rounded-lg px-5 ml-2 transition-all duration-300 shadow-sm hover:shadow-md" onClick={handleEndSession} disabled={isTyping}>
-            End Session
+            Finish & Feedback
           </Button>
         </div>
       </header>

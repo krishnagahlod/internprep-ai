@@ -87,7 +87,7 @@ export default function DashboardPage() {
             <Briefcase className="mr-3 h-4 w-4" />
             Interviews
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50">
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/dashboard/analytics")}>
             <TrendingUp className="mr-3 h-4 w-4" />
             Analytics
           </Button>

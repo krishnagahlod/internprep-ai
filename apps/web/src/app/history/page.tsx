@@ -126,7 +126,7 @@ export default function HistoryPage() {
                         {scan.analysis_data?.overall_feedback || "No feedback generated."}
                       </p>
                       <Button variant="outline" className="w-full text-xs" onClick={() => {
-                        alert("Detailed view coming soon! For now, refer to the summary above.")
+                        router.push(`/history/resume/${scan.id}`)
                       }}>
                         View Details
                       </Button>
@@ -167,9 +167,9 @@ export default function HistoryPage() {
                     </CardHeader>
                     <CardContent>
                       <Button variant="outline" className="w-full text-xs" onClick={() => {
-                        alert("Detailed transcript view coming soon!")
+                        router.push(`/interview?id=${interview.id}`)
                       }}>
-                        View Transcript
+                        {interview.status === 'completed' ? 'View Transcript' : 'Resume Interview'}
                       </Button>
                     </CardContent>
                   </Card>
