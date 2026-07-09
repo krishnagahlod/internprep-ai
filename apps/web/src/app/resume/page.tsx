@@ -605,7 +605,7 @@ export default function ResumePage() {
                   size="lg" 
                   variant="outline"
                   className="h-12 px-8 border-primary/20 text-primary hover:bg-primary/5 font-semibold" 
-                  onClick={() => startWorkshop({original_bullet: "Overall Resume"}, true)}
+                  onClick={() => startWorkshop({original_bullet: "Overall Resume", section_type: "overall"}, true)}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" /> Overall Strategy Session
                 </Button>
@@ -688,7 +688,12 @@ export default function ResumePage() {
           <form 
             onSubmit={(e) => {
               e.preventDefault();
-              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages, activeWorkshopBullet?.original_bullet === "Overall Resume" ? JSON.stringify(analysisResult?.section_summaries) : null);
+              const fullOverallCtx = analysisResult ? JSON.stringify({
+                radar: analysisResult.radar_scores,
+                summaries: analysisResult.section_summaries,
+                day1: analysisResult.day1_comparison
+              }) : null;
+              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages, activeWorkshopBullet?.section_type === "overall" ? fullOverallCtx : null);
             }} 
             className="relative"
           >
