@@ -46,7 +46,7 @@ class GeminiClient:
         self.key_status[key] = time.time() + self.cooldown_seconds
         print(f"Rate limit hit. Marked key ending in ...{key[-4:]} for {self.cooldown_seconds}s cooldown.")
 
-    def generate_content(self, model_name: str, prompt: str, generation_config: genai.GenerationConfig = None, max_retries: int = 6) -> Any:
+    def generate_content(self, model_name: str, prompt: str, generation_config: genai.GenerationConfig = None, max_retries: int = 6, pdf_bytes: bytes = None) -> Any:
         # Chat-based generation (if prompt is a string) or start_chat
         current_model_name = model_name
         for attempt in range(max_retries):
@@ -55,9 +55,16 @@ class GeminiClient:
             model = genai.GenerativeModel(current_model_name)
             
             try:
+                payload = [prompt]
+                if pdf_bytes:
+                    payload.append({
+                        "mime_type": "application/pdf",
+                        "data": pdf_bytes
+                    })
+                    
                 if generation_config:
-                    return model.generate_content(prompt, generation_config=generation_config)
-                return model.generate_content(prompt)
+                    return model.generate_content(payload, generation_config=generation_config)
+                return model.generate_content(payload)
             except Exception as e:
                 error_msg = str(e).lower()
                 if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:

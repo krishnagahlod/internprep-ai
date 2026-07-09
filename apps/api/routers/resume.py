@@ -56,16 +56,31 @@ async def analyze_resume(
         if not text.strip():
             raise HTTPException(status_code=400, detail="Could not extract text from the PDF")
             
+        # Check Cache for authenticated users
+        from agents.resume_analyzer import supabase
+        if supabase and user_id:
+            try:
+                cached_res = supabase.table("resume_analyses") \
+                    .select("analysis_data") \
+                    .eq("user_id", user_id) \
+                    .eq("target_role", target_role) \
+                    .eq("resume_text", text) \
+                    .execute()
+                if cached_res.data:
+                    print("Cache hit! Returning cached analysis.")
+                    return AnalysisResponse(raw_text=text, analysis=cached_res.data[0]["analysis_data"])
+            except Exception as e:
+                print(f"Error checking resume cache: {e}")
+
         # Run analyzer with timeout wrapper
         analysis_json_str = await asyncio.wait_for(
-            asyncio.to_thread(analyze_resume_text, text, target_role),
+            asyncio.to_thread(analyze_resume_text, text, target_role, pdf_bytes),
             timeout=300.0
         )
         
         analysis_dict = json.loads(analysis_json_str)
         
         # Save to database if user is authenticated
-        from agents.resume_analyzer import supabase
         if supabase and user_id:
             try:
                 supabase.table("resume_analyses").insert({

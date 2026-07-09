@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, ShieldAlert, Target } from "lucide-react"
+import { ArrowLeft, Loader2, CheckCircle2, AlertCircle, ShieldAlert, Target, Brain } from "lucide-react"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -157,6 +157,17 @@ export default function ResumeHistoryDetail() {
               </CardHeader>
               <CardContent className="p-6">
                 <RadarChart scores={analysis?.radar_scores} />
+                {analysis?.radar_scores_reasoning && (
+                  <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Brain className="h-4 w-4 text-primary" />
+                      <h4 className="text-sm font-semibold text-primary">AI Evaluation Reasoning</h4>
+                    </div>
+                    <p className="text-sm text-foreground/80 leading-relaxed">
+                      {analysis.radar_scores_reasoning}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

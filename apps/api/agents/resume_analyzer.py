@@ -133,7 +133,7 @@ def classify_bullet_strengths(bullets: List[Dict[str, str]]) -> Dict[str, str]:
         return {str(i): "weak" for i in range(len(bullets))}
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> str:
+def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_bytes: bytes = None) -> str:
     """
     Analyzes resume text using Two-Pass Adaptive RAG against Golden Resumes and Best Practices.
     """
@@ -166,7 +166,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         if len(bullet_text) < 15: return ""
         
         strength = strengths.get(str(idx), "weak")
-        match_count = 3 if strength == "strong" else 7
+        match_count = 15 # Increased for Gemini 3.5 Flash massive context window
         
         for attempt in range(3):
             try:
@@ -240,6 +240,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         "overall_feedback": "string",
         "day1_comparison": "string",
         "section_ordering_advice": "string",
+        "radar_scores_reasoning": "string (Chain of Thought reasoning for why you are assigning the specific scores below)",
         "radar_scores": {{
             "quantification": number, "action_verbs": number, "structure": number,
             "section_balance": number, "star_compliance": number, "formatting": number
@@ -268,9 +269,49 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         ]
     }}
     """
+    
+    import typing_extensions as typing
+    class RadarScores(typing.TypedDict):
+        quantification: int
+        action_verbs: int
+        structure: int
+        section_balance: int
+        star_compliance: int
+        formatting: int
+        
+    class SectionSummary(typing.TypedDict):
+        score: int
+        summary: str
+        bullet_count: int
+        
+    class BulletFeedback(typing.TypedDict):
+        id: str
+        original_bullet: str
+        section_type: str
+        severity: str
+        action_verb_rating: str
+        action_verb_alternatives: list[str]
+        metrics_hint: str
+        suggested_rewrite: str
+        feedback: str
+        grammar_issues: list[str]
+        formatting_issues: list[str]
 
-    config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
-    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), final_prompt, generation_config=config)
+    class ResumeAnalysisResponse(typing.TypedDict):
+        overall_feedback: str
+        day1_comparison: str
+        section_ordering_advice: str
+        radar_scores_reasoning: str
+        radar_scores: RadarScores
+        section_summaries: dict[str, SectionSummary]
+        bullets: list[BulletFeedback]
+
+    config = genai.GenerationConfig(
+        response_mime_type="application/json", 
+        temperature=0.0,
+        response_schema=list[ResumeAnalysisResponse] if False else ResumeAnalysisResponse # force schema type
+    )
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), final_prompt, generation_config=config, pdf_bytes=pdf_bytes)
     
     return clean_json(response.text)
 

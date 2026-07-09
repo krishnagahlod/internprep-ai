@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp } from "lucide-react"
+import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 
@@ -276,7 +276,7 @@ export default function ResumePage() {
     switch(severity?.toLowerCase()) {
       case 'critical': return { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-800 dark:text-red-400', edge: 'bg-red-500' };
       case 'major': return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-800 dark:text-amber-400', edge: 'bg-amber-500' };
-      case 'minor': return { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
+      case 'minor': return { bg: 'bg-yellow-500/10', border: 'bg-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
       case 'good': 
       default: return { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-800 dark:text-green-400', edge: 'bg-green-500' };
     }
@@ -441,6 +441,17 @@ export default function ResumePage() {
                 <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 flex flex-col items-center justify-center">
                   <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
                   <RadarChart scores={analysisResult.radar_scores} />
+                  {analysisResult.radar_scores_reasoning && (
+                    <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Brain className="h-4 w-4 text-primary" />
+                        <h4 className="text-sm font-semibold text-primary">AI Evaluation Reasoning</h4>
+                      </div>
+                      <p className="text-sm text-foreground/80 leading-relaxed">
+                        {analysisResult.radar_scores_reasoning}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex flex-col gap-4">
