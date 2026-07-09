@@ -143,7 +143,20 @@ export default function ResumePage() {
 
     setIsUploading(true)
     setError(null)
-    setProgress(10)
+    setProgress(5)
+
+    // Simulate gradual progress since analysis can take a few minutes
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 95) {
+          clearInterval(progressInterval);
+          return 95;
+        }
+        // slow down as it gets closer to 95
+        const increment = prev < 40 ? 5 : prev < 75 ? 2 : 0.5;
+        return prev + increment;
+      })
+    }, 2000)
 
     try {
       const formData = new FormData()
@@ -152,8 +165,6 @@ export default function ResumePage() {
       if (user?.id) {
         formData.append("user_id", user.id)
       }
-
-      setProgress(30)
       
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/resume/analyze`, {
@@ -161,14 +172,13 @@ export default function ResumePage() {
         body: formData,
       })
 
-      setProgress(80)
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.detail || "Failed to analyze resume")
       }
 
       const data = await response.json()
+      clearInterval(progressInterval)
       setResumeText(data.raw_text)
       setAnalysisResult(data.analysis)
       setProgress(100)
@@ -176,9 +186,11 @@ export default function ResumePage() {
         incrementGuestResume()
       }
     } catch (err: any) {
+      clearInterval(progressInterval)
       setError(err.message || "An unexpected error occurred.")
       setProgress(0)
     } finally {
+      clearInterval(progressInterval)
       setIsUploading(false)
     }
   }
@@ -376,7 +388,7 @@ export default function ResumePage() {
                 <div className="mb-6 space-y-2">
                   <div className="flex justify-between text-xs font-mono text-muted-foreground">
                     <span>Adaptive RAG & Multi-Pass Neural Engine Active...</span>
-                    <span>{progress}%</span>
+                    <span>{Math.floor(progress)}%</span>
                   </div>
                   <Progress value={progress} className="h-2 bg-black/10 dark:bg-white/10" />
                 </div>
@@ -387,12 +399,15 @@ export default function ResumePage() {
                 onClick={handleUpload} 
                 disabled={!file || isUploading}
               >
-                {isUploading ? "Executing Analysis (~45s)" : "Analyze Document"}
+                {isUploading ? "Executing Deep Analysis (~2 mins)" : "Analyze Document"}
               </Button>
-              <p className="text-center text-xs text-muted-foreground mt-4 opacity-70">
-                <ShieldAlert className="inline-block w-3 h-3 mr-1 mb-0.5" />
-                Your resume is processed in real-time and is never permanently stored or shared.
-              </p>
+              
+              <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-xl text-center">
+                <p className="text-sm font-medium text-primary">
+                  <ShieldAlert className="inline-block w-4 h-4 mr-2 mb-0.5" />
+                  Privacy First: Your resume is processed in real-time and is never permanently stored or shared.
+                </p>
+              </div>
             </div>
           ) : (
             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
