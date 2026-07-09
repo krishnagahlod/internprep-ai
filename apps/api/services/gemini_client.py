@@ -46,12 +46,13 @@ class GeminiClient:
         self.key_status[key] = time.time() + self.cooldown_seconds
         print(f"Rate limit hit. Marked key ending in ...{key[-4:]} for {self.cooldown_seconds}s cooldown.")
 
-    def generate_content(self, model_name: str, prompt: str, generation_config: genai.GenerationConfig = None, max_retries: int = 3) -> Any:
+    def generate_content(self, model_name: str, prompt: str, generation_config: genai.GenerationConfig = None, max_retries: int = 6) -> Any:
         # Chat-based generation (if prompt is a string) or start_chat
+        current_model_name = model_name
         for attempt in range(max_retries):
             key = self._get_next_healthy_key()
             genai.configure(api_key=key)
-            model = genai.GenerativeModel(model_name)
+            model = genai.GenerativeModel(current_model_name)
             
             try:
                 if generation_config:
@@ -64,13 +65,12 @@ class GeminiClient:
                     if attempt == max_retries - 1:
                         raise e
                     # Backoff
-                    time.sleep(1 * (attempt + 1) + random.uniform(0, 1))
+                    time.sleep(2 * (attempt + 1) + random.uniform(0, 1))
                 elif "404" in error_msg or "notfound" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
-                    print(f"Model {model_name} not found, falling back to gemini-2.0-flash")
-                    model = genai.GenerativeModel("gemini-2.0-flash")
-                    if generation_config:
-                        return model.generate_content(prompt, generation_config=generation_config)
-                    return model.generate_content(prompt)
+                    print(f"Model {current_model_name} not found, falling back to gemini-flash-latest")
+                    current_model_name = "gemini-flash-latest"
+                    if attempt == max_retries - 1:
+                        raise e
                 else:
                     raise e
                     
@@ -92,8 +92,8 @@ class GeminiClient:
             return chat
         except Exception as e:
             if "404" in str(e).lower() or "notfound" in str(e).lower() or "not found" in str(e).lower() or "no longer available" in str(e).lower():
-                print(f"Model {model_name} not found, falling back to gemini-2.0-flash")
-                model = genai.GenerativeModel("gemini-2.0-flash")
+                print(f"Model {model_name} not found, falling back to gemini-flash-latest")
+                model = genai.GenerativeModel("gemini-flash-latest")
                 return model.start_chat(history=history or [])
             raise e
 
