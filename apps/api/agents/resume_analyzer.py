@@ -247,7 +247,10 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         }},
         "section_summaries": {{
             "experience": {{"score": number, "summary": "string", "bullet_count": number}},
-            "project": {{...}} // Include all sections present
+            "project": {{"score": number, "summary": "string", "bullet_count": number}},
+            "por": {{"score": number, "summary": "string", "bullet_count": number}},
+            "scholastic": {{"score": number, "summary": "string", "bullet_count": number}},
+            "extracurricular": {{"score": number, "summary": "string", "bullet_count": number}}
         }},
         "bullets": [
             {{
@@ -297,13 +300,20 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         grammar_issues: list[str]
         formatting_issues: list[str]
 
+    class SectionSummaries(typing.TypedDict, total=False):
+        experience: SectionSummary
+        project: SectionSummary
+        por: SectionSummary
+        scholastic: SectionSummary
+        extracurricular: SectionSummary
+
     class ResumeAnalysisResponse(typing.TypedDict):
         overall_feedback: str
         day1_comparison: str
         section_ordering_advice: str
         radar_scores_reasoning: str
         radar_scores: RadarScores
-        section_summaries: dict[str, SectionSummary]
+        section_summaries: SectionSummaries
         bullets: list[BulletFeedback]
 
     config = genai.GenerationConfig(
