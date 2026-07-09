@@ -133,7 +133,6 @@ export default function LoginPage() {
 
           <div className="relative z-10 mt-12">
             <p className="text-sm font-medium text-foreground">Exclusive to IIT Bombay</p>
-            <p className="text-xs text-muted-foreground mt-1">For Phase 1 and Phase 2 placements</p>
           </div>
         </div>
 
