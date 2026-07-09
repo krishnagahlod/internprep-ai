@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"

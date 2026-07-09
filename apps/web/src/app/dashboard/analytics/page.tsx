@@ -55,9 +55,10 @@ export default function AnalyticsPage() {
         if (resumes && resumes.length > 0) {
           // Process trend data (overall scores over time)
           const trends = resumes.map((r, i) => {
-            const scores = r.analysis_data?.radar_scores || {}
+            const analysis_data = r.analysis_data as any
+            const scores: Record<string, number> = analysis_data?.radar_scores || {}
             // Average of all scores to get a single performance metric
-            const avgScore = Object.values(scores).reduce((a: any, b: any) => a + b, 0) / (Object.keys(scores).length || 1)
+            const avgScore = Object.values(scores).reduce((a: number, b: number) => a + b, 0) / (Object.keys(scores).length || 1)
             
             return {
               name: `Scan ${i + 1}`,
@@ -80,7 +81,8 @@ export default function AnalyticsPage() {
           
           let validCount = 0
           recentResumes.forEach(r => {
-            const scores = r.analysis_data?.radar_scores
+            const analysis_data = r.analysis_data as any
+            const scores = analysis_data?.radar_scores
             if (scores) {
               categorySums["Quantification"] += scores.quantification || 0
               categorySums["Action Verbs"] += scores.action_verbs || 0
