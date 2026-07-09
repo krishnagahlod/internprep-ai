@@ -67,8 +67,12 @@ async def analyze_resume(
                     .eq("resume_text", text) \
                     .execute()
                 if cached_res.data:
-                    print("Cache hit! Returning cached analysis.")
-                    return AnalysisResponse(raw_text=text, analysis=cached_res.data[0]["analysis_data"])
+                    cached_analysis = cached_res.data[0]["analysis_data"]
+                    if cached_analysis and cached_analysis.get("bullets"):
+                        print("Cache hit! Returning cached analysis.")
+                        return AnalysisResponse(raw_text=text, analysis=cached_analysis)
+                    else:
+                        print("Found incomplete cache entry. Bypassing cache.")
             except Exception as e:
                 print(f"Error checking resume cache: {e}")
 
@@ -80,9 +84,11 @@ async def analyze_resume(
         
         analysis_dict = json.loads(analysis_json_str)
         
-        # Save to database if user is authenticated
-        if supabase and user_id:
+        # Save to database if user is authenticated and analysis is complete
+        if supabase and user_id and analysis_dict.get("bullets"):
             try:
+                # We do an upsert or just insert, but since we bypassed a bad cache, let's just insert for now 
+                # (or ideally update if it existed, but insert is fine since we select the first one).
                 supabase.table("resume_analyses").insert({
                     "user_id": user_id,
                     "resume_text": text,

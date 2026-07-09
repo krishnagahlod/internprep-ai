@@ -338,8 +338,8 @@ export default function ResumePage() {
           </div>
         </header>
 
-        <div className="container mx-auto py-12 px-4 md:px-8 max-w-4xl relative z-10">
-          <div className="mb-12">
+        <div className={`container mx-auto px-4 md:px-8 relative z-10 ${!analysisResult ? 'py-12 max-w-4xl' : 'py-6 max-w-[1600px] h-[calc(100vh-56px)] flex flex-col'}`}>
+          <div className="mb-8 shrink-0">
             <h1 className="text-4xl font-extrabold tracking-tight mb-3">Resume Intelligence</h1>
             <p className="text-muted-foreground text-lg">
               Upload your PDF. Our engine extracts text, analyzes structuring against Day 1 benchmarks, and helps you rewrite.
@@ -427,7 +427,7 @@ export default function ResumePage() {
               </div>
             </div>
           ) : (
-            <ResizablePanelGroup orientation="horizontal" className="h-[calc(100vh-100px)] min-h-[800px] border-t border-black/10 dark:border-white/10 mt-6 pt-6">
+            <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0 border-t border-black/10 dark:border-white/10 mt-2 pt-6">
               
               {/* PDF Viewer Panel */}
               <ResizablePanel defaultSize={40} minSize={25} className="pr-4 hidden md:block">
@@ -474,15 +474,16 @@ export default function ResumePage() {
                   <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
                   <RadarChart scores={analysisResult.radar_scores} />
                   {analysisResult.radar_scores_reasoning && (
-                    <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Brain className="h-4 w-4 text-primary" />
-                        <h4 className="text-sm font-semibold text-primary">AI Evaluation Reasoning</h4>
-                      </div>
-                      <p className="text-sm text-foreground/80 leading-relaxed">
+                    <details className="mt-6 w-full p-4 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
+                      <summary className="flex items-center gap-2 outline-none font-semibold text-sm text-primary list-none">
+                        <Brain className="h-4 w-4" />
+                        AI Evaluation Reasoning
+                        <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
+                      </summary>
+                      <p className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text">
                         {analysisResult.radar_scores_reasoning}
                       </p>
-                    </div>
+                    </details>
                   )}
                 </div>
                 
