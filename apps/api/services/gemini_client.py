@@ -65,6 +65,12 @@ class GeminiClient:
                         raise e
                     # Backoff
                     time.sleep(1 * (attempt + 1) + random.uniform(0, 1))
+                elif "notfound" in error_msg or "not found" in error_msg:
+                    print(f"Model {model_name} not found, falling back to gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    if generation_config:
+                        return model.generate_content(prompt, generation_config=generation_config)
+                    return model.generate_content(prompt)
                 else:
                     raise e
                     
@@ -76,7 +82,20 @@ class GeminiClient:
         key = self._get_next_healthy_key()
         genai.configure(api_key=key)
         model = genai.GenerativeModel(model_name)
-        return model.start_chat(history=history or [])
+        try:
+            # Test if model exists by instantiating chat
+            chat = model.start_chat(history=history or [])
+            # Make a dummy call? No, start_chat doesn't make an API call immediately.
+            # But if we want to fallback safely, we can just return it. 
+            # If the user wants 2.5-flash everywhere, we'll try it. If start_chat fails later during send_message, that's harder to catch here.
+            # But usually it fails on the first generate_content/send_message.
+            return chat
+        except Exception as e:
+            if "notfound" in str(e).lower() or "not found" in str(e).lower():
+                print(f"Model {model_name} not found, falling back to gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                return model.start_chat(history=history or [])
+            raise e
 
     def embed_text(self, text: str, model_name: str = 'models/gemini-embedding-001', max_retries: int = 3) -> List[float]:
         for attempt in range(max_retries):
