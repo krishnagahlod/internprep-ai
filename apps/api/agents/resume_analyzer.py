@@ -158,6 +158,8 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
     print("Fetching adaptive RAG context concurrently...")
     
     def fetch_rag_for_bullet(args):
+        import time
+        import random
         idx, ub = args
         bullet_text = ub.get('bullet_text', '')
         section_type = ub.get('section_type', 'experience')
@@ -166,29 +168,34 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting") -> st
         strength = strengths.get(str(idx), "weak")
         match_count = 3 if strength == "strong" else 7
         
-        try:
-            embedding = gemini_client.embed_text(bullet_text)
-            if embedding:
-                rpc_res = supabase.rpc('match_golden_bullets', {
-                    'query_embedding': embedding,
-                    'match_count': match_count,
-                    'filter_section_type': section_type,
-                    'filter_target_role': target_role
-                }).execute()
-                
-                matches = rpc_res.data
-                if matches:
-                    local_context = f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
-                    local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
-                    for m in matches:
-                        local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
-                        local_context += f"  Text: {m['bullet_text']}\n"
-                    return local_context
-        except Exception as e:
-            print(f"Supabase RPC error: {e}")
+        for attempt in range(3):
+            try:
+                # Add slight jitter to prevent thundering herd connection resets
+                time.sleep(random.uniform(0.1, 0.5))
+                embedding = gemini_client.embed_text(bullet_text)
+                if embedding:
+                    rpc_res = supabase.rpc('match_golden_bullets', {
+                        'query_embedding': embedding,
+                        'match_count': match_count,
+                        'filter_section_type': section_type,
+                        'filter_target_role': target_role
+                    }).execute()
+                    
+                    matches = rpc_res.data
+                    if matches:
+                        local_context = f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
+                        local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
+                        for m in matches:
+                            local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
+                            local_context += f"  Text: {m['bullet_text']}\n"
+                        return local_context
+                break # Success, break out of retry loop
+            except Exception as e:
+                print(f"Supabase RPC error on attempt {attempt+1} for bullet {idx}: {e}")
+                time.sleep(1.5) # Wait before retrying
         return ""
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         rag_results = list(executor.map(fetch_rag_for_bullet, enumerate(user_bullets)))
     
     rag_context = "".join(rag_results)
