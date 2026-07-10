@@ -65,6 +65,7 @@ async def analyze_resume(
                     .eq("user_id", user_id) \
                     .eq("target_role", target_role) \
                     .eq("resume_text", text) \
+                    .order("created_at", desc=True) \
                     .execute()
                 if cached_res.data:
                     cached_analysis = cached_res.data[0]["analysis_data"]
