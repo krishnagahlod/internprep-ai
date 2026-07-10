@@ -74,8 +74,8 @@ class GeminiClient:
                     # Backoff
                     time.sleep(2 * (attempt + 1) + random.uniform(0, 1))
                 elif "404" in error_msg or "notfound" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
-                    print(f"Model {current_model_name} not found, falling back to gemini-1.5-flash")
-                    current_model_name = "gemini-1.5-flash"
+                    print(f"Model {current_model_name} not found, falling back to gemini-flash-latest")
+                    current_model_name = "gemini-flash-latest"
                     if attempt == max_retries - 1:
                         raise e
                 else:
@@ -99,8 +99,8 @@ class GeminiClient:
             return chat
         except Exception as e:
             if "404" in str(e).lower() or "notfound" in str(e).lower() or "not found" in str(e).lower() or "no longer available" in str(e).lower():
-                print(f"Model {model_name} not found, falling back to gemini-1.5-flash")
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                print(f"Model {model_name} not found, falling back to gemini-flash-latest")
+                model = genai.GenerativeModel("gemini-flash-latest")
                 return model.start_chat(history=history or [])
             raise e
 
