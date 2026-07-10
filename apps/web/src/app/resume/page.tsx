@@ -11,7 +11,7 @@ import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageS
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
+
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
   if (!scores) return null;
