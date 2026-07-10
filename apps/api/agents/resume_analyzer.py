@@ -334,10 +334,9 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
 
     config = genai.GenerationConfig(
         response_mime_type="application/json", 
-        temperature=0.0,
-        response_schema=list[ResumeAnalysisResponse] if False else ResumeAnalysisResponse # force schema type
+        temperature=0.0
     )
-    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), final_prompt, generation_config=config, pdf_bytes=pdf_bytes)
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), final_prompt, generation_config=config)
     
     return clean_json(response.text)
 
