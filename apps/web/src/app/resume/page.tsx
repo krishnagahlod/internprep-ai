@@ -11,8 +11,7 @@ import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageS
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
-import { BulletDiff } from "@/components/resume/bullet-diff"
-
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
   if (!scores) return null;
@@ -564,96 +563,101 @@ export default function ResumePage() {
                               const verbColor = getVerbColors(bullet.action_verb_rating);
                               
                               return (
-                                <div key={idx} className="glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all">
+                                <div key={idx} className="glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all mb-4 border border-black/5 dark:border-white/5 shadow-sm">
                                   <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sev.edge}`} />
                                   
                                   <div className="p-5 pl-6">
+                                    {/* Original Bullet */}
                                     <div className="flex justify-between items-start mb-4 gap-4">
                                       <p className="font-mono text-sm leading-relaxed text-foreground/90 flex-1">"{bullet.original_bullet}"</p>
                                       
                                       <div className="flex flex-col items-end gap-2 shrink-0">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border`}>
+                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border shadow-sm`}>
                                           {bullet.severity} Priority
                                         </span>
-                                        <span className="text-[10px] text-muted-foreground">
+                                        <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
                                           {Math.round(bullet.confidence * 100)}% Confidence
                                         </span>
                                       </div>
                                     </div>
                                     
+                                    {/* Tags Row */}
                                     <div className="flex flex-wrap gap-2 mb-4 items-center">
-                                      <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor}`}>
+                                      <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor} shadow-sm border border-black/5 dark:border-white/5`}>
                                         Verb: {bullet.action_verb_rating}
                                       </span>
-                                      {bullet.action_verb_alternatives?.length > 0 && (
-                                        <span className="text-xs text-muted-foreground">
-                                          Try: {bullet.action_verb_alternatives.join(", ")}
+                                      
+                                      {bullet.structural_issues?.map((issue: string, i: number) => (
+                                        <span key={`struct-${i}`} className="px-2 py-1 bg-black/5 dark:bg-white/5 text-foreground/70 text-[10px] uppercase tracking-wider rounded font-semibold border border-black/10 dark:border-white/10">
+                                          {issue}
                                         </span>
-                                      )}
+                                      ))}
+                                      {bullet.best_practice_violations?.map((violation: string, i: number) => (
+                                        <span key={`rule-${i}`} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-800 dark:text-red-400 text-[10px] uppercase tracking-wider rounded font-semibold">
+                                          Rule Break: {violation}
+                                        </span>
+                                      ))}
                                     </div>
 
-                                    {(bullet.structural_issues?.length > 0 || bullet.best_practice_violations?.length > 0) && (
-                                      <div className="flex flex-wrap gap-2 mb-4">
-                                        {bullet.structural_issues?.map((issue: string, i: number) => (
-                                          <span key={`struct-${i}`} className="px-2 py-1 bg-black/10 dark:bg-white/10 text-foreground/70 text-[10px] uppercase tracking-wider rounded font-semibold">
-                                            {issue}
-                                          </span>
-                                        ))}
-                                        {bullet.best_practice_violations?.map((violation: string, i: number) => (
-                                          <span key={`rule-${i}`} className="px-2 py-1 bg-red-500/10 border border-red-500/20 text-red-800 dark:text-red-400 text-[10px] uppercase tracking-wider rounded font-semibold">
-                                            Rule Break: {violation}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    <div className={`p-4 rounded-xl mb-4 border ${sev.bg} ${sev.border} ${sev.text}`}>
+                                    {/* Critique & Hints Box */}
+                                    <div className={`p-4 rounded-xl mb-4 border shadow-sm ${sev.bg} ${sev.border} ${sev.text}`}>
                                       <div className="flex justify-between items-start">
-                                        <p className="text-sm"><strong>Critique:</strong> {bullet.critique}</p>
+                                        <div className="space-y-3 pr-4">
+                                          <p className="text-sm"><strong>Critique:</strong> {bullet.critique}</p>
+                                          {bullet.metrics_hint && (
+                                            <p className="text-sm flex items-start gap-2">
+                                              <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
+                                              <span><strong>Hint:</strong> {bullet.metrics_hint}</span>
+                                            </p>
+                                          )}
+                                          {bullet.action_verb_alternatives?.length > 0 && (
+                                            <p className="text-sm flex items-start gap-2">
+                                              <Activity className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
+                                              <span><strong>Try Verbs:</strong> {bullet.action_verb_alternatives.join(", ")}</span>
+                                            </p>
+                                          )}
+                                        </div>
                                         <Button 
                                           size="sm" 
                                           variant="outline" 
-                                          className="ml-4 shrink-0 bg-background/50 hover:bg-background border-black/10 dark:border-white/10"
+                                          className="shrink-0 bg-background/50 hover:bg-background border-black/10 dark:border-white/10 shadow-sm"
                                           onClick={() => startWorkshop(bullet)}
                                         >
                                           <MessageSquare className="h-4 w-4 mr-2" /> Workshop
                                         </Button>
                                       </div>
                                     </div>
-
-                                    {bullet.metrics_hint && (
-                                      <div className="p-3 rounded-lg mb-4 bg-yellow-500/10 border border-yellow-500/20 text-yellow-800 dark:text-yellow-500 flex items-start gap-2">
-                                        <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
-                                        <p className="text-sm"><strong>Quantification Hint:</strong> {bullet.metrics_hint}</p>
-                                      </div>
-                                    )}
                                     
+                                    {/* Suggested Rewrite */}
                                     {bullet.suggested_rewrite && (
-                                      <div className="mb-4">
-                                        <div className="flex justify-between items-center mb-2">
-                                          <div className="flex items-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400">
-                                            <Lightbulb className="h-4 w-4" /> Day 1 Rewrite Strategy
+                                      <div className="p-4 rounded-xl mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 shadow-inner">
+                                        <div className="flex justify-between items-center mb-3">
+                                          <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase">
+                                            <CheckCircle2 className="h-4 w-4" /> Suggested Rewrite
                                           </div>
                                           <Button 
                                             variant="ghost" 
                                             size="sm" 
-                                            className="h-6 text-xs px-2"
+                                            className="h-6 text-xs px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400"
                                             onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
                                           >
-                                            <Copy className="h-3 w-3 mr-1" /> Copy Text
+                                            <Copy className="h-3 w-3 mr-1" /> Copy
                                           </Button>
                                         </div>
-                                        <BulletDiff original={bullet.original_bullet} rewrite={bullet.suggested_rewrite} />
+                                        <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100 leading-relaxed font-serif">
+                                          {bullet.suggested_rewrite}
+                                        </p>
                                       </div>
                                     )}
 
+                                    {/* Benchmark */}
                                     {bullet.golden_comparison && (
-                                      <div className="p-4 rounded-xl mb-4 bg-primary/5 border border-primary/20">
-                                        <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2">
-                                          <CheckCircle2 className="h-3 w-3" />
-                                          Day 1 Structural Benchmark
+                                      <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2 opacity-70">
+                                          <Target className="h-3 w-3" />
+                                          Golden Benchmark Inspiration
                                         </p>
-                                        <p className="text-sm text-primary/80 mb-3 italic">"{bullet.golden_comparison}"</p>
+                                        <p className="text-sm text-primary/80 italic font-serif leading-relaxed">"{bullet.golden_comparison}"</p>
                                       </div>
                                     )}
                                   </div>
