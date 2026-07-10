@@ -212,6 +212,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
     Analyze the user's resume bullet by bullet. Provide a deep structural critique using the new schema.
     Provide severity (critical, major, minor, good), an action verb rating (weak, moderate, strong) with alternatives, and a metrics hint if they lack quantification.
     Generate a suggested_rewrite that preserves their facts but upgrades the structural skeleton.
+    CRITICAL TENSE RULE: You MUST preserve the original verb tense of the point (e.g. if the original uses continuous tense like "Designing", the rewrite and suggested verbs MUST use continuous tense. Do not change it to past tense if they are currently doing it).
     
     CRITICAL LENGTH CONSTRAINT: The suggested_rewrite MUST be extremely close in length to the original_bullet (ideally exactly the same number of words/characters). IIT Bombay resumes require exactly 1-line per bullet with no empty space. Do NOT generate a rewrite that is significantly longer or shorter than the original, otherwise it will ruin their formatting.
     

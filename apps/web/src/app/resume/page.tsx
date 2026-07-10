@@ -576,7 +576,7 @@ export default function ResumePage() {
                                             {bullet.severity} Priority
                                           </span>
                                           <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
-                                            {Math.round(bullet.confidence * 100)}% Confidence
+                                            {Math.round(bullet.confidence > 1 ? bullet.confidence : bullet.confidence * 100)}% Confidence
                                           </span>
                                         </div>
                                       </div>
