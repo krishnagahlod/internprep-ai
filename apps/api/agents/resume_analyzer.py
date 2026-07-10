@@ -85,11 +85,12 @@ class ResumeAnalysisResult(BaseModel):
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
-    """Extracts raw bullets from the user's resume for independent analysis."""
+    """Extracts raw bullets from the user's resume and classifies their strength for independent analysis."""
     prompt = f"""
     Extract every single achievement bullet point from the following resume text.
-    Return ONLY a JSON list of objects containing 'bullet_text' and 'section_type'.
+    Return ONLY a JSON list of objects containing 'bullet_text', 'section_type', and 'strength'.
     Section type must be one of: experience, project, por, scholastic, extracurricular.
+    Strength must be either "strong" (has numbers/metrics) or "weak" (vague, no metrics).
     
     CRITICAL: You MUST extract EVERY SINGLE bullet point from the entire resume (usually 20-40 points). Do not omit or skip any bullet.
     
@@ -98,7 +99,7 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
     """
     try:
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), prompt, generation_config=config)
+        res = gemini_client.generate_content(os.getenv("PREPROCESSING_MODEL", "gemini-3.5-flash"), prompt, generation_config=config)
         data = json.loads(clean_json(res.text))
         if isinstance(data, list): return data
         if "bullets" in data: return data["bullets"]
@@ -106,31 +107,6 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
     except Exception as e:
         print(f"Extraction error: {e}")
         return []
-
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-def classify_bullet_strengths(bullets: List[Dict[str, str]]) -> Dict[str, str]:
-    """Fast pass to classify bullet strengths (weak vs strong) to guide RAG depth."""
-    if not bullets: return {}
-    
-    bullets_json = json.dumps([{"id": i, "text": b.get("bullet_text", "")[:100]} for i, b in enumerate(bullets)])
-    prompt = f"""
-    Quickly classify if each bullet point is 'strong' (has numbers/metrics) or 'weak' (vague, no metrics).
-    Return ONLY a JSON list of objects with 'id' and 'strength' ("strong" or "weak").
-    
-    Bullets:
-    {bullets_json}
-    """
-    try:
-        config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-        res = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), prompt, generation_config=config)
-        data = json.loads(clean_json(res.text))
-        result = {}
-        for item in data:
-            result[str(item.get("id"))] = item.get("strength", "weak")
-        return result
-    except Exception as e:
-        print(f"Classification error: {e}")
-        return {str(i): "weak" for i in range(len(bullets))}
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_bytes: bytes = None) -> str:
@@ -149,12 +125,9 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         Resume: {resume_text}
         """
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.0)
-        response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), prompt, generation_config=config)
+        response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), prompt, generation_config=config)
         return clean_json(response.text)
 
-    print(f"Found {len(user_bullets)} user bullets. Running strength classification...")
-    strengths = classify_bullet_strengths(user_bullets)
-    
     print("Fetching adaptive RAG context concurrently using batch embeddings...")
     
     # 1. Extract texts for batch embedding
@@ -175,7 +148,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         section_type = ub.get('section_type', 'experience')
         if len(bullet_text) < 15 or not embedding: return ""
         
-        strength = strengths.get(str(idx), "weak")
+        strength = ub.get("strength", "weak")
         match_count = 15 # Increased for Gemini 3.5 Flash massive context window
         
         for attempt in range(3):
@@ -336,7 +309,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         response_mime_type="application/json", 
         temperature=0.0
     )
-    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), final_prompt, generation_config=config)
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), final_prompt, generation_config=config)
     
     return clean_json(response.text)
 
