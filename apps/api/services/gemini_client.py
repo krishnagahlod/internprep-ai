@@ -124,4 +124,29 @@ class GeminiClient:
                     
         raise Exception("Max retries exceeded for embed_text")
 
+    def embed_batch(self, texts: List[str], model_name: str = 'models/gemini-embedding-001', max_retries: int = 3) -> List[List[float]]:
+        if not texts:
+            return []
+            
+        for attempt in range(max_retries):
+            key = self._get_next_healthy_key()
+            genai.configure(api_key=key)
+            
+            try:
+                # Passes a list of strings to embed_content, which returns a list of embeddings
+                res = genai.embed_content(model=model_name, content=texts)
+                # Google generative AI returns dict with 'embedding' as a list of embeddings when passed a list
+                return res['embedding']
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
+                    self._mark_key_cooldown(key)
+                    if attempt == max_retries - 1:
+                        raise e
+                    time.sleep(1.0 * (attempt + 1) + random.uniform(0, 0.5))
+                else:
+                    raise e
+                    
+        raise Exception("Max retries exceeded for embed_batch")
+
 gemini_client = GeminiClient()

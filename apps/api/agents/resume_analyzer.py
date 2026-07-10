@@ -155,48 +155,56 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
     print(f"Found {len(user_bullets)} user bullets. Running strength classification...")
     strengths = classify_bullet_strengths(user_bullets)
     
-    print("Fetching adaptive RAG context concurrently...")
+    print("Fetching adaptive RAG context concurrently using batch embeddings...")
     
+    # 1. Extract texts for batch embedding
+    bullet_texts = [ub.get('bullet_text', '') for ub in user_bullets]
+    
+    # 2. Fetch all embeddings in ONE API call to avoid rate limits
+    try:
+        embeddings = gemini_client.embed_batch(bullet_texts)
+    except Exception as e:
+        print(f"Batch embedding failed: {e}")
+        embeddings = [None] * len(user_bullets)
+        
     def fetch_rag_for_bullet(args):
         import time
         import random
-        idx, ub = args
+        idx, ub, embedding = args
         bullet_text = ub.get('bullet_text', '')
         section_type = ub.get('section_type', 'experience')
-        if len(bullet_text) < 15: return ""
+        if len(bullet_text) < 15 or not embedding: return ""
         
         strength = strengths.get(str(idx), "weak")
         match_count = 15 # Increased for Gemini 3.5 Flash massive context window
         
         for attempt in range(3):
             try:
-                # Add slight jitter to prevent thundering herd connection resets
-                time.sleep(random.uniform(0.1, 0.5))
-                embedding = gemini_client.embed_text(bullet_text)
-                if embedding:
-                    rpc_res = supabase.rpc('match_golden_bullets', {
-                        'query_embedding': embedding,
-                        'match_count': match_count,
-                        'filter_section_type': section_type,
-                        'filter_target_role': target_role
-                    }).execute()
-                    
-                    matches = rpc_res.data
-                    if matches:
-                        local_context = f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
-                        local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
-                        for m in matches:
-                            local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
-                            local_context += f"  Text: {m['bullet_text']}\n"
-                        return local_context
+                rpc_res = supabase.rpc('match_golden_bullets', {
+                    'query_embedding': embedding,
+                    'match_count': match_count,
+                    'filter_section_type': section_type,
+                    'filter_target_role': target_role
+                }).execute()
+                
+                matches = rpc_res.data
+                if matches:
+                    local_context = f"\n--- USER BULLET: {bullet_text} (Section: {section_type}) ---\n"
+                    local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\n"
+                    for m in matches:
+                        local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\n"
+                        local_context += f"  Text: {m['bullet_text']}\n"
+                    return local_context
                 break # Success, break out of retry loop
             except Exception as e:
                 print(f"Supabase RPC error on attempt {attempt+1} for bullet {idx}: {e}")
                 time.sleep(1.5) # Wait before retrying
         return ""
 
+    # 3. Fetch RAG matches concurrently from Supabase
+    args_list = [(i, ub, embeddings[i] if i < len(embeddings) else None) for i, ub in enumerate(user_bullets)]
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        rag_results = list(executor.map(fetch_rag_for_bullet, enumerate(user_bullets)))
+        rag_results = list(executor.map(fetch_rag_for_bullet, args_list))
     
     rag_context = "".join(rag_results)
 
