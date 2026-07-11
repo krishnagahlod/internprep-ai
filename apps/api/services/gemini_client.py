@@ -104,13 +104,16 @@ class GeminiClient:
                 return model.start_chat(history=history or [])
             raise e
 
-    def embed_text(self, text: str, model_name: str = 'models/gemini-embedding-001', max_retries: int = 3) -> List[float]:
+    def embed_text(self, text: str, model_name: str = 'models/gemini-embedding-001', max_retries: int = 3, task_type: str = None) -> List[float]:
         for attempt in range(max_retries):
             key = self._get_next_healthy_key()
             genai.configure(api_key=key)
             
             try:
-                res = genai.embed_content(model=model_name, content=text)
+                kwargs = {"model": model_name, "content": text}
+                if task_type:
+                    kwargs["task_type"] = task_type
+                res = genai.embed_content(**kwargs)
                 return res['embedding']
             except Exception as e:
                 error_msg = str(e).lower()
@@ -124,7 +127,7 @@ class GeminiClient:
                     
         raise Exception("Max retries exceeded for embed_text")
 
-    def embed_batch(self, texts: List[str], model_name: str = 'models/gemini-embedding-001', max_retries: int = 3) -> List[List[float]]:
+    def embed_batch(self, texts: List[str], model_name: str = 'models/gemini-embedding-001', max_retries: int = 3, task_type: str = None) -> List[List[float]]:
         if not texts:
             return []
             
@@ -133,8 +136,11 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
+                kwargs = {"model": model_name, "content": texts}
+                if task_type:
+                    kwargs["task_type"] = task_type
                 # Passes a list of strings to embed_content, which returns a list of embeddings
-                res = genai.embed_content(model=model_name, content=texts)
+                res = genai.embed_content(**kwargs)
                 # Google generative AI returns dict with 'embedding' as a list of embeddings when passed a list
                 return res['embedding']
             except Exception as e:
