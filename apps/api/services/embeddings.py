@@ -3,7 +3,9 @@ import google.generativeai as genai
 from typing import List
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/embedding-001")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
+if not EMBEDDING_MODEL.startswith("models/") and not EMBEDDING_MODEL.startswith("tunedModels/"):
+    EMBEDDING_MODEL = f"models/{EMBEDDING_MODEL}"
 
 def get_embedding(text: str) -> List[float]:
     """
