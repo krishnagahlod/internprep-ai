@@ -426,25 +426,24 @@ export default function ResumePage() {
               </div>
             </div>
           ) : (
-            <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0 border-t border-black/10 dark:border-white/10 mt-2 pt-6">
+            <div className="flex flex-1 min-h-0 border-t border-black/10 dark:border-white/10 mt-2 pt-6">
               
-              {/* PDF Viewer Panel */}
-              <ResizablePanel defaultSize={40} minSize={25} className="pr-4 hidden md:block">
-                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border-black/10 dark:border-white/10 p-2">
+              {/* PDF Viewer Panel - Desktop Only */}
+              <div className="hidden md:flex w-[40%] flex-col pr-4 border-r border-black/10 dark:border-white/10">
+                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2">
                   {pdfUrl ? (
                     <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground">PDF Preview Unavailable</div>
                   )}
                 </div>
-              </ResizablePanel>
+              </div>
               
-              <ResizableHandle withHandle className="w-2 cursor-col-resize flex items-center justify-center group hidden md:flex" />
-
-              <ResizablePanel defaultSize={60} className="pl-4 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
+              {/* Analysis Content */}
+              <div className="flex-1 overflow-y-auto px-2 md:pl-4 custom-scrollbar">
+                <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
               {/* Summary Stats */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
                   <Activity className="h-6 w-6 mx-auto mb-2 text-primary" />
                   <p className="text-2xl font-bold">{healthScore}%</p>
@@ -713,8 +712,8 @@ export default function ResumePage() {
                   <CreatorBadge />
                 </div>
               </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            </div>
+          </div>
           )}
         </div>
       </div>
