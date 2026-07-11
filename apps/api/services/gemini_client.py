@@ -110,7 +110,7 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": text}
+                kwargs = {"model": model_name, "content": text, "output_dimensionality": 768}
                 if task_type:
                     kwargs["task_type"] = task_type
                 res = genai.embed_content(**kwargs)
@@ -136,7 +136,7 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": texts}
+                kwargs = {"model": model_name, "content": texts, "output_dimensionality": 768}
                 if task_type:
                     kwargs["task_type"] = task_type
                 # Passes a list of strings to embed_content, which returns a list of embeddings
