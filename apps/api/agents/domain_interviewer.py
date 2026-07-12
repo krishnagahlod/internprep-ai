@@ -101,6 +101,7 @@ def get_phase_instructions(current_phase: str, domain_context: str, resume_conte
         {domain_context}
         
         Instructions: Select ONE question from the QUESTION BANK and ask the candidate. If they answer it, evaluate their answer briefly. You can ask up to 3 clarifying follow-ups to test their depth if needed. Once you have sufficiently explored their answer (0-3 follow-ups), you MUST transition to a completely new question from the Question Bank. Do not ask all questions at once.
+        """
     elif current_phase == "hr":
         phase_specific = """
         PHASE: HR & Behavioral
