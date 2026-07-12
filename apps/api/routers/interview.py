@@ -132,10 +132,14 @@ async def start_domain_endpoint(request: Request, body: StartDomainRequest):
         
         # Get resume context if resume_id is provided
         resume_context = "No resume provided."
+        file_url = ""
         if body.resume_id and supabase:
-            res = supabase.table("resumes").select("parsed_content").eq("id", body.resume_id).execute()
-            if res.data and res.data[0].get("parsed_content"):
-                resume_context = res.data[0]["parsed_content"]
+            res = supabase.table("resumes").select("parsed_content, file_url").eq("id", body.resume_id).execute()
+            if res.data:
+                if res.data[0].get("parsed_content"):
+                    resume_context = res.data[0]["parsed_content"]
+                if res.data[0].get("file_url"):
+                    file_url = res.data[0]["file_url"]
         
         # Generate the opening message
         bot_reply, next_phase = generate_domain_interview_response(
@@ -152,7 +156,7 @@ async def start_domain_endpoint(request: Request, body: StartDomainRequest):
             insert_data = {
                 "interview_type": "domain",
                 "status": "in_progress",
-                "case_state": {"current_phase": next_phase, "domain": body.domain, "company": body.company, "resume_context": resume_context}
+                "case_state": {"current_phase": next_phase, "domain": body.domain, "company": body.company, "resume_context": resume_context, "case_source": file_url}
             }
             if body.user_id:
                 insert_data["user_id"] = body.user_id

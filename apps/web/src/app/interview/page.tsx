@@ -62,6 +62,7 @@ function InterviewEngine() {
   
   // New State
   const [showSetupModal, setShowSetupModal] = useState(true)
+  const [isInitializingSession, setIsInitializingSession] = useState(false)
   const [selectedCaseType, setSelectedCaseType] = useState("Random")
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(false)
@@ -74,6 +75,7 @@ function InterviewEngine() {
   useEffect(() => {
     const resumeSession = async () => {
       if (sessionIdParam && user) {
+        setIsInitializingSession(true)
         setShowSetupModal(false)
         setIsTyping(true)
         try {
@@ -110,6 +112,7 @@ function InterviewEngine() {
           console.error("Failed to resume session", e)
         } finally {
           setIsTyping(false)
+          setIsInitializingSession(false)
         }
       }
     }
@@ -364,6 +367,17 @@ function InterviewEngine() {
   }
 
   const caseTypes = ["Random", "Profitability", "Market Entry", "Growth", "Pricing", "Market Sizing", "M&A"]
+
+  if (isInitializingSession) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-neutral-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <p className="text-sm font-medium text-slate-500">Restoring interview session...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-neutral-950 text-slate-800 dark:text-neutral-200 font-sans antialiased selection:bg-primary/20 ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
