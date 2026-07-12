@@ -58,6 +58,7 @@ function InterviewEngine() {
   const [rightPanelState, setRightPanelState] = useState<RightPanelState>("whiteboard")
   const [chatWidth, setChatWidth] = useState(50) // Default to 50%
   const [isDragging, setIsDragging] = useState(false)
+  const [showResumePanel, setShowResumePanel] = useState(false)
   
   // New State
   const [showSetupModal, setShowSetupModal] = useState(true)
@@ -484,6 +485,22 @@ function InterviewEngine() {
             </>
           )}
 
+          {interviewMode === "domain" && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowResumePanel(!showResumePanel)}
+                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${showResumePanel ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Resume
+              </Button>
+
+              <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
+            </>
+          )}
+
           <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           
           <Button size="sm" className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-neutral-900 text-xs font-semibold h-9 rounded-lg px-5 ml-2 transition-all duration-300 shadow-sm hover:shadow-md" onClick={handleEndSession} disabled={isTyping}>
@@ -496,12 +513,23 @@ function InterviewEngine() {
         MAIN BENTO GRID LAYOUT 
         min-h-0 is absolutely critical here. It prevents flex children from expanding past their parent.
       */}
-      <div className={`flex flex-1 overflow-hidden min-h-0 ${interviewMode === "domain" ? "justify-center bg-slate-50/50 dark:bg-neutral-950/50" : ""}`}>
+      <div className={`flex flex-1 overflow-hidden min-h-0 relative ${interviewMode === "domain" ? "justify-center bg-slate-50 dark:bg-[#0a0a0a]" : ""}`}>
 
-        {/* LEFT PANEL: CO-PILOT CHAT SIDEBAR */}
+        {/* Domain AI Visualizer Background */}
+        {interviewMode === "domain" && (
+          <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none flex justify-center pt-12 z-0">
+            <div className={`w-40 h-40 rounded-full blur-3xl transition-all duration-1000 ${isSpeaking ? 'bg-primary/30 scale-150 animate-pulse' : 'bg-primary/10 scale-100'}`} />
+          </div>
+        )}
+
+        {/* LEFT PANEL: CO-PILOT CHAT SIDEBAR / MAIN DOMAIN CHAT */}
         <div 
           style={interviewMode === "case" ? { width: `${chatWidth}%` } : {}}
-          className={`flex flex-col min-w-[320px] bg-white dark:bg-neutral-900 shrink-0 relative shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 ${interviewMode === "domain" ? 'w-full max-w-4xl mx-auto border-x border-slate-200/70 dark:border-neutral-800/70' : 'border-r border-slate-200/70 dark:border-neutral-800/70'}`}
+          className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-500 
+            ${interviewMode === "domain" 
+              ? `w-full max-w-4xl mx-auto bg-transparent border-none ${showResumePanel ? 'mr-[400px]' : ''}`
+              : 'bg-white dark:bg-neutral-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-200/70 dark:border-neutral-800/70'
+            }`}
         >
           {/* Custom Drag Handle (Only for Case mode) */}
           {interviewMode === "case" && (
@@ -526,7 +554,7 @@ function InterviewEngine() {
               )}
               
               {messages.map((msg, idx) => (
-                <div key={idx} className="flex gap-5 group animate-in slide-in-from-bottom-2 fade-in duration-500">
+                <div key={idx} className={`flex gap-5 group animate-in slide-in-from-bottom-2 fade-in duration-500 ${interviewMode === "domain" ? 'bg-white/60 dark:bg-neutral-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/40 dark:border-neutral-800/40 shadow-sm' : ''}`}>
                   
                   {/* Elegant Avatar */}
                   <div className="shrink-0 mt-1">
@@ -585,7 +613,7 @@ function InterviewEngine() {
           </div>
           
           {/* PREMIUM FLOATING OMNIBAR */}
-          <div className="shrink-0 p-6 bg-gradient-to-t from-white via-white dark:from-neutral-900 dark:via-neutral-900 to-white/80 dark:to-neutral-900/80 border-t border-slate-200/50 dark:border-neutral-800/50 relative z-20">
+          <div className={`shrink-0 relative z-20 ${interviewMode === "domain" ? 'bg-transparent p-6 pb-8' : 'p-6 bg-gradient-to-t from-white via-white dark:from-neutral-900 dark:via-neutral-900 to-white/80 dark:to-neutral-900/80 border-t border-slate-200/50 dark:border-neutral-800/50'}`}>
             <div className="flex justify-between items-center mb-3 px-2">
               <span className="text-[11px] font-bold tracking-widest text-slate-400 dark:text-neutral-400 uppercase">Input</span>
               <Button 
@@ -600,7 +628,7 @@ function InterviewEngine() {
               </Button>
             </div>
 
-            <div className="flex gap-2 p-1.5 bg-white dark:bg-neutral-950 border border-slate-200/80 dark:border-neutral-800 rounded-2xl focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10 transition-all duration-300 w-full shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-none">
+            <div className={`flex gap-2 transition-all duration-300 w-full shadow-lg ${interviewMode === "domain" ? 'bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/50 dark:border-neutral-800 rounded-3xl p-2' : 'p-1.5 bg-white dark:bg-neutral-950 border border-slate-200/80 dark:border-neutral-800 rounded-2xl focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10'}`}>
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -644,6 +672,32 @@ function InterviewEngine() {
             </div>
           </div>
         </div>
+
+        {/* DOMAIN RESUME PANEL */}
+        {interviewMode === "domain" && showResumePanel && (
+          <div className="absolute right-0 top-0 bottom-0 w-[400px] bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-800">
+              <h3 className="font-semibold text-sm">Your Resume</h3>
+              <Button variant="ghost" size="icon" onClick={() => setShowResumePanel(false)} className="h-8 w-8 rounded-full">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden relative">
+              {caseSource ? (
+                <iframe 
+                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`} 
+                  className="w-full h-full border-0 bg-white dark:bg-neutral-900"
+                  title="Candidate Resume"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                  <FileText className="h-10 w-10 opacity-20 mb-4" />
+                  <span className="font-semibold text-sm">Resume not available</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* RIGHT PANEL: HERO CANVAS (Only for Case Mode) */}
         {interviewMode === "case" && (
