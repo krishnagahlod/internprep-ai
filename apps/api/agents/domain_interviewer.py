@@ -71,7 +71,7 @@ def get_phase_instructions(current_phase: str, domain_context: str, resume_conte
     CRITICAL INTERVIEW RULES (NEVER BREAK THESE):
     1. You are interviewing the candidate for a {domain} role at {company if company else 'a top company'}.
     2. Drive the interview forward. ALWAYS end your response by asking the candidate a specific question.
-    3. If the candidate gives a shallow answer, ask a probing follow-up question. However, DO NOT ask more than 1 or 2 follow-ups on the exact same point. If they still do not provide a deep answer after a follow-up, acknowledge it briefly and MOVE ON to a completely new topic or question.
+    3. If the candidate gives a shallow answer, ask a probing follow-up question. You can ask anywhere from 0 to 3 follow-ups dynamically depending on the depth and requirement of their answers. Once a topic is sufficiently explored (or if they are struggling after a few attempts), acknowledge it briefly and MOVE ON to a completely new topic or question.
     4. Act as a collaborative but rigorous Hiring Manager. Be professional and conversational.
     5. Keep your responses extremely concise (1-3 sentences maximum).
     
@@ -100,8 +100,7 @@ def get_phase_instructions(current_phase: str, domain_context: str, resume_conte
         QUESTION BANK (Historically asked by {company if company else 'similar companies'}):
         {domain_context}
         
-        Instructions: Select ONE question from the QUESTION BANK and ask the candidate. If they answer it, evaluate their answer briefly and either ask a clarifying follow-up to test their depth, or move on to a different question from the bank. Do not ask all questions at once. 
-        CRITICAL: Never ask more than ONE follow-up on the same question. Once they answer your follow-up, you MUST transition to a completely new question from the Question Bank.
+        Instructions: Select ONE question from the QUESTION BANK and ask the candidate. If they answer it, evaluate their answer briefly. You can ask up to 3 clarifying follow-ups to test their depth if needed. Once you have sufficiently explored their answer (0-3 follow-ups), you MUST transition to a completely new question from the Question Bank. Do not ask all questions at once.
     elif current_phase == "hr":
         phase_specific = """
         PHASE: HR & Behavioral
