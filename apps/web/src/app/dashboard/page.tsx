@@ -4,16 +4,115 @@ import { useAuthStore } from "@/stores/auth-store"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { useEffect, useState } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Input } from "@/components/ui/input"
 
 export default function DashboardPage() {
   const { isGuest, user, clearState, setUser } = useAuthStore()
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+
+  // Domain Interview Modal States
+  const [showDomainModal, setShowDomainModal] = useState(false)
+  const [selectedDomain, setSelectedDomain] = useState("Software")
+  const [targetCompanyName, setTargetCompanyName] = useState("")
+  const [resumes, setResumes] = useState<any[]>([])
+  const [selectedResumeId, setSelectedResumeId] = useState<string>("")
+  const [uploadingResume, setUploadingResume] = useState(false)
+  const [uploadError, setUploadError] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchResumes = async () => {
+    if (user) {
+      const { data } = await supabase.from("resumes").select("id, file_name, created_at").eq("user_id", user.id).order('created_at', { ascending: false })
+      if (data && data.length > 0) {
+        setResumes(data)
+        if (!selectedResumeId) setSelectedResumeId(data[0].id)
+      }
+    }
+  }
+
+  useEffect(() => {
+    fetchResumes()
+  }, [user])
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File too large. Max 5MB.")
+      return
+    }
+
+    setUploadingResume(true)
+    setUploadError("")
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("user_id", user.id)
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${API_URL}/resume/upload`, {
+        method: "POST",
+        body: formData,
+      })
+      
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+      
+      const data = await response.json()
+      await fetchResumes()
+      setSelectedResumeId(data.id)
+    } catch (err: any) {
+      console.error(err)
+      setUploadError("Failed to upload and parse resume.")
+    } finally {
+      setUploadingResume(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const handleStartDomainInterview = async () => {
+    if (!selectedResumeId) {
+      setUploadError("Please select or upload a resume first.")
+      return
+    }
+    
+    // We will start the session by creating it via API, then redirect
+    setUploadingResume(true) // Reuse loading state for spinner
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${API_URL}/interview/start_domain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          domain: selectedDomain,
+          company: targetCompanyName,
+          resume_id: selectedResumeId,
+          user_id: user?.id
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        router.push(`/interview?id=${data.session_id}`)
+      } else {
+        setUploadError("Failed to start session.")
+        setUploadingResume(false)
+      }
+    } catch (err) {
+      console.error(err)
+      setUploadError("Connection error.")
+      setUploadingResume(false)
+    }
+  }
 
   useEffect(() => {
     const checkUser = async () => {
@@ -63,6 +162,90 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-background relative overflow-hidden">
       
+      {/* Domain Setup Modal */}
+      {showDomainModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-slate-200/20 dark:border-white/10 relative">
+            <button onClick={() => setShowDomainModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+            
+            <div className="flex items-center justify-center w-16 h-16 bg-blue-500/10 rounded-full mx-auto mb-6">
+              <Users className="h-8 w-8 text-blue-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-center mb-2 font-outfit">Domain Specific Interview</h2>
+            <p className="text-muted-foreground text-center mb-8 text-sm">Configure your tailored interview environment.</p>
+            
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="text-sm font-semibold mb-2 block">Domain</label>
+                <select 
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                  value={selectedDomain}
+                  onChange={(e) => setSelectedDomain(e.target.value)}
+                >
+                  {["Analytics", "Consult", "Core", "Finance", "FMCG", "Quant", "Software"].map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-semibold mb-2 block">Target Company (Optional)</label>
+                <Input 
+                  placeholder="e.g. Goldman Sachs" 
+                  value={targetCompanyName}
+                  onChange={(e) => setTargetCompanyName(e.target.value)}
+                  className="rounded-xl h-11"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-semibold mb-2 block">Select Resume</label>
+                <select 
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm mb-3"
+                  value={selectedResumeId}
+                  onChange={(e) => setSelectedResumeId(e.target.value)}
+                  disabled={uploadingResume}
+                >
+                  {resumes.length === 0 && <option value="">No resumes found...</option>}
+                  {resumes.map(r => (
+                    <option key={r.id} value={r.id}>{r.file_name || 'Resume'}</option>
+                  ))}
+                </select>
+                
+                <div 
+                  className="border-2 border-dashed border-slate-300 dark:border-neutral-700 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadingResume ? (
+                    <div className="flex items-center gap-2 text-primary">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span className="text-sm font-medium">Parsing and extracting layout...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <UploadCloud className="h-6 w-6 text-slate-400 mb-2" />
+                      <span className="text-sm font-medium text-slate-600 dark:text-neutral-300">Upload new resume (PDF)</span>
+                      <span className="text-xs text-slate-400 mt-1">We will parse and extract it perfectly.</span>
+                    </>
+                  )}
+                  <input type="file" className="hidden" accept=".pdf" ref={fileInputRef} onChange={handleFileUpload} />
+                </div>
+                {uploadError && <p className="text-xs text-red-500 mt-2 font-medium">{uploadError}</p>}
+              </div>
+            </div>
+            
+            <Button 
+              onClick={handleStartDomainInterview} 
+              className="w-full h-12 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
+              disabled={uploadingResume || !selectedResumeId}
+            >
+              {uploadingResume ? "Initializing..." : "Start Domain Interview"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
       <aside className="w-64 border-r border-border bg-white/40 dark:bg-neutral-950/40 backdrop-blur-3xl hidden lg:flex flex-col p-6 z-20">
         <div className="flex items-center gap-3 mb-12">
@@ -177,6 +360,28 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
                   Upload your PDF. We'll generate a precise heatmap flagging vague claims and predicting cross-questions.
                 </p>
+              </div>
+            </motion.div>
+
+            {/* Domain Interview Card (Spans 2 cols) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 dark:bg-blue-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-blue-200/50 dark:group-hover:bg-blue-800/30 transition-colors duration-500 z-0" />
+              
+              <div className="flex items-start justify-between relative z-10">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform duration-300">
+                  <Users className="h-7 w-7 text-white" />
+                </div>
+                <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">DOMAIN FOCUS</span>
+              </div>
+              
+              <div className="relative z-10 mt-6">
+                <h2 className="text-2xl md:text-3xl font-extrabold mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors font-outfit">Domain Interview Simulator</h2>
+                <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-6 max-w-sm">
+                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles in Finance, SWE, Consulting, and more.
+                </p>
+                <div className="inline-flex items-center text-white bg-blue-600 px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  Configure Session <ExternalLink className="ml-2 h-4 w-4" />
+                </div>
               </div>
             </motion.div>
 

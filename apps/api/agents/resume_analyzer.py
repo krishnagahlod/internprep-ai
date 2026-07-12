@@ -9,6 +9,7 @@ from services.gemini_client import gemini_client
 from services.cerebras_client import cerebras_client
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
+import base64
 
 # Configure Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -109,6 +110,44 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
         return []
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def parse_resume_structural(pdf_bytes: bytes) -> str:
+    """Uses Gemini to extract deeply structured text from a PDF resume."""
+    try:
+        model = genai.GenerativeModel("gemini-1.5-pro-latest")
+        
+        prompt = """
+You are an expert resume parser. I am providing you with a raw PDF resume.
+Extract the entire text content of this resume into a highly structured, clean Markdown document.
+CRITICAL INSTRUCTIONS:
+1. Maintain the exact logical structure, sections (e.g., Experience, Education, Skills, Projects).
+2. Preserve all bullet points perfectly. Do NOT truncate or summarize.
+3. Capture the hierarchy (e.g., Company -> Role -> Dates -> Bullets).
+4. Do NOT output anything other than the extracted Markdown. No conversational filler.
+"""
+        
+        response = model.generate_content([
+            {"mime_type": "application/pdf", "data": pdf_bytes},
+            prompt
+        ])
+        
+        text = response.text
+        # Strip markdown fences if they exist
+        if text.startswith("```markdown"):
+            text = text[11:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+            
+        return text.strip()
+    except Exception as e:
+        print(f"Error parsing resume with Gemini: {e}")
+        # Fallback to standard extraction if Gemini fails
+        from pdfminer.high_level import extract_text
+        import io
+        return extract_text(io.BytesIO(pdf_bytes))
+
+
 def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_bytes: bytes = None) -> str:
     """
     Analyzes resume text using Two-Pass Adaptive RAG against Golden Resumes and Best Practices.

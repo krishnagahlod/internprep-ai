@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
 from dependencies import limiter
-from agents.resume_analyzer import analyze_resume_text, run_workshop_turn
+from agents.resume_analyzer import analyze_resume_text, run_workshop_turn, parse_resume_structural
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -30,6 +30,79 @@ class WorkshopResponse(BaseModel):
     response: str
     is_final_bullet: bool
     final_bullet: Optional[str] = None
+
+class UploadResponse(BaseModel):
+    id: str
+    file_name: str
+    message: str
+
+@router.post("/upload", response_model=UploadResponse)
+@limiter.limit("10/hour")
+async def upload_resume(
+    request: Request,
+    file: UploadFile = File(...),
+    user_id: str = Form(...)
+):
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Max size is 5MB.")
+
+    from agents.resume_analyzer import supabase
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+
+    try:
+        pdf_bytes = await file.read()
+        file_name = file.filename
+        
+        # 1. Upload to Storage
+        import uuid
+        file_path = f"{user_id}/{uuid.uuid4()}_{file_name}"
+        
+        # We need to read it again for upload or just use bytes
+        res = supabase.storage.from_("resume_pdfs").upload(
+            file_path,
+            pdf_bytes,
+            {"content-type": "application/pdf"}
+        )
+        file_url = supabase.storage.from_("resume_pdfs").get_public_url(file_path)
+        
+        # 2. Extract Structural text using Gemini
+        parsed_content = await asyncio.wait_for(
+            asyncio.to_thread(parse_resume_structural, pdf_bytes),
+            timeout=120.0
+        )
+        
+        # 3. Extract raw text for fallback or basic analytics
+        raw_text = extract_text(io.BytesIO(pdf_bytes))
+        
+        # 4. Save to database
+        db_res = supabase.table("resumes").insert({
+            "user_id": user_id,
+            "file_name": file_name,
+            "raw_text": raw_text,
+            "file_url": file_url,
+            "parsed_content": parsed_content
+        }).execute()
+        
+        resume_id = db_res.data[0]["id"]
+        
+        return UploadResponse(
+            id=resume_id,
+            file_name=file_name,
+            message="Resume uploaded and parsed successfully"
+        )
+        
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=503, detail="Resume parsing timed out.")
+    except Exception as e:
+        print(f"Error uploading resume: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze", response_model=AnalysisResponse)
 @limiter.limit("3/hour")
