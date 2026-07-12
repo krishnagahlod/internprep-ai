@@ -33,6 +33,12 @@ const PHASES = [
   { id: "synthesis", label: "Synthesis" }
 ]
 
+const DOMAIN_PHASES = [
+  { id: "introduction", label: "Intro & Resume" },
+  { id: "technical", label: "Technical Q&A" },
+  { id: "hr", label: "HR & Behavioral" }
+]
+
 function InterviewEngine() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -55,9 +61,28 @@ function InterviewEngine() {
   
   // New State
   const [showSetupModal, setShowSetupModal] = useState(true)
+  const [interviewMode, setInterviewMode] = useState<"case" | "domain">("case")
   const [selectedCaseType, setSelectedCaseType] = useState("Random")
+  const [selectedDomain, setSelectedDomain] = useState("Software")
+  const [targetCompanyName, setTargetCompanyName] = useState("")
+  const [resumes, setResumes] = useState<any[]>([])
+  const [selectedResumeId, setSelectedResumeId] = useState<string>("")
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(false)
+
+  // Fetch Resumes for Domain Interview
+  useEffect(() => {
+    if (user && interviewMode === "domain") {
+      const fetchResumes = async () => {
+        const { data } = await supabase.from("resumes").select("id, name").eq("user_id", user.id)
+        if (data && data.length > 0) {
+          setResumes(data)
+          setSelectedResumeId(data[0].id)
+        }
+      }
+      fetchResumes()
+    }
+  }, [user, interviewMode])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -76,11 +101,12 @@ function InterviewEngine() {
             .single()
             
           if (session && !error) {
-            setCaseContext(session.case_state?.case_context || "")
+            setCaseContext(session.case_state?.case_context || session.case_state?.resume_context || "")
             setCaseSource(session.case_state?.case_source || "")
             setMessages(session.messages || [])
             setCurrentSessionId(session.id)
             setCurrentPhase(session.case_state?.current_phase || "introduction")
+            setInterviewMode(session.interview_type || "case")
             setIsTimerRunning(true)
             // Ideally we'd restore elapsed time if we tracked it in the DB, but 0 is fine for now
           }
@@ -143,18 +169,34 @@ function InterviewEngine() {
     setIsTyping(true)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const response = await fetch(`${API_URL}/interview/start_case`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          case_type: selectedCaseType,
-          user_id: user?.id
+      
+      let response;
+      if (interviewMode === "domain") {
+        response = await fetch(`${API_URL}/interview/start_domain`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            domain: selectedDomain,
+            company: targetCompanyName,
+            resume_id: selectedResumeId,
+            user_id: user?.id
+          })
         })
-      })
+      } else {
+        response = await fetch(`${API_URL}/interview/start_case`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            case_type: selectedCaseType,
+            user_id: user?.id
+          })
+        })
+      }
+
       if (response.ok) {
         const data = await response.json()
-        setCaseContext(data.case_context)
-        setCaseSource(data.case_source)
+        setCaseContext(data.case_context || data.resume_context || "")
+        setCaseSource(data.case_source || "")
         if (data.page_number) setPageNumber(data.page_number)
         setMessages([{ role: "assistant", content: data.initial_message }])
         setCurrentSessionId(data.session_id)
@@ -164,7 +206,7 @@ function InterviewEngine() {
           incrementGuestInterview()
         }
       } else {
-        setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin the case?" }])
+        setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin?" }])
       }
     } catch (e) {
       setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin the case?" }])
@@ -279,9 +321,13 @@ function InterviewEngine() {
           session_id: currentSessionId || "temp_session_id",
           messages: newMessages,
           current_phase: currentPhase,
-          scratchpad: "", // Not extracting canvas text as requested
+          scratchpad: "", 
           case_context: caseContext,
-          case_source: caseSource
+          case_source: caseSource,
+          interview_type: interviewMode,
+          domain: selectedDomain,
+          company: targetCompanyName,
+          resume_context: interviewMode === "domain" ? caseContext : undefined
         }),
       })
 
@@ -352,20 +398,83 @@ function InterviewEngine() {
             
             <div className="space-y-4 mb-8">
               <div>
-                <label className="text-sm font-semibold mb-2 block">Case Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {caseTypes.map(type => (
-                    <Button
-                      key={type}
-                      variant={selectedCaseType === type ? "default" : "outline"}
-                      className={`justify-start ${selectedCaseType === type ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900' : ''}`}
-                      onClick={() => setSelectedCaseType(type)}
-                    >
-                      {type}
-                    </Button>
-                  ))}
+                <label className="text-sm font-semibold mb-2 block">Interview Mode</label>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <Button
+                    variant={interviewMode === "case" ? "default" : "outline"}
+                    className={interviewMode === "case" ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900' : ''}
+                    onClick={() => setInterviewMode("case")}
+                  >
+                    Case Interview
+                  </Button>
+                  <Button
+                    variant={interviewMode === "domain" ? "default" : "outline"}
+                    className={interviewMode === "domain" ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900' : ''}
+                    onClick={() => setInterviewMode("domain")}
+                  >
+                    Domain Specific
+                  </Button>
                 </div>
               </div>
+
+              {interviewMode === "case" ? (
+                <div>
+                  <label className="text-sm font-semibold mb-2 block">Case Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {caseTypes.map(type => (
+                      <Button
+                        key={type}
+                        variant={selectedCaseType === type ? "default" : "outline"}
+                        className={`justify-start ${selectedCaseType === type ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900' : ''}`}
+                        onClick={() => setSelectedCaseType(type)}
+                      >
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-semibold mb-2 block">Domain</label>
+                    <select 
+                      className="w-full p-2 rounded-md border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      value={selectedDomain}
+                      onChange={(e) => setSelectedDomain(e.target.value)}
+                    >
+                      {["Analytics", "Consult", "Core", "Finance", "FMCG", "Quant", "Software"].map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold mb-2 block">Target Company (Optional)</label>
+                    <Input 
+                      placeholder="e.g. Goldman Sachs" 
+                      value={targetCompanyName}
+                      onChange={(e) => setTargetCompanyName(e.target.value)}
+                    />
+                  </div>
+                  {user && resumes.length > 0 && (
+                    <div>
+                      <label className="text-sm font-semibold mb-2 block">Select Resume</label>
+                      <select 
+                        className="w-full p-2 rounded-md border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        value={selectedResumeId}
+                        onChange={(e) => setSelectedResumeId(e.target.value)}
+                      >
+                        <option value="">No Resume (Not Recommended)</option>
+                        {resumes.map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {user && resumes.length === 0 && (
+                    <p className="text-sm text-amber-600 dark:text-amber-400">Please upload a resume in the dashboard first for personalized questions.</p>
+                  )}
+                </div>
+              )}
             </div>
             
             <Button onClick={handleStartCase} className="w-full h-12 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all">
@@ -387,9 +496,9 @@ function InterviewEngine() {
           
           {/* Phase Progress Indicator */}
           <div className="hidden lg:flex items-center gap-1.5 ml-2">
-            {PHASES.map((phase, idx) => {
+            {(interviewMode === "domain" ? DOMAIN_PHASES : PHASES).map((phase, idx, arr) => {
               const isActive = currentPhase === phase.id
-              const phaseIndex = PHASES.findIndex(p => p.id === currentPhase)
+              const phaseIndex = arr.findIndex(p => p.id === currentPhase)
               const isPast = idx < phaseIndex
               
               return (
@@ -398,7 +507,7 @@ function InterviewEngine() {
                     {isPast && <CheckCircle2 className="h-3 w-3 mr-1" />}
                     {phase.label}
                   </div>
-                  {idx < PHASES.length - 1 && (
+                  {idx < arr.length - 1 && (
                     <div className={`w-3 h-px mx-1 ${isPast ? 'bg-emerald-500/30' : 'bg-slate-200 dark:bg-neutral-800'}`} />
                   )}
                 </div>
