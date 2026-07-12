@@ -44,6 +44,12 @@ export default function DashboardPage() {
     const file = e.target.files?.[0]
     if (!file || !user) return
     
+    // Check if it's a PDF (either by type or extension)
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setUploadError("Please upload a PDF file.")
+      return
+    }
+    
     if (file.size > 5 * 1024 * 1024) {
       setUploadError("File too large. Max 5MB.")
       return
@@ -229,7 +235,7 @@ export default function DashboardPage() {
                       <span className="text-xs text-slate-400 mt-1">We will parse and extract it perfectly.</span>
                     </>
                   )}
-                  <input type="file" className="hidden" accept=".pdf" ref={fileInputRef} onChange={handleFileUpload} />
+                  <input type="file" className="hidden" accept="application/pdf,.pdf" ref={fileInputRef} onChange={handleFileUpload} />
                 </div>
                 {uploadError && <p className="text-xs text-red-500 mt-2 font-medium">{uploadError}</p>}
               </div>

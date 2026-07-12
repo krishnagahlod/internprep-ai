@@ -43,7 +43,7 @@ async def upload_resume(
     file: UploadFile = File(...),
     user_id: str = Form(...)
 ):
-    if not file.filename.endswith(".pdf"):
+    if not (file.filename.lower().endswith(".pdf") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
     file.file.seek(0, 2)
