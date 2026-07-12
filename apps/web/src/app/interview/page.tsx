@@ -527,7 +527,7 @@ function InterviewEngine() {
           style={interviewMode === "case" ? { width: `${chatWidth}%` } : {}}
           className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-500 
             ${interviewMode === "domain" 
-              ? `w-full max-w-4xl mx-auto bg-transparent border-none ${showResumePanel ? 'mr-[400px]' : ''}`
+              ? `w-full flex-1 max-w-5xl mx-auto bg-transparent border-none`
               : 'bg-white dark:bg-neutral-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-200/70 dark:border-neutral-800/70'
             }`}
         >
@@ -616,16 +616,18 @@ function InterviewEngine() {
           <div className={`shrink-0 relative z-20 ${interviewMode === "domain" ? 'bg-transparent p-6 pb-8' : 'p-6 bg-gradient-to-t from-white via-white dark:from-neutral-900 dark:via-neutral-900 to-white/80 dark:to-neutral-900/80 border-t border-slate-200/50 dark:border-neutral-800/50'}`}>
             <div className="flex justify-between items-center mb-3 px-2">
               <span className="text-[11px] font-bold tracking-widest text-slate-400 dark:text-neutral-400 uppercase">Input</span>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 px-3 text-[11px] font-bold tracking-widest text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-all duration-300 uppercase rounded-full"
-                onClick={handleGetHint}
-                disabled={isTyping || messages.length === 0}
-              >
-                <Lightbulb className="h-3 w-3 mr-1.5" />
-                Request Hint
-              </Button>
+              {interviewMode === "case" && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 px-3 text-[11px] font-bold tracking-widest text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-all duration-300 uppercase rounded-full"
+                  onClick={handleGetHint}
+                  disabled={isTyping || messages.length === 0}
+                >
+                  <Lightbulb className="h-3 w-3 mr-1.5" />
+                  Request Hint
+                </Button>
+              )}
             </div>
 
             <div className={`flex gap-2 transition-all duration-300 w-full shadow-lg ${interviewMode === "domain" ? 'bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/50 dark:border-neutral-800 rounded-3xl p-2' : 'p-1.5 bg-white dark:bg-neutral-950 border border-slate-200/80 dark:border-neutral-800 rounded-2xl focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10'}`}>
@@ -687,7 +689,7 @@ function InterviewEngine() {
 
         {/* DOMAIN RESUME PANEL */}
         {interviewMode === "domain" && showResumePanel && (
-          <div className="absolute right-0 top-0 bottom-0 w-[400px] bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex flex-col">
+          <div className="w-[500px] shrink-0 bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex flex-col relative">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-800">
               <h3 className="font-semibold text-sm">Your Resume</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowResumePanel(false)} className="h-8 w-8 rounded-full">
