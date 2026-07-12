@@ -542,7 +542,7 @@ function InterviewEngine() {
           )}
           
           {/* Strict overflow-y-auto ensures ONLY the chat feed scrolls */}
-          <div className="flex-1 overflow-y-auto px-8 py-8 scroll-smooth" ref={scrollRef}>
+          <div className="flex-1 overflow-y-auto px-8 py-8 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" ref={scrollRef}>
             <div className="space-y-10 pb-6">
               {messages.length === 0 && !showSetupModal && (
                 <div className="flex h-full items-center justify-center pt-32">
@@ -653,13 +653,25 @@ function InterviewEngine() {
               >
                 {ttsEnabled ? <Volume2 className={`h-5 w-5 ${isSpeaking ? 'animate-pulse' : ''}`} /> : <VolumeX className="h-5 w-5 opacity-70" />}
               </Button>
-              <Input 
+              <textarea 
                 placeholder={isListening ? "Listening..." : "Message your interviewer..."}
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-3 text-[15px] shadow-none placeholder:text-slate-400 dark:placeholder:text-neutral-400 text-slate-800 dark:text-neutral-100 h-11 font-medium"
+                onChange={(e) => {
+                  setInputValue(e.target.value)
+                  // Auto-expand logic
+                  e.target.style.height = 'auto'
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                    e.currentTarget.style.height = 'auto'; // reset height on send
+                  }
+                }}
+                className="flex-1 border-0 bg-transparent focus-visible:outline-none px-3 py-3 text-[15px] shadow-none placeholder:text-slate-400 dark:placeholder:text-neutral-400 text-slate-800 dark:text-neutral-100 font-medium resize-none min-h-[44px] max-h-[200px]"
                 disabled={isTyping}
+                rows={1}
               />
               <Button 
                 onClick={handleSendMessage} 
@@ -685,7 +697,7 @@ function InterviewEngine() {
             <div className="flex-1 overflow-hidden relative">
               {caseSource ? (
                 <iframe 
-                  src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`} 
+                  src={caseSource.startsWith('http') ? caseSource : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`} 
                   className="w-full h-full border-0 bg-white dark:bg-neutral-900"
                   title="Candidate Resume"
                 />
