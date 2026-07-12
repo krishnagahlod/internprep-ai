@@ -179,7 +179,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-center w-16 h-16 bg-blue-500/10 rounded-full mx-auto mb-6">
               <Users className="h-8 w-8 text-blue-500" />
             </div>
-            <h2 className="text-2xl font-bold text-center mb-2 font-outfit">Domain Specific Interview</h2>
+            <h2 className="text-2xl font-bold text-center mb-2 font-outfit">Full Interview Simulator</h2>
             <p className="text-muted-foreground text-center mb-8 text-sm">Configure your tailored interview environment.</p>
             
             <div className="space-y-4 mb-8">
@@ -246,7 +246,7 @@ export default function DashboardPage() {
               className="w-full h-12 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
               disabled={uploadingResume || !selectedResumeId}
             >
-              {uploadingResume ? "Initializing..." : "Start Domain Interview"}
+              {uploadingResume ? "Initializing..." : "Start Full Interview"}
             </Button>
           </div>
         </div>
@@ -352,25 +352,8 @@ export default function DashboardPage() {
             className="grid gap-6 md:grid-cols-3 lg:grid-cols-4 auto-rows-[220px]"
           >
             
-            {/* Resume Card (Spans 2 columns) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume")}>
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 dark:from-violet-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
-              <div className="flex items-start justify-between relative z-10">
-                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-violet-100 dark:border-violet-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                  <FileText className="h-6 w-6 text-violet-600 dark:text-violet-400" />
-                </div>
-                <span className="text-xs font-semibold tracking-wider text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-3 py-1 rounded-full border border-violet-100 dark:border-violet-800/50">MODULE 01</span>
-              </div>
-              <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2 group-hover:text-violet-700 transition-colors font-outfit">Resume Intelligence</h2>
-                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
-                  Upload your PDF. We'll generate a precise heatmap flagging vague claims and predicting cross-questions.
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Domain Interview Card (Spans 2 cols) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
+            {/* Full Interview Simulator Card (Spans 2 cols, 2 rows) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 row-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 dark:bg-blue-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-blue-200/50 dark:group-hover:bg-blue-800/30 transition-colors duration-500 z-0" />
               
               <div className="flex items-start justify-between relative z-10">
@@ -380,10 +363,10 @@ export default function DashboardPage() {
                 <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">DOMAIN FOCUS</span>
               </div>
               
-              <div className="relative z-10 mt-6">
-                <h2 className="text-2xl md:text-3xl font-extrabold mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors font-outfit">Domain Interview Simulator</h2>
+              <div className="relative z-10 mt-auto">
+                <h2 className="text-2xl md:text-3xl font-extrabold mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors font-outfit">Full Interview Simulator</h2>
                 <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-6 max-w-sm">
-                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles in Finance, SWE, Consulting, and more.
+                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across various domains.
                 </p>
                 <div className="inline-flex items-center text-white bg-blue-600 px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                   Configure Session <ExternalLink className="ml-2 h-4 w-4" />
@@ -391,7 +374,7 @@ export default function DashboardPage() {
               </div>
             </motion.div>
 
-            {/* Interview Engine Card (Spans 2 cols, 2 rows) */}
+            {/* Mock Case Simulator Card (Spans 2 cols, 2 rows) */}
             <motion.div variants={itemVariants} className="md:col-span-2 row-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => router.push("/interview")}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-100/50 dark:bg-cyan-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-cyan-200/50 dark:group-hover:bg-cyan-800/30 transition-colors duration-500 z-0" />
               
@@ -410,6 +393,23 @@ export default function DashboardPage() {
                 <div className="inline-flex items-center text-white bg-primary px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
                   Initialize Session <ExternalLink className="ml-2 h-4 w-4" />
                 </div>
+              </div>
+            </motion.div>
+
+            {/* Resume Card (Spans 2 columns, 1 row) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume")}>
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 dark:from-violet-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-violet-100 dark:border-violet-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                  <FileText className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+                </div>
+                <span className="text-xs font-semibold tracking-wider text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-3 py-1 rounded-full border border-violet-100 dark:border-violet-800/50">MODULE 01</span>
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-2xl font-bold mb-2 group-hover:text-violet-700 transition-colors font-outfit">Resume Intelligence</h2>
+                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
+                  Upload your PDF. We'll generate a precise heatmap flagging vague claims and predicting cross-questions.
+                </p>
               </div>
             </motion.div>
 

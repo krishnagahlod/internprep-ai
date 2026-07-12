@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, BrainCircuit, FileText, ChevronRight } from "lucide-react";
+import { Sparkles, ArrowRight, BrainCircuit, FileText, ChevronRight, Users } from "lucide-react";
 import { motion, Variants } from "framer-motion";
 
 export default function Home() {
@@ -111,7 +111,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-          className="w-full max-w-6xl mx-auto px-4 mt-24 grid md:grid-cols-2 gap-8"
+          className="w-full max-w-6xl mx-auto px-4 mt-24 grid md:grid-cols-3 gap-8"
         >
           {/* Card 1 */}
           <div className="glass-card rounded-3xl p-8 flex flex-col items-start text-left relative overflow-hidden group cursor-default">
@@ -139,6 +139,21 @@ export default function Home() {
               Engage in hyper-realistic, voice-enabled mock interviews. Work through problems on a live digital scratchpad evaluated in real-time.
             </p>
             <div className="mt-auto flex items-center text-sm font-semibold text-cyan-600 group-hover:text-cyan-700">
+              Explore Module <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Card 3 */}
+          <div className="glass-card rounded-3xl p-8 flex flex-col items-start text-left relative overflow-hidden group cursor-default">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover:bg-blue-400/20 transition-colors duration-500" />
+            <div className="h-12 w-12 rounded-2xl bg-blue-100 flex items-center justify-center mb-6 text-blue-600 shadow-sm border border-blue-200 group-hover:scale-110 transition-transform duration-300">
+              <Users className="h-6 w-6" />
+            </div>
+            <h3 className="text-2xl font-bold mb-3 font-outfit">Full Interview Simulator</h3>
+            <p className="text-muted-foreground leading-relaxed mb-6">
+              Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across various domains like Finance, SWE, and Consulting.
+            </p>
+            <div className="mt-auto flex items-center text-sm font-semibold text-blue-600 group-hover:text-blue-700">
               Explore Module <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
