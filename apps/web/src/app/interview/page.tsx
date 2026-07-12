@@ -484,17 +484,7 @@ function InterviewEngine() {
             </>
           )}
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => {
-              if (ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel()
-              setTtsEnabled(!ttsEnabled)
-            }}
-            className={`transition-all duration-300 h-9 w-9 p-0 rounded-full flex items-center justify-center ${ttsEnabled ? 'text-primary bg-primary/10' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-          >
-            {ttsEnabled ? <Volume2 className={`h-4 w-4 ${isSpeaking ? 'animate-pulse text-primary' : ''}`} /> : <VolumeX className="h-4 w-4" />}
-          </Button>
+          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           
           <Button size="sm" className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-neutral-900 text-xs font-semibold h-9 rounded-lg px-5 ml-2 transition-all duration-300 shadow-sm hover:shadow-md" onClick={handleEndSession} disabled={isTyping}>
             Finish & Feedback
@@ -614,7 +604,7 @@ function InterviewEngine() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`shrink-0 rounded-xl h-11 w-11 transition-all duration-300 ${isListening ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+                className={`shrink-0 rounded-xl h-11 w-11 transition-all duration-300 ${isListening ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
                 onClick={toggleListening}
                 title={isListening ? "Stop Dictation" : "Start Voice Dictation"}
               >
@@ -622,6 +612,18 @@ function InterviewEngine() {
                   <Mic className="h-5 w-5" />
                   {isListening && <span className="absolute -inset-1 rounded-full border-2 border-red-500/30 animate-ping opacity-100" />}
                 </div>
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => {
+                  if (ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel()
+                  setTtsEnabled(!ttsEnabled)
+                }}
+                className={`shrink-0 rounded-xl h-11 w-11 transition-all duration-300 ${ttsEnabled ? 'bg-primary/10 text-primary shadow-[0_0_10px_rgba(59,130,246,0.2)]' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+                title={ttsEnabled ? "Disable Voice Output" : "Enable Voice Output"}
+              >
+                {ttsEnabled ? <Volume2 className={`h-5 w-5 ${isSpeaking ? 'animate-pulse' : ''}`} /> : <VolumeX className="h-5 w-5 opacity-70" />}
               </Button>
               <Input 
                 placeholder={isListening ? "Listening..." : "Message your interviewer..."}

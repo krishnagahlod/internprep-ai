@@ -21,7 +21,8 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({
     totalResumes: 0,
-    totalInterviews: 0,
+    caseInterviews: 0,
+    domainInterviews: 0,
   })
   const [trendData, setTrendData] = useState<any[]>([])
   const [radarData, setRadarData] = useState<any[]>([])
@@ -42,14 +43,18 @@ export default function AnalyticsPage() {
           .order("created_at", { ascending: true })
 
         // Fetch interviews
-        const { count: interviewCount } = await supabase
+        const { data: interviews } = await supabase
           .from("interview_sessions")
-          .select("*", { count: "exact", head: true })
+          .select("interview_type")
           .eq("user_id", user.id)
+
+        const caseCount = interviews?.filter((i: any) => i.interview_type !== 'domain').length || 0
+        const domainCount = interviews?.filter((i: any) => i.interview_type === 'domain').length || 0
 
         setStats({
           totalResumes: resumes?.length || 0,
-          totalInterviews: interviewCount || 0,
+          caseInterviews: caseCount,
+          domainInterviews: domainCount,
         })
 
         if (resumes && resumes.length > 0) {
@@ -140,32 +145,41 @@ export default function AnalyticsPage() {
 
         {/* Top Stats */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800">
+          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Resumes Scanned</CardTitle>
-              <FileText className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Resumes Scanned</CardTitle>
+              <FileText className="h-4 w-4 text-violet-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold font-outfit">{stats.totalResumes}</div>
+              <div className="text-3xl font-bold font-outfit text-slate-800 dark:text-slate-100">{stats.totalResumes}</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800">
+          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Mock Interviews Done</CardTitle>
-              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Case Interviews</CardTitle>
+              <Activity className="h-4 w-4 text-cyan-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold font-outfit">{stats.totalInterviews}</div>
+              <div className="text-3xl font-bold font-outfit text-slate-800 dark:text-slate-100">{stats.caseInterviews}</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800">
+          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Average Resume Score</CardTitle>
-              <Target className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Full Interviews</CardTitle>
+              <Target className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold font-outfit text-slate-800 dark:text-slate-100">{stats.domainInterviews}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Avg Resume Score</CardTitle>
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-outfit text-emerald-600 dark:text-emerald-400">
-                {trendData.length > 0 ? trendData[trendData.length - 1].score : 0}/100
+                {trendData.length > 0 ? trendData[trendData.length - 1].score : 0}<span className="text-lg text-emerald-600/60 dark:text-emerald-400/60 font-medium">/100</span>
               </div>
             </CardContent>
           </Card>

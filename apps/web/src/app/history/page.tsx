@@ -81,17 +81,17 @@ export default function HistoryPage() {
           <p className="text-muted-foreground mt-2">Review your past resume analyses and mock interviews to track your progress.</p>
         </div>
 
-        <Tabs defaultValue="resumes" orientation="vertical" className="w-full flex flex-col md:flex-row gap-6">
-          <TabsList className="md:w-64 flex md:flex-col h-auto justify-start p-2 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-2xl shadow-sm gap-2">
-            <TabsTrigger value="resumes" className="w-full justify-start rounded-xl px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium">
-              <FileText className="h-4 w-4 mr-3" /> Resume Scans
+        <Tabs defaultValue="resumes" className="w-full flex flex-col gap-8">
+          <TabsList className="w-full sm:w-fit inline-flex p-1.5 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-2xl shadow-sm gap-2 mx-auto">
+            <TabsTrigger value="resumes" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium text-sm flex items-center">
+              <FileText className="h-4 w-4 mr-2.5" /> Resume Scans
             </TabsTrigger>
-            <TabsTrigger value="interviews" className="w-full justify-start rounded-xl px-4 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium">
-              <Bot className="h-4 w-4 mr-3" /> Mock Interviews
+            <TabsTrigger value="interviews" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium text-sm flex items-center">
+              <Bot className="h-4 w-4 mr-2.5" /> Mock Interviews
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex-1 min-h-[400px] bg-white/30 dark:bg-neutral-900/20 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-3xl p-6 md:p-8">
+          <div className="min-h-[400px] bg-white/30 dark:bg-neutral-900/20 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-3xl p-6 md:p-8">
             <TabsContent value="resumes" className="mt-0 h-full">
               {resumeHistory.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center py-20">
@@ -149,28 +149,39 @@ export default function HistoryPage() {
               ) : (
                 <div className="grid gap-4 xl:grid-cols-2">
                   {interviewHistory.map((interview) => (
-                    <Card key={interview.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-md transition-all rounded-2xl overflow-hidden">
-                      <CardHeader className="pb-3">
+                    <Card key={interview.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-lg transition-all rounded-2xl overflow-hidden group">
+                      <CardHeader className="pb-3 bg-black/5 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
                         <div className="flex justify-between items-start">
                           <div>
-                            <CardTitle className="text-lg flex items-center">
-                              <Calendar className="h-4 w-4 mr-2 text-primary" />
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-primary" />
                               {new Date(interview.created_at).toLocaleDateString()}
                             </CardTitle>
-                            <CardDescription className="mt-1 uppercase tracking-widest text-[10px] font-bold text-primary/70">
-                              PHASE: {interview.case_state?.current_phase || "Unknown"}
+                            <CardDescription className="mt-1 flex items-center gap-2">
+                              <span className="uppercase tracking-widest text-[10px] font-bold text-primary/70">
+                                {interview.interview_type === 'domain' ? 'FULL INTERVIEW' : 'MOCK CASE'}
+                              </span>
+                              <span className="text-slate-300 dark:text-neutral-700">•</span>
+                              <span className="text-xs uppercase font-medium">{interview.case_state?.current_phase || "Introduction"}</span>
                             </CardDescription>
                           </div>
-                          <div className={`px-3 py-1 rounded-full text-xs font-bold ${interview.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-                            {interview.status === 'completed' ? 'Completed' : 'In Progress'}
-                          </div>
+                          {interview.status === 'completed' && (
+                            <div className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-3 py-1 rounded-full text-[10px] font-bold border border-green-200 dark:border-green-800/50 uppercase tracking-widest">
+                              Completed
+                            </div>
+                          )}
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <Button variant="outline" className="w-full text-xs" onClick={() => {
+                      <CardContent className="pt-4">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-6">
+                          {interview.interview_type === 'domain' 
+                            ? 'Comprehensive behavioral and technical interview based on your resume.' 
+                            : 'Case interview simulating strategy consulting and problem solving.'}
+                        </p>
+                        <Button variant={interview.status === 'completed' ? 'outline' : 'default'} className="w-full text-sm font-semibold rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={() => {
                           router.push(`/interview?id=${interview.id}`)
                         }}>
-                          {interview.status === 'completed' ? 'View Transcript' : 'Resume Interview'}
+                          {interview.status === 'completed' ? 'View Transcript' : 'Resume Interview'} <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                       </CardContent>
                     </Card>

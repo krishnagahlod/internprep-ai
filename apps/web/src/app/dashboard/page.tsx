@@ -349,48 +349,48 @@ export default function DashboardPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid gap-6 md:grid-cols-3 lg:grid-cols-4 auto-rows-[220px]"
+            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
           >
             
-            {/* Full Interview Simulator Card (Spans 2 cols, 2 rows) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 row-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
+            {/* Full Interview Simulator Card (Spans 2 cols) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 dark:bg-blue-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-blue-200/50 dark:group-hover:bg-blue-800/30 transition-colors duration-500 z-0" />
               
-              <div className="flex items-start justify-between relative z-10">
+              <div className="flex items-start justify-between relative z-10 mb-6">
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform duration-300">
                   <Users className="h-7 w-7 text-white" />
                 </div>
                 <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">DOMAIN FOCUS</span>
               </div>
               
-              <div className="relative z-10 mt-auto">
+              <div className="relative z-10">
                 <h2 className="text-2xl md:text-3xl font-extrabold mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors font-outfit">Full Interview Simulator</h2>
                 <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-6 max-w-sm">
                   Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across various domains.
                 </p>
-                <div className="inline-flex items-center text-white bg-blue-600 px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                <div className="inline-flex items-center text-white bg-blue-600 px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-fit">
                   Configure Session <ExternalLink className="ml-2 h-4 w-4" />
                 </div>
               </div>
             </motion.div>
 
-            {/* Mock Case Simulator Card (Spans 2 cols, 2 rows) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 row-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => router.push("/interview")}>
+            {/* Mock Case Simulator Card (Spans 2 cols) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => router.push("/interview")}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-100/50 dark:bg-cyan-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-cyan-200/50 dark:group-hover:bg-cyan-800/30 transition-colors duration-500 z-0" />
               
-              <div className="flex items-start justify-between relative z-10">
+              <div className="flex items-start justify-between relative z-10 mb-6">
                 <div className="h-16 w-16 rounded-2xl bg-gradient-premium flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform duration-300">
                   <Briefcase className="h-7 w-7 text-white" />
                 </div>
                 <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">CORE ENGINE</span>
               </div>
               
-              <div className="relative z-10 mt-auto">
+              <div className="relative z-10">
                 <h2 className="text-3xl font-extrabold mb-3 group-hover:text-cyan-700 transition-colors font-outfit">Mock Case Simulator</h2>
                 <p className="text-muted-foreground text-base leading-relaxed mb-6 max-w-sm">
                   Engage in a hyper-realistic, voice-enabled mock interview. Work through problems on a live digital scratchpad evaluated in real-time.
                 </p>
-                <div className="inline-flex items-center text-white bg-primary px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+                <div className="inline-flex items-center text-white bg-primary px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-fit">
                   Initialize Session <ExternalLink className="ml-2 h-4 w-4" />
                 </div>
               </div>
