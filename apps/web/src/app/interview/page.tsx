@@ -85,7 +85,20 @@ function InterviewEngine() {
           if (session && !error) {
             setCaseContext(session.case_state?.case_context || session.case_state?.resume_context || "")
             setCaseSource(session.case_state?.case_source || "")
-            setMessages(session.messages || [])
+            
+            // Fetch messages separately since backend uses session_messages
+            const { data: messagesData } = await supabase
+              .from("session_messages")
+              .select("*")
+              .eq("session_id", sessionIdParam)
+              .order("created_at", { ascending: true })
+            
+            if (messagesData && messagesData.length > 0) {
+              setMessages(messagesData.map((m: any) => ({ role: m.role, content: m.content })))
+            } else {
+              setMessages(session.messages || [])
+            }
+            
             setCurrentSessionId(session.id)
             setCurrentPhase(session.case_state?.current_phase || "introduction")
             setInterviewMode(session.interview_type || "case")
@@ -445,27 +458,31 @@ function InterviewEngine() {
           <ThemeToggle />
           <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setRightPanelState("whiteboard")}
-            className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "whiteboard" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-          >
-            <PenTool className="h-4 w-4 mr-2" />
-            Canvas
-          </Button>
+          {interviewMode === "case" && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRightPanelState("whiteboard")}
+                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "whiteboard" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+              >
+                <PenTool className="h-4 w-4 mr-2" />
+                Canvas
+              </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setRightPanelState("source")}
-            className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "source" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Document
-          </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRightPanelState("source")}
+                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "source" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Document
+              </Button>
 
-          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
+              <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
+            </>
+          )}
 
           <Button 
             variant="ghost" 
@@ -489,20 +506,22 @@ function InterviewEngine() {
         MAIN BENTO GRID LAYOUT 
         min-h-0 is absolutely critical here. It prevents flex children from expanding past their parent.
       */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className={`flex flex-1 overflow-hidden min-h-0 ${interviewMode === "domain" ? "justify-center bg-slate-50/50 dark:bg-neutral-950/50" : ""}`}>
 
         {/* LEFT PANEL: CO-PILOT CHAT SIDEBAR */}
         <div 
-          style={{ width: `${chatWidth}%` }}
-          className="flex flex-col min-w-[320px] border-r border-slate-200/70 dark:border-neutral-800/70 bg-white dark:bg-neutral-900 shrink-0 relative shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10"
+          style={interviewMode === "case" ? { width: `${chatWidth}%` } : {}}
+          className={`flex flex-col min-w-[320px] bg-white dark:bg-neutral-900 shrink-0 relative shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 ${interviewMode === "domain" ? 'w-full max-w-4xl mx-auto border-x border-slate-200/70 dark:border-neutral-800/70' : 'border-r border-slate-200/70 dark:border-neutral-800/70'}`}
         >
-          {/* Custom Drag Handle */}
-          <div 
-            className="absolute -right-3 top-0 bottom-0 w-6 cursor-col-resize z-50 flex items-center justify-center group"
-            onMouseDown={() => setIsDragging(true)}
-          >
-            <div className="h-16 w-1.5 rounded-full bg-slate-200/50 dark:bg-neutral-700/50 group-hover:bg-primary/40 transition-colors duration-300" />
-          </div>
+          {/* Custom Drag Handle (Only for Case mode) */}
+          {interviewMode === "case" && (
+            <div 
+              className="absolute -right-3 top-0 bottom-0 w-6 cursor-col-resize z-50 flex items-center justify-center group"
+              onMouseDown={() => setIsDragging(true)}
+            >
+              <div className="h-16 w-1.5 rounded-full bg-slate-200/50 dark:bg-neutral-700/50 group-hover:bg-primary/40 transition-colors duration-300" />
+            </div>
+          )}
           
           {/* Strict overflow-y-auto ensures ONLY the chat feed scrolls */}
           <div className="flex-1 overflow-y-auto px-8 py-8 scroll-smooth" ref={scrollRef}>
@@ -624,13 +643,14 @@ function InterviewEngine() {
           </div>
         </div>
 
-        {/* RIGHT PANEL: HERO CANVAS */}
-        <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-neutral-950/50 relative z-0 overflow-hidden">
-          {rightPanelState === "whiteboard" ? (
-            <div className="absolute inset-0 animate-in fade-in duration-500">
-              <ExcalidrawWrapper />
-            </div>
-          ) : (
+        {/* RIGHT PANEL: HERO CANVAS (Only for Case Mode) */}
+        {interviewMode === "case" && (
+          <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-neutral-950/50 relative z-0 overflow-hidden">
+            {rightPanelState === "whiteboard" ? (
+              <div className="absolute inset-0 animate-in fade-in duration-500">
+                <ExcalidrawWrapper />
+              </div>
+            ) : (
             <div className="h-full w-full relative animate-in fade-in duration-500">
               {caseSource ? (
                 <div className="w-full h-full relative">
@@ -665,6 +685,7 @@ function InterviewEngine() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )
