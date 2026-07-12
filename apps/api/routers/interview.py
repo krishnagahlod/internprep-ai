@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
 from agents.case_interviewer import generate_case_response, generate_hint, get_random_case
+from agents.domain_interviewer import generate_domain_interview_response
 from services.rag import retrieve_context
 from supabase import create_client
 from dependencies import limiter
@@ -36,10 +37,28 @@ class ChatRequest(BaseModel):
     scratchpad: str
     case_context: Optional[str] = None
     case_source: Optional[str] = None
+    interview_type: Optional[str] = "case"
+    domain: Optional[str] = None
+    company: Optional[str] = None
+    resume_context: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
     new_phase: str
+
+class StartDomainRequest(BaseModel):
+    user_id: Optional[str] = None
+    domain: str
+    company: Optional[str] = None
+    resume_id: Optional[str] = None
+
+class StartDomainResponse(BaseModel):
+    session_id: str
+    initial_message: str
+    initial_phase: str
+    domain: str
+    company: Optional[str] = None
+    resume_context: Optional[str] = None
 
 class HintResponse(BaseModel):
     hint: str
@@ -105,6 +124,62 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
         print(f"Error starting case: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/start_domain", response_model=StartDomainResponse)
+@limiter.limit("3/hour")
+async def start_domain_endpoint(request: Request, body: StartDomainRequest):
+    try:
+        initial_phase = "introduction"
+        
+        # Get resume context if resume_id is provided
+        resume_context = "No resume provided."
+        if body.resume_id and supabase:
+            res = supabase.table("resumes").select("parsed_content").eq("id", body.resume_id).execute()
+            if res.data and res.data[0].get("parsed_content"):
+                resume_context = res.data[0]["parsed_content"]
+        
+        # Generate the opening message
+        bot_reply, next_phase = generate_domain_interview_response(
+            history=[],
+            current_phase=initial_phase,
+            resume_context=resume_context,
+            domain=body.domain,
+            company=body.company
+        )
+        
+        session_id = "temp_session_id"
+        if supabase:
+            # Create session in DB
+            insert_data = {
+                "interview_type": "domain",
+                "status": "in_progress",
+                "case_state": {"current_phase": next_phase, "domain": body.domain, "company": body.company, "resume_context": resume_context}
+            }
+            if body.user_id:
+                insert_data["user_id"] = body.user_id
+                
+            res = supabase.table("interview_sessions").insert(insert_data).execute()
+            if res.data:
+                session_id = res.data[0]["id"]
+                # Save initial bot message
+                supabase.table("session_messages").insert({
+                    "session_id": session_id,
+                    "role": "assistant",
+                    "content": bot_reply,
+                    "phase": initial_phase
+                }).execute()
+        
+        return StartDomainResponse(
+            session_id=session_id,
+            initial_message=bot_reply,
+            initial_phase=next_phase,
+            domain=body.domain,
+            company=body.company,
+            resume_context=resume_context
+        )
+    except Exception as e:
+        print(f"Error starting domain interview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit("50/hour")
 async def chat_endpoint(request: Request, body: ChatRequest):
@@ -121,12 +196,24 @@ async def chat_endpoint(request: Request, body: ChatRequest):
         if dynamic_context:
             combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
         
-        bot_reply, new_phase = generate_case_response(
-            history=history,
-            current_phase=body.current_phase,
-            context=combined_context,
-            scratchpad=body.scratchpad
-        )
+        bot_reply = ""
+        new_phase = body.current_phase
+        
+        if body.interview_type == "domain":
+            bot_reply, new_phase = generate_domain_interview_response(
+                history=history,
+                current_phase=body.current_phase,
+                resume_context=body.resume_context or "No resume provided.",
+                domain=body.domain or "General",
+                company=body.company
+            )
+        else:
+            bot_reply, new_phase = generate_case_response(
+                history=history,
+                current_phase=body.current_phase,
+                context=combined_context,
+                scratchpad=body.scratchpad
+            )
         
         if supabase and body.session_id != "temp_session_id":
             # Save user message
