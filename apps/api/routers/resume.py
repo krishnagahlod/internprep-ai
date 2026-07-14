@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 
 from dependencies import limiter
 from agents.resume_analyzer import analyze_resume_text, run_workshop_turn, parse_resume_structural
+from main import posthog_client
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -91,6 +92,12 @@ async def upload_resume(
         }).execute()
         
         resume_id = db_res.data[0]["id"]
+        
+        if posthog_client and user_id:
+            posthog_client.capture(user_id, 'resume_uploaded', {
+                'resume_id': resume_id,
+                'file_size': file_size
+            })
         
         return UploadResponse(
             id=resume_id,

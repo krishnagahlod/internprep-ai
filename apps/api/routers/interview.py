@@ -7,6 +7,7 @@ from agents.domain_interviewer import generate_domain_interview_response
 from services.rag import retrieve_context
 from supabase import create_client
 from dependencies import limiter
+from main import posthog_client
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
@@ -112,6 +113,12 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
                     "phase": initial_phase
                 }).execute()
         
+        if posthog_client and body.user_id:
+            posthog_client.capture(body.user_id, 'interview_started', {
+                'interview_type': 'case',
+                'session_id': session_id,
+            })
+            
         return StartCaseResponse(
             session_id=session_id,
             case_context=full_context,
@@ -172,6 +179,14 @@ async def start_domain_endpoint(request: Request, body: StartDomainRequest):
                     "phase": initial_phase
                 }).execute()
         
+        if posthog_client and body.user_id:
+            posthog_client.capture(body.user_id, 'interview_started', {
+                'interview_type': 'domain',
+                'domain': body.domain,
+                'company': body.company,
+                'session_id': session_id,
+            })
+            
         return StartDomainResponse(
             session_id=session_id,
             initial_message=bot_reply,

@@ -15,3 +15,5 @@ sentence-transformers
 pymupdf
 slowapi
 tenacity
+sentry-sdk[fastapi]
+posthog
