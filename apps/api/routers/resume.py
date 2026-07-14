@@ -6,9 +6,8 @@ from pdfminer.high_level import extract_text
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
-from dependencies import limiter
+from dependencies import limiter, posthog_client
 from agents.resume_analyzer import analyze_resume_text, run_workshop_turn, parse_resume_structural
-from main import posthog_client
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 

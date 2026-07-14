@@ -7,20 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from routers import resume, interview, feedback, gratitude
 import os
 import sentry_sdk
-from posthog import Posthog
 
 if os.environ.get("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=os.environ.get("SENTRY_DSN"),
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
-    )
-
-posthog_client = None
-if os.environ.get("POSTHOG_PROJECT_API_KEY"):
-    posthog_client = Posthog(
-        os.environ.get("POSTHOG_PROJECT_API_KEY"),
-        host=os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com")
     )
 
 app = FastAPI(title="AI Interview Coach API", version="1.0.0")

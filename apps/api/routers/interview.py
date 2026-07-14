@@ -6,8 +6,7 @@ from agents.case_interviewer import generate_case_response, generate_hint, get_r
 from agents.domain_interviewer import generate_domain_interview_response
 from services.rag import retrieve_context
 from supabase import create_client
-from dependencies import limiter
-from main import posthog_client
+from dependencies import limiter, posthog_client
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
