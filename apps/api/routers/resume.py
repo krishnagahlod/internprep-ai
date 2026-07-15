@@ -93,10 +93,14 @@ async def upload_resume(
         resume_id = db_res.data[0]["id"]
         
         if posthog_client and user_id:
-            posthog_client.capture(user_id, 'resume_uploaded', {
-                'resume_id': resume_id,
-                'file_size': file_size
-            })
+            posthog_client.capture(
+                distinct_id=user_id,
+                event='resume_uploaded',
+                properties={
+                    'resume_id': resume_id,
+                    'file_size': file_size
+                }
+            )
         
         return UploadResponse(
             id=resume_id,

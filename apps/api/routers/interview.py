@@ -113,10 +113,15 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
                 }).execute()
         
         if posthog_client and body.user_id:
-            posthog_client.capture(body.user_id, 'interview_started', {
-                'interview_type': 'case',
-                'session_id': session_id,
-            })
+            posthog_client.capture(
+                distinct_id=body.user_id, 
+                event='interview_started', 
+                properties={
+                    'interview_type': 'case',
+                    'case_source': case_source,
+                    'session_id': session_id,
+                }
+            )
             
         return StartCaseResponse(
             session_id=session_id,
@@ -179,12 +184,16 @@ async def start_domain_endpoint(request: Request, body: StartDomainRequest):
                 }).execute()
         
         if posthog_client and body.user_id:
-            posthog_client.capture(body.user_id, 'interview_started', {
-                'interview_type': 'domain',
-                'domain': body.domain,
-                'company': body.company,
-                'session_id': session_id,
-            })
+            posthog_client.capture(
+                distinct_id=body.user_id, 
+                event='interview_started', 
+                properties={
+                    'interview_type': 'domain',
+                    'domain': body.domain,
+                    'company': body.company,
+                    'session_id': session_id,
+                }
+            )
             
         return StartDomainResponse(
             session_id=session_id,

@@ -28,7 +28,7 @@ def check_phase_advance(history: List[Dict[str, str]], current_phase: str) -> bo
     if current_phase == "complete" or len(history) < 2:
         return False
         
-    last_messages = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in history[-3:]])
+    last_messages = "\n".join([f"{m.get('role', 'unknown').upper()}: {m.get('content', '')}" for m in history[-3:]])
     
     criteria = {
         "introduction": "Has the candidate started asking clarifying questions about the business model or revenue streams?",
