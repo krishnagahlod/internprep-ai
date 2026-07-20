@@ -74,30 +74,24 @@ function InterviewEngine() {
   // Resume Session logic
   useEffect(() => {
     const resumeSession = async () => {
-      if (sessionIdParam && user) {
+      if (sessionIdParam) {
         setIsInitializingSession(true)
         setShowSetupModal(false)
         setIsTyping(true)
         try {
-          const { data: session, error } = await supabase
-            .from("interview_sessions")
-            .select("*")
-            .eq("id", sessionIdParam)
-            .single()
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+          const response = await fetch(`${API_URL}/interview/session/${sessionIdParam}`)
+          
+          if (response.ok) {
+            const data = await response.json()
+            const session = data.session
+            const sessionMessages = data.messages
             
-          if (session && !error) {
             setCaseContext(session.case_state?.case_context || session.case_state?.resume_context || "")
             setCaseSource(session.case_state?.case_source || "")
             
-            // Fetch messages separately since backend uses session_messages
-            const { data: messagesData } = await supabase
-              .from("session_messages")
-              .select("*")
-              .eq("session_id", sessionIdParam)
-              .order("created_at", { ascending: true })
-            
-            if (messagesData && messagesData.length > 0) {
-              setMessages(messagesData.map((m: any) => ({ role: m.role, content: m.content })))
+            if (sessionMessages && sessionMessages.length > 0) {
+              setMessages(sessionMessages)
             } else {
               setMessages(session.messages || [])
             }
@@ -106,7 +100,8 @@ function InterviewEngine() {
             setCurrentPhase(session.case_state?.current_phase || "introduction")
             setInterviewMode(session.interview_type || "case")
             setIsTimerRunning(true)
-            // Ideally we'd restore elapsed time if we tracked it in the DB, but 0 is fine for now
+          } else {
+             console.error("Failed to fetch session from API")
           }
         } catch (e) {
           console.error("Failed to resume session", e)
@@ -117,7 +112,7 @@ function InterviewEngine() {
       }
     }
     resumeSession()
-  }, [sessionIdParam, user])
+  }, [sessionIdParam])
 
   // Drag to resize handler
   useEffect(() => {

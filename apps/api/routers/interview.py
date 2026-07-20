@@ -311,3 +311,28 @@ async def end_session_endpoint(request: EndSessionRequest):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/session/{session_id}")
+@limiter.limit("30/hour")
+async def get_session_endpoint(request: Request, session_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        res = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+        session = res.data[0]
+        
+        # Fetch messages
+        msg_res = supabase.table("session_messages").select("*").eq("session_id", session_id).order("created_at").execute()
+        messages = [{"role": m["role"], "content": m["content"]} for m in msg_res.data] if msg_res.data else session.get("messages", [])
+        
+        return {
+            "session": session,
+            "messages": messages
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error fetching session: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
