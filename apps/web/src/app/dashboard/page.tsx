@@ -42,7 +42,7 @@ export default function DashboardPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file || !user) return
+    if (!file) return
     
     // Check if it's a PDF (either by type or extension)
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
@@ -60,7 +60,11 @@ export default function DashboardPage() {
 
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("user_id", user.id)
+    if (user) {
+      formData.append("user_id", user.id)
+    } else {
+      formData.append("user_id", "guest")
+    }
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -74,7 +78,11 @@ export default function DashboardPage() {
       }
       
       const data = await response.json()
-      await fetchResumes()
+      if (user) {
+        await fetchResumes()
+      } else {
+        setResumes((prev) => [{ id: data.id, file_name: file.name, created_at: new Date().toISOString() }, ...prev])
+      }
       setSelectedResumeId(data.id)
     } catch (err: any) {
       console.error(err)

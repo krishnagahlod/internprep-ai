@@ -83,9 +83,11 @@ async def upload_resume(
         # 3. Extract raw text for fallback or basic analytics
         raw_text = extract_text(io.BytesIO(pdf_bytes))
         
+        db_user_id = None if user_id == "guest" else user_id
+        
         # 4. Save to database
         db_res = supabase.table("resumes").insert({
-            "user_id": user_id,
+            "user_id": db_user_id,
             "file_name": file_name,
             "raw_text": raw_text,
             "file_url": file_url,
