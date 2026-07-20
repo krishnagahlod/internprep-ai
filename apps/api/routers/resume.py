@@ -71,6 +71,8 @@ async def upload_resume(
             {"content-type": "application/pdf"}
         )
         file_url = supabase.storage.from_("resume_pdfs").get_public_url(file_path)
+        if file_url.endswith("?"):
+            file_url = file_url[:-1]
         
         # 2. Extract Structural text using Gemini
         parsed_content = await asyncio.wait_for(
