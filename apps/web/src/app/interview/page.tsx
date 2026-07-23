@@ -59,8 +59,10 @@ function InterviewEngine() {
   const [chatWidth, setChatWidth] = useState(50) // Default to 50%
   const [isDragging, setIsDragging] = useState(false)
   const [showResumePanel, setShowResumePanel] = useState(false)
-  
-  // New State
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null)
+
+  // Wait for auth to initialize before rendering
+  const [isAuthReady, setIsAuthReady] = useState(false)
   const [showSetupModal, setShowSetupModal] = useState(true)
   const [isInitializingSession, setIsInitializingSession] = useState(false)
   const [selectedCaseType, setSelectedCaseType] = useState("Random")
@@ -101,9 +103,11 @@ function InterviewEngine() {
             setInterviewMode(session.interview_type || "case")
             setIsTimerRunning(true)
           } else {
+             setSessionLoadError("Failed to fetch session. Please ensure you are connected to the network.")
              console.error("Failed to fetch session from API")
           }
         } catch (e) {
+          setSessionLoadError("Connection error while loading session. Please ensure the backend is running.")
           console.error("Failed to resume session", e)
         } finally {
           setIsTyping(false)
@@ -553,7 +557,14 @@ function InterviewEngine() {
           {/* Strict overflow-y-auto ensures ONLY the chat feed scrolls */}
           <div className="flex-1 overflow-y-auto px-8 py-8 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" ref={scrollRef}>
             <div className="space-y-10 pb-6">
-              {messages.length === 0 && !showSetupModal && (
+              {sessionLoadError ? (
+                <div className="flex h-full items-center justify-center pt-32">
+                  <div className="flex flex-col items-center gap-4 text-red-500">
+                    <p className="text-sm font-medium">{sessionLoadError}</p>
+                    <Button variant="outline" onClick={() => router.push("/history")}>Go Back</Button>
+                  </div>
+                </div>
+              ) : messages.length === 0 && !showSetupModal && (
                 <div className="flex h-full items-center justify-center pt-32">
                   <div className="flex flex-col items-center gap-4 text-slate-400">
                     <Loader2 className="h-6 w-6 animate-spin opacity-50" />
