@@ -3,6 +3,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: "/api/proxy/:path*",
+        destination: "https://internprep-ai-production.up.railway.app/:path*",
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {
