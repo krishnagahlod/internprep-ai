@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/proxy/:path*",
-        destination: "https://internprep-ai-production.up.railway.app/:path*",
+        destination: "https://internprep-ai.onrender.com/:path*",
       },
     ];
   },
