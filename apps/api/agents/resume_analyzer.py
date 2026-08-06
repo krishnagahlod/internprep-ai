@@ -113,8 +113,6 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
 def parse_resume_structural(pdf_bytes: bytes) -> str:
     """Uses Gemini to extract deeply structured text from a PDF resume."""
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        
         prompt = """
 You are an expert resume parser. I am providing you with a raw PDF resume.
 Extract the entire text content of this resume into a highly structured, clean Markdown document.
@@ -125,10 +123,7 @@ CRITICAL INSTRUCTIONS:
 4. Do NOT output anything other than the extracted Markdown. No conversational filler.
 """
         
-        response = model.generate_content([
-            {"mime_type": "application/pdf", "data": pdf_bytes},
-            prompt
-        ])
+        response = gemini_client.generate_content("gemini-1.5-flash", prompt, pdf_bytes=pdf_bytes)
         
         text = response.text
         # Strip markdown fences if they exist
