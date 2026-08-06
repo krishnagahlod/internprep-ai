@@ -15,6 +15,11 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         capture_pageview: false // We will handle this manually below
       })
     }
+    
+    // Silently ping the backend to wake it up from Render free-tier sleep
+    if (typeof window !== 'undefined') {
+      fetch(process.env.NEXT_PUBLIC_API_URL || '/api/proxy').catch(() => {})
+    }
   }, [])
 
   return (
