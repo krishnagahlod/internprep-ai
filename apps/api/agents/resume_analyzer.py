@@ -215,7 +215,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
 
     # 3. Fetch RAG matches concurrently from Supabase
     args_list = [(i, ub, embeddings[i] if i < len(embeddings) else None) for i, ub in enumerate(user_bullets)]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         rag_results = list(executor.map(fetch_rag_for_bullet, args_list))
     
     rag_context = "".join(rag_results)
