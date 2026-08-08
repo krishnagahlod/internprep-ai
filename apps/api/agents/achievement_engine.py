@@ -251,6 +251,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     - Follow standard Day 1 resume rules (Start with strong action verb, quantify, single line).
     - Do NOT hallucinate metrics; use the provided metrics or abstract them safely (e.g. 'significant improvement').
     - NEVER put a full stop (period) at the end of the bullet point.
+    - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
     """
     
     try:
@@ -261,6 +262,17 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             temperature=0.4,
             max_tokens=1024
         )
+        
+        # Clean up the JSON string
+        import re
+        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(1)
+        response_text = response_text.strip()
+        
+        # Remove trailing commas which break standard json.loads
+        response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+        
         data = json.loads(response_text)
         variants = data.get("variants", [])
         
