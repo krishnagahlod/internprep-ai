@@ -271,10 +271,10 @@ export default function ResumeBuilderPage() {
     setIsStrategyLoading(false)
   }
 
-  const sendChatMessage = async () => {
-    if (!activeChatAchievement || !chatInput.trim() || !user) return
+  const sendChatMessage = async (forceStart = false) => {
+    if (!activeChatAchievement || (!chatInput.trim() && !forceStart) || !user) return
     
-    const newMessages = [...chatMessages, { role: "user", content: chatInput }]
+    const newMessages = chatInput.trim() ? [...chatMessages, { role: "user", content: chatInput }] : chatMessages
     setChatMessages(newMessages)
     setChatInput("")
     setIsChatLoading(true)
@@ -579,7 +579,7 @@ export default function ResumeBuilderPage() {
                       <h4 className="text-lg font-semibold text-foreground mb-2">Metrics Discovery</h4>
                       <p className="text-sm mb-6 max-w-sm mx-auto">Start an interview with our AI consultant to uncover hidden metrics and impact in this achievement.</p>
                       <Button onClick={() => {
-                        sendChatMessage() // Send empty to trigger greeting
+                        sendChatMessage(true) // Send empty to trigger greeting
                       }} size="lg" className="rounded-full shadow-md">
                         <Sparkles className="h-4 w-4 mr-2" /> Start Interview
                       </Button>
@@ -636,7 +636,7 @@ export default function ResumeBuilderPage() {
                       }}
                     />
                     <Button 
-                      onClick={sendChatMessage} 
+                      onClick={() => sendChatMessage()} 
                       disabled={isChatLoading || !chatInput.trim()}
                       className="absolute right-2 top-2 h-11 w-11 rounded-lg"
                       size="icon"
@@ -787,21 +787,32 @@ export default function ResumeBuilderPage() {
                     <CardContent className="py-6 flex-1 bg-background">
                       <p className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</p>
                     </CardContent>
-                    <CardFooter className="p-4 bg-muted/10 border-t flex justify-end gap-2">
-                       <Button 
-                          size="sm" 
-                          variant={bullet.is_saved ? "secondary" : "default"}
-                          className={`shadow-sm w-full sm:w-auto ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
-                          onClick={() => saveBullet(bullet)}
-                          disabled={bullet.is_saved}
-                        >
-                          {bullet.is_saved ? (
-                            <><CheckCircle2 className="h-4 w-4 mr-2"/> Saved to Bank</>
-                          ) : (
-                            <><Save className="h-4 w-4 mr-2"/> Save to Point Bank</>
-                          )}
-                        </Button>
-                    </CardFooter>
+                    <div className="p-4 border-t bg-muted/5 flex justify-end gap-2 mt-auto">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => navigator.clipboard.writeText(bullet.bullet_text)}
+                      >
+                        <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                        Copy
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant={bullet.is_saved ? "secondary" : "default"}
+                        className={`shadow-sm ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
+                        onClick={() => saveBullet(bullet)}
+                        disabled={bullet.is_saved}
+                      >
+                        {bullet.is_saved ? (
+                          <><CheckCircle2 className="h-4 w-4 mr-2"/> Saved to Bank</>
+                        ) : (
+                          <><Save className="h-4 w-4 mr-2"/> Save to Point Bank</>
+                        )}
+                      </Button>
+                    </div>
                   </Card>
                 ))}
               </div>

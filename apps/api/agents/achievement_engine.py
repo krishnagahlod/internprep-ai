@@ -201,35 +201,44 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     3. 'technical_heavy': Focus on the specific tools, methods, frameworks, and technical execution.
     4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
     
-    Return strictly a JSON array of objects, with each object matching this schema:
-    {{
-        "variant_type": "impact_heavy" | "leadership_heavy" | "technical_heavy" | "concise",
-        "bullet_text": "The generated bullet point",
-        "scores": {{
-            "impact": 0-100,
-            "quantification": 0-100,
-            "role_fit": 0-100
-        }}
-    }}
+    Return strictly a JSON object with a "variants" key that contains an array of exactly 4 objects matching this schema:
+    {
+        "variants": [
+            {
+                "variant_type": "impact_heavy" | "leadership_heavy" | "technical_heavy" | "concise",
+                "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
+                "scores": {
+                    "impact": 0-100,
+                    "quantification": 0-100,
+                    "role_fit": 0-100
+                }
+            }
+        ]
+    }
     
     CRITICAL: 
     - Follow standard Day 1 resume rules (Start with strong action verb, quantify, single line).
     - Do NOT hallucinate metrics; use the provided metrics or abstract them safely (e.g. 'significant improvement').
+    - NEVER put a full stop (period) at the end of the bullet point.
     """
     
-    response = gemini_client.generate_content(
-        model_name="gemini-3.5-flash",
-        prompt=system_prompt,
-        generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.4)
-    )
-    
     try:
-        data = json.loads(response.text)
-        if isinstance(data, dict):
-            for k, v in data.items():
-                if isinstance(v, list): return v
-            return [data]
-        return data if isinstance(data, list) else []
+        response_text = cerebras_client.generate_chat_completion(
+            model="gpt-oss-120b",
+            messages=[{"role": "user", "content": system_prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            max_tokens=1024
+        )
+        data = json.loads(response_text)
+        variants = data.get("variants", [])
+        
+        # Ensure no full stops made it through
+        for v in variants:
+            if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                v["bullet_text"] = v["bullet_text"][:-1]
+                
+        return variants
     except Exception as e:
         print(f"Failed to generate variants JSON: {e}")
         return []
