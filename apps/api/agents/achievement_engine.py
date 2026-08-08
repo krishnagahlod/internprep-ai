@@ -202,19 +202,19 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
     
     Return strictly a JSON object with a "variants" key that contains an array of exactly 4 objects matching this schema:
-    {
+    {{
         "variants": [
-            {
+            {{
                 "variant_type": "impact_heavy" | "leadership_heavy" | "technical_heavy" | "concise",
                 "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
-                "scores": {
+                "scores": {{
                     "impact": 0-100,
                     "quantification": 0-100,
                     "role_fit": 0-100
-                }
-            }
+                }}
+            }}
         ]
-    }
+    }}
     
     CRITICAL: 
     - Follow standard Day 1 resume rules (Start with strong action verb, quantify, single line).
