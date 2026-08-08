@@ -38,11 +38,13 @@ interface GeneratedBullet {
 
 // Helper to highlight numbers and percentages in text
 const highlightMetrics = (text: string) => {
-  const parts = text.split(/(\d+(?:,\d+)*(?:\.\d+)?%?)/g);
+  // Matches numbers with optional currency symbols, commas, decimals, and suffixes (k, M, B, +, %, x)
+  const regex = /((?:[\$€£₹]\s*)?\d+(?:,\d+)*(?:\.\d+)?(?:[kKmMbB]|k\+|M\+|\+)?(?:%|x|X)?)/g;
+  const parts = text.split(regex);
   return (
     <>
       {parts.map((part, i) => {
-        if (/^\d+(?:,\d+)*(?:\.\d+)?%?$/.test(part)) {
+        if (/^(?:[\$€£₹]\s*)?\d+(?:,\d+)*(?:\.\d+)?(?:[kKmMbB]|k\+|M\+|\+)?(?:%|x|X)?$/.test(part)) {
           return <span key={i} className="font-bold text-primary">{part}</span>;
         }
         return part;
@@ -821,18 +823,23 @@ export default function ResumeBuilderPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {generatedBullets.map((bullet, idx) => (
-                  <Card key={idx} className="border-2 border-border/50 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all flex flex-col group bg-card">
-                    <CardHeader className="py-4 bg-muted/10 border-b relative">
+                  <Card key={idx} className="border-l-4 border-l-primary/60 border-t border-r border-b border-border shadow-sm hover:shadow-md transition-all flex flex-col group bg-card">
+                    <CardHeader className="py-4 bg-muted/5 border-b relative">
                       <div className="flex justify-between items-center">
-                        <Badge variant="outline" className="bg-background text-foreground/80 font-bold tracking-widest text-[11px] px-3 py-1 uppercase">
+                        <Badge variant="secondary" className="bg-muted text-muted-foreground font-semibold tracking-widest text-[10px] px-3 py-1 uppercase shadow-none border-0">
                           {bullet.variant_type.replace('_', ' ')}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-8 flex-1 flex items-center justify-center">
-                      <p className="text-lg md:text-xl font-medium leading-relaxed text-foreground text-center">
-                        {highlightMetrics(bullet.bullet_text)}
-                      </p>
+                    <CardContent className="p-6 md:p-8 flex-1 flex items-start">
+                      <div className="flex gap-4 items-start">
+                        <div className="mt-1 hidden sm:block">
+                          <div className="h-2 w-2 rounded-full bg-primary/40"></div>
+                        </div>
+                        <p className="text-base md:text-[17px] font-medium leading-relaxed text-foreground text-left">
+                          {highlightMetrics(bullet.bullet_text)}
+                        </p>
+                      </div>
                     </CardContent>
                     <div className="p-4 border-t bg-muted/5 flex justify-end gap-3 mt-auto">
                       <Button 
