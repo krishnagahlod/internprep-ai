@@ -44,7 +44,8 @@ export default function ResumeBuilderPage() {
   // Vault State
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [file, setFile] = useState<File | null>(null)
-  const [isExtracting, setIsExtracting] = useState(false)
+  const [isExtractingPDF, setIsExtractingPDF] = useState(false)
+  const [isExtractingText, setIsExtractingText] = useState(false)
   const [rawText, setRawText] = useState("")
   
   // Lab State
@@ -76,11 +77,15 @@ export default function ResumeBuilderPage() {
   // Fetch initial data
   useEffect(() => {
     setMounted(true)
-    if (user) {
+  }, [])
+
+  // Fetch initial data
+  useEffect(() => {
+    if (mounted && user) {
       fetchAchievements()
       fetchPointBank()
     }
-  }, [user])
+  }, [mounted, user])
 
   // Auth protection
   useEffect(() => {
@@ -121,7 +126,7 @@ export default function ResumeBuilderPage() {
 
   const handleFileUpload = async () => {
     if (!file || !user) return
-    setIsExtracting(true)
+    setIsExtractingPDF(true)
     
     const formData = new FormData()
     formData.append("file", file)
@@ -139,12 +144,12 @@ export default function ResumeBuilderPage() {
     } catch (e) {
       console.error(e)
     }
-    setIsExtracting(false)
+    setIsExtractingPDF(false)
   }
 
   const handleTextUpload = async () => {
     if (!rawText.trim() || !user) return
-    setIsExtracting(true)
+    setIsExtractingText(true)
     
     try {
       const res = await fetch(`${apiBase}/builder/extract/text`, {
@@ -159,7 +164,7 @@ export default function ResumeBuilderPage() {
     } catch (e) {
       console.error(e)
     }
-    setIsExtracting(false)
+    setIsExtractingText(false)
   }
   
   const generateVariants = async () => {
@@ -387,9 +392,9 @@ export default function ResumeBuilderPage() {
                       {file && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />}
                     </div>
                   </div>
-                  <Button onClick={handleFileUpload} disabled={!file || isExtracting} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5">
-                    {isExtracting ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
-                    {isExtracting ? "Extracting achievements..." : "Auto-Extract Achievements"}
+                  <Button onClick={handleFileUpload} disabled={!file || isExtractingPDF} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5">
+                    {isExtractingPDF ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
+                    {isExtractingPDF ? "Extracting achievements..." : "Auto-Extract Achievements"}
                   </Button>
                 </div>
               </CardContent>
@@ -414,9 +419,9 @@ export default function ResumeBuilderPage() {
                   className="h-[74px] resize-none rounded-xl border-border focus-visible:ring-primary/30 focus-visible:border-primary/50 text-[15px] p-3 shadow-sm"
                   aria-label="Raw text for extraction"
                 />
-                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtracting} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5" variant="secondary">
-                  {isExtracting ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Plus className="h-5 w-5 mr-2"/>}
-                  {isExtracting ? "Processing text..." : "Add to Vault manually"}
+                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtractingText} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5" variant="secondary">
+                  {isExtractingText ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Plus className="h-5 w-5 mr-2"/>}
+                  {isExtractingText ? "Extracting text..." : "Add to Vault manually"}
                 </Button>
               </CardContent>
             </Card>
