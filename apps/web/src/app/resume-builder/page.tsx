@@ -271,112 +271,148 @@ export default function ResumeBuilderPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl">
-      <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Placement Resume Builder</h1>
-          <p className="text-muted-foreground mt-2">
-            Store your raw achievements once. Generate perfect bullets for any role.
+    <div className="container mx-auto py-8 max-w-6xl px-4">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-4">
+        <div className="space-y-2">
+          <div className="inline-flex items-center rounded-lg bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-2">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Placement Focus
+          </div>
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
+            Resume Builder
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl">
+            Specifically focusing on placements. Store your raw achievements once, and let our AI generate perfectly benchmarked bullet variants tailored for top-tier roles.
           </p>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="vault">1. Achievement Vault</TabsTrigger>
-          <TabsTrigger value="lab">2. Bullet Laboratory</TabsTrigger>
-          <TabsTrigger value="bank">3. Point Bank & Strategy</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-8">
+        <TabsList className="flex flex-col sm:flex-row w-full h-auto bg-muted/50 p-1.5 rounded-xl shadow-sm border border-border/50">
+          <TabsTrigger value="vault" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+            1. Achievement Vault
+          </TabsTrigger>
+          <TabsTrigger value="lab" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+            2. Bullet Laboratory
+          </TabsTrigger>
+          <TabsTrigger value="bank" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+            3. Point Bank & Strategy
+          </TabsTrigger>
         </TabsList>
 
         {/* VAULT TAB */}
-        <TabsContent value="vault" className="space-y-6">
+        <TabsContent value="vault" className="space-y-8 animate-in fade-in-50 duration-500">
           <div className="grid md:grid-cols-2 gap-6">
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-gradient-to-br from-background to-muted/20">
               <CardHeader>
-                <CardTitle>Extract from PDF Resume</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-md text-primary">
+                    <UploadCloud className="h-5 w-5" />
+                  </div>
+                  Extract from PDF
+                </CardTitle>
                 <CardDescription>Upload an old resume to auto-extract achievements</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-4">
                   <Input 
                     type="file" 
                     accept="application/pdf"
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="file:bg-primary/10 file:text-primary file:border-0 file:rounded-md file:px-4 file:py-2 file:mr-4 file:font-medium hover:file:bg-primary/20 cursor-pointer h-14 pt-3"
                   />
-                  <Button onClick={handleFileUpload} disabled={!file || isExtracting}>
-                    {isExtracting ? <RefreshCw className="h-4 w-4 animate-spin mr-2"/> : <UploadCloud className="h-4 w-4 mr-2"/>}
-                    Extract
+                  <Button onClick={handleFileUpload} disabled={!file || isExtracting} className="w-full h-11 text-base">
+                    {isExtracting ? <RefreshCw className="h-5 w-5 animate-spin mr-2"/> : <UploadCloud className="h-5 w-5 mr-2"/>}
+                    Extract Achievements
                   </Button>
                 </div>
               </CardContent>
             </Card>
             
-            <Card>
+            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-gradient-to-bl from-background to-muted/20">
               <CardHeader>
-                <CardTitle>Extract from Raw Text</CardTitle>
-                <CardDescription>Paste project descriptions or notes</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-md text-primary">
+                    <Edit3 className="h-5 w-5" />
+                  </div>
+                  Extract from Raw Text
+                </CardTitle>
+                <CardDescription>Paste rough project descriptions or unformatted notes</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea 
-                  placeholder="Paste raw project notes here..." 
+                  placeholder="E.g., I worked on a machine learning model to predict churn. It improved retention by 15%..." 
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  className="h-20"
+                  className="h-[76px] resize-none focus-visible:ring-primary/20"
                 />
-                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtracting} className="w-full">
-                  {isExtracting ? <RefreshCw className="h-4 w-4 animate-spin mr-2"/> : <Plus className="h-4 w-4 mr-2"/>}
+                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtracting} className="w-full h-11 text-base" variant="secondary">
+                  {isExtracting ? <RefreshCw className="h-5 w-5 animate-spin mr-2"/> : <Plus className="h-5 w-5 mr-2"/>}
                   Extract from Text
                 </Button>
               </CardContent>
             </Card>
           </div>
 
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Your Achievements ({achievements.length})</h2>
+          <div className="pt-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                Your Vault <Badge variant="secondary" className="text-sm px-2 rounded-full">{achievements.length}</Badge>
+              </h2>
+            </div>
+            
             {achievements.length === 0 ? (
-              <div className="text-center p-12 border border-dashed rounded-lg text-muted-foreground">
-                No achievements yet. Upload a resume or paste notes to begin.
+              <div className="text-center p-16 border-2 border-dashed rounded-xl border-muted bg-muted/10 text-muted-foreground flex flex-col items-center justify-center">
+                <div className="p-4 bg-background rounded-full shadow-sm mb-4">
+                  <Activity className="h-8 w-8 text-primary/50" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-1">Your vault is empty</h3>
+                <p>Upload a resume or paste notes above to extract your first achievement.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                 {achievements.map(ach => (
-                  <Card key={ach.id} className="flex flex-col">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="text-lg">{ach.title}</CardTitle>
-                        <Badge variant={ach.status === 'accepted' ? "default" : "secondary"}>
-                          {ach.status}
-                        </Badge>
+                  <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group">
+                    <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
+                      <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <CardDescription>{ach.parent_experience} • {ach.timeline}</CardDescription>
+                      <div className="pr-10">
+                        <CardTitle className="text-lg font-semibold leading-tight mb-1 group-hover:text-primary transition-colors">{ach.title}</CardTitle>
+                        <CardDescription className="flex items-center gap-2 font-medium">
+                          <span className="text-foreground/80">{ach.parent_experience}</span> 
+                          <span className="text-muted-foreground/50">•</span> 
+                          <span className="text-muted-foreground">{ach.timeline}</span>
+                        </CardDescription>
+                      </div>
                     </CardHeader>
-                    <CardContent className="flex-1">
-                      <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
+                    <CardContent className="flex-1 pt-4">
+                      <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 mb-5">
                         {ach.original_description}
                       </p>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {ach.competency_tags?.map(tag => (
-                          <Badge key={tag} variant="outline" className="text-xs">{tag.replace(/_/g, ' ')}</Badge>
+                          <Badge key={tag} variant="secondary" className="text-[10px] uppercase tracking-wider font-semibold bg-primary/5 text-primary border border-primary/10">
+                            {tag.replace(/_/g, ' ')}
+                          </Badge>
                         ))}
                       </div>
                     </CardContent>
-                    <CardFooter className="pt-0 flex gap-2 justify-between border-t p-4 mt-auto">
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => deleteAchievement(ach.id)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setActiveChatAchievement(ach)
-                          setChatMessages([])
-                        }}>
-                          <MessageSquare className="h-4 w-4 mr-2" /> Metrics Chat
-                        </Button>
-                      </div>
-                      <Button size="sm" onClick={() => {
+                    <CardFooter className="pt-0 flex gap-3 justify-between p-4 bg-muted/10 border-t border-border/30 mt-auto">
+                      <Button variant="outline" size="sm" className="flex-1 h-9 bg-background shadow-sm hover:bg-primary/5 hover:text-primary border-primary/20" onClick={() => {
+                        setActiveChatAchievement(ach)
+                        setChatMessages([])
+                      }}>
+                        <MessageSquare className="h-4 w-4 mr-2 text-primary" /> Metrics Chat
+                      </Button>
+                      <Button size="sm" className="flex-1 h-9 shadow-sm" onClick={() => {
                         setSelectedAchievement(ach.id);
                         setActiveTab("lab");
                       }}>
-                        Lab <ChevronRight className="h-4 w-4 ml-1" />
+                        Go to Lab <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
                     </CardFooter>
                   </Card>
@@ -397,42 +433,65 @@ export default function ResumeBuilderPage() {
                   <Button variant="ghost" size="sm" onClick={() => setActiveChatAchievement(null)}>Close</Button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-muted/10">
                   {chatMessages.length === 0 && (
-                    <div className="text-center text-muted-foreground p-8">
-                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                      <p>Start a chat to help quantify this achievement.</p>
-                      <Button className="mt-4" onClick={() => {
+                    <div className="text-center text-muted-foreground p-10 bg-background rounded-xl border shadow-sm">
+                      <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <MessageSquare className="h-8 w-8 text-primary" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-foreground mb-2">Metrics Discovery</h4>
+                      <p className="text-sm mb-6 max-w-sm mx-auto">Start an interview with our AI consultant to uncover hidden metrics and impact in this achievement.</p>
+                      <Button onClick={() => {
                         sendChatMessage() // Send empty to trigger greeting
-                      }}>Start Interview</Button>
+                      }} size="lg" className="rounded-full shadow-md">
+                        <Sparkles className="h-4 w-4 mr-2" /> Start Interview
+                      </Button>
                     </div>
                   )}
                   {chatMessages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] rounded-lg p-3 text-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                      <div className={`max-w-[85%] rounded-2xl p-4 text-[15px] shadow-sm leading-relaxed ${
+                        msg.role === 'user' 
+                          ? 'bg-primary text-primary-foreground rounded-br-sm' 
+                          : 'bg-background border rounded-bl-sm'
+                        }`}>
                         {msg.content}
                       </div>
                     </div>
                   ))}
                   {isChatLoading && (
                     <div className="flex justify-start">
-                      <div className="bg-muted rounded-lg p-3 text-sm flex gap-2 items-center">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Thinking...
+                      <div className="bg-background border rounded-2xl rounded-bl-sm p-4 text-[15px] shadow-sm flex gap-3 items-center text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin text-primary" /> AI is thinking...
                       </div>
                     </div>
                   )}
                 </div>
                 
-                <div className="p-4 border-t flex gap-2">
-                  <Input 
-                    value={chatInput} 
-                    onChange={e => setChatInput(e.target.value)} 
-                    placeholder="Type your answer..." 
-                    onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-                  />
-                  <Button onClick={sendChatMessage} disabled={isChatLoading || !chatInput.trim()}>
-                    <Send className="h-4 w-4" />
-                  </Button>
+                <div className="p-4 border-t bg-background">
+                  <div className="flex gap-3 relative">
+                    <Textarea 
+                      value={chatInput} 
+                      onChange={e => setChatInput(e.target.value)} 
+                      placeholder="Type your answer here..." 
+                      className="resize-none pr-14 min-h-[60px] rounded-xl focus-visible:ring-primary/30 text-[15px]"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          sendChatMessage()
+                        }
+                      }}
+                    />
+                    <Button 
+                      onClick={sendChatMessage} 
+                      disabled={isChatLoading || !chatInput.trim()}
+                      className="absolute right-2 top-2 h-11 w-11 rounded-lg"
+                      size="icon"
+                    >
+                      <Send className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-center text-muted-foreground mt-2">Press Enter to send, Shift+Enter for new line.</p>
                 </div>
               </div>
             </div>
@@ -440,80 +499,104 @@ export default function ResumeBuilderPage() {
         </TabsContent>
 
         {/* LABORATORY TAB */}
-        <TabsContent value="lab" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bullet Laboratory</CardTitle>
-              <CardDescription>Select an achievement and target role to generate tailored bullet variants based on placement golden benchmarks.</CardDescription>
+        <TabsContent value="lab" className="space-y-8 animate-in fade-in-50 duration-500">
+          <Card className="border-border/60 shadow-md bg-gradient-to-b from-background to-muted/10">
+            <CardHeader className="border-b bg-muted/5 pb-6">
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Activity className="h-6 w-6 text-primary" /> Bullet Laboratory
+              </CardTitle>
+              <CardDescription className="text-base">Mix and match your raw achievements into perfectly crafted, role-specific bullet points tailored to golden benchmarks.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Achievement</label>
+            <CardContent className="space-y-8 pt-8">
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                    Select Achievement Source
+                  </label>
                   <select 
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                     value={selectedAchievement || ""}
                     onChange={(e) => setSelectedAchievement(e.target.value)}
                   >
-                    <option value="" disabled>-- Select Achievement --</option>
+                    <option value="" disabled>-- Select an achievement from your vault --</option>
                     {achievements.map(a => (
                       <option key={a.id} value={a.id}>{a.title} ({a.parent_experience})</option>
                     ))}
                   </select>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Target Role</label>
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                    Select Target Industry Role
+                  </label>
                   <select 
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                     value={targetRole}
                     onChange={(e) => setTargetRole(e.target.value)}
                   >
-                    <option value="consult">Consulting</option>
-                    <option value="finance">Finance</option>
+                    <option value="consult">Management Consulting</option>
+                    <option value="finance">Finance / Investment Banking</option>
                     <option value="product management">Product Management</option>
-                    <option value="analytics">Analytics</option>
-                    <option value="it-software">IT / Software</option>
+                    <option value="analytics">Data & Analytics</option>
+                    <option value="it-software">Software Engineering / IT</option>
                   </select>
                 </div>
               </div>
               
-              <Button 
-                className="w-full" 
-                onClick={generateVariants} 
-                disabled={!selectedAchievement || isGenerating}
-              >
-                {isGenerating ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Activity className="h-4 w-4 mr-2" />}
-                Generate Benchmarked Variants
-              </Button>
+              <div className="pt-2">
+                <Button 
+                  className="w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl transition-all" 
+                  onClick={generateVariants} 
+                  disabled={!selectedAchievement || isGenerating}
+                >
+                  {isGenerating ? (
+                    <><Loader2 className="h-5 w-5 animate-spin mr-3" /> Synthesizing variants using AI...</>
+                  ) : (
+                    <><Sparkles className="h-5 w-5 mr-3" /> Generate Benchmarked Variants</>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           {generatedBullets.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold">Generated Variants</h3>
-              <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-border flex-1"></div>
+                <h3 className="text-xl font-bold px-2">Generated Variants</h3>
+                <div className="h-px bg-border flex-1"></div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {generatedBullets.map((bullet, idx) => (
-                  <Card key={idx} className="border-primary/20">
-                    <CardHeader className="py-3 bg-muted/30">
+                  <Card key={idx} className="border-border/60 shadow-sm hover:shadow-md hover:border-primary/40 transition-all flex flex-col group">
+                    <CardHeader className="py-4 bg-muted/20 border-b relative">
                       <div className="flex justify-between items-center">
-                        <Badge variant="outline" className="bg-background">
+                        <Badge variant="secondary" className="bg-background border shadow-sm font-semibold tracking-wide text-xs px-3 py-1">
                           {bullet.variant_type.replace('_', ' ').toUpperCase()}
                         </Badge>
-                        <Button 
+                      </div>
+                    </CardHeader>
+                    <CardContent className="py-6 flex-1 bg-background">
+                      <p className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</p>
+                    </CardContent>
+                    <CardFooter className="p-4 bg-muted/10 border-t flex justify-end gap-2">
+                       <Button 
                           size="sm" 
                           variant={bullet.is_saved ? "secondary" : "default"}
+                          className={`shadow-sm w-full sm:w-auto ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
                           onClick={() => saveBullet(bullet)}
                           disabled={bullet.is_saved}
                         >
-                          {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2"/> : <Save className="h-4 w-4 mr-2"/>}
-                          {bullet.is_saved ? "Saved to Bank" : "Save Bullet"}
+                          {bullet.is_saved ? (
+                            <><CheckCircle2 className="h-4 w-4 mr-2"/> Saved to Bank</>
+                          ) : (
+                            <><Save className="h-4 w-4 mr-2"/> Save to Point Bank</>
+                          )}
                         </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="py-4">
-                      <p className="text-base">{bullet.bullet_text}</p>
-                    </CardContent>
+                    </CardFooter>
                   </Card>
                 ))}
               </div>
@@ -522,33 +605,48 @@ export default function ResumeBuilderPage() {
         </TabsContent>
 
         {/* POINT BANK TAB */}
-        <TabsContent value="bank" className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-6">
+        <TabsContent value="bank" className="space-y-6 animate-in fade-in-50 duration-500">
+          <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Point Bank</CardTitle>
-                  <CardDescription>Your saved, role-specific bullet points. Copy these into your final resume template.</CardDescription>
+              <Card className="border-border/60 shadow-md">
+                <CardHeader className="border-b bg-muted/5 pb-5">
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <Save className="h-6 w-6 text-primary" /> Point Bank
+                  </CardTitle>
+                  <CardDescription className="text-base">Your curated collection of saved, role-specific bullet points ready to be pasted into your resume template.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   {pointBank.length === 0 ? (
-                    <div className="text-center p-8 text-muted-foreground">
-                      No saved bullets yet. Go to the Laboratory to generate and save some!
+                    <div className="text-center p-16 border-2 border-dashed rounded-xl border-muted bg-muted/10 text-muted-foreground flex flex-col items-center justify-center">
+                      <div className="p-4 bg-background rounded-full shadow-sm mb-4">
+                        <Save className="h-8 w-8 text-primary/40" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-1">Your bank is empty</h3>
+                      <p>Go to the Laboratory to generate and save your best bullets here.</p>
+                      <Button className="mt-6" variant="outline" onClick={() => setActiveTab("lab")}>Go to Laboratory</Button>
                     </div>
                   ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-10">
                       {/* Group by target role */}
                       {Array.from(new Set(pointBank.map(b => b.target_role))).map(role => (
                         <div key={role} className="space-y-4">
-                          <h3 className="text-lg font-bold capitalize border-b pb-2">{role}</h3>
-                          <ul className="space-y-3">
+                          <div className="flex items-center gap-3 border-b border-border/50 pb-3">
+                            <Badge variant="secondary" className="px-3 py-1 text-sm bg-primary/10 text-primary capitalize font-bold tracking-wide">
+                              {role} Role
+                            </Badge>
+                            <span className="text-sm font-medium text-muted-foreground">{pointBank.filter(b => b.target_role === role).length} bullets</span>
+                          </div>
+                          <ul className="space-y-4">
                             {pointBank.filter(b => b.target_role === role).map(bullet => (
-                              <li key={bullet.id} className="flex gap-4 items-start group">
-                                <div className="flex-1 bg-muted/30 p-3 rounded-md text-sm group-hover:bg-muted/50 transition-colors">
+                              <li key={bullet.id} className="flex gap-4 items-start group p-4 rounded-xl border border-border/40 bg-background hover:bg-muted/20 hover:border-border/80 hover:shadow-sm transition-all">
+                                <div className="mt-1">
+                                  <div className="h-2 w-2 rounded-full bg-primary/60"></div>
+                                </div>
+                                <div className="flex-1 text-[15px] leading-relaxed text-foreground/90 pr-4">
                                   {bullet.bullet_text}
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-red-50 hover:text-red-600 rounded-full h-8 w-8">
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </li>
                             ))}
@@ -562,57 +660,79 @@ export default function ResumeBuilderPage() {
             </div>
             
             <div className="md:col-span-1 space-y-6">
-              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-primary" /> Strategy Engine
+              <Card className="bg-gradient-to-b from-primary/5 via-background to-background border-primary/20 shadow-md sticky top-6">
+                <CardHeader className="border-b border-primary/10 pb-5">
+                  <CardTitle className="flex items-center gap-2 text-xl text-primary">
+                    <Target className="h-6 w-6" /> Strategy Engine
                   </CardTitle>
-                  <CardDescription>Analyze your vault and bank for a specific role.</CardDescription>
+                  <CardDescription>Analyze your vault and point bank against top-tier placement standards.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <select 
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={strategyTargetRole}
-                    onChange={(e) => setStrategyTargetRole(e.target.value)}
-                  >
-                    <option value="consult">Consulting</option>
-                    <option value="finance">Finance</option>
-                    <option value="product management">Product Management</option>
-                    <option value="analytics">Analytics</option>
-                    <option value="it-software">IT / Software</option>
-                  </select>
-                  <Button className="w-full" onClick={generateStrategy} disabled={isStrategyLoading}>
-                    {isStrategyLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2"/> : <Sparkles className="h-4 w-4 mr-2"/>}
-                    Generate Strategy
+                <CardContent className="space-y-6 pt-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground">Target Role for Analysis</label>
+                    <select 
+                      className="flex h-11 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
+                      value={strategyTargetRole}
+                      onChange={(e) => setStrategyTargetRole(e.target.value)}
+                    >
+                      <option value="consult">Management Consulting</option>
+                      <option value="finance">Finance / IB</option>
+                      <option value="product management">Product Management</option>
+                      <option value="analytics">Data & Analytics</option>
+                      <option value="it-software">Software Engineering</option>
+                    </select>
+                  </div>
+                  
+                  <Button className="w-full h-12 shadow-sm font-medium" onClick={generateStrategy} disabled={isStrategyLoading}>
+                    {isStrategyLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
+                    Generate Strategy Report
                   </Button>
                   
                   {strategyData && (
-                    <div className="mt-6 space-y-4">
-                      <div className="flex items-center justify-between border-b pb-2">
-                        <span className="font-semibold">Readiness Score</span>
-                        <Badge variant={strategyData.overall_readiness_score > 70 ? "default" : "destructive"}>
-                          {strategyData.overall_readiness_score}/100
-                        </Badge>
+                    <div className="mt-8 space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+                      <div className="flex flex-col items-center justify-center p-6 bg-background rounded-xl border shadow-sm">
+                        <span className="text-sm font-medium text-muted-foreground mb-2">Overall Readiness</span>
+                        <div className="flex items-end gap-1">
+                          <span className={`text-4xl font-extrabold ${strategyData.overall_readiness_score > 70 ? "text-green-600" : strategyData.overall_readiness_score > 40 ? "text-amber-500" : "text-destructive"}`}>
+                            {strategyData.overall_readiness_score}
+                          </span>
+                          <span className="text-muted-foreground font-medium mb-1">/100</span>
+                        </div>
                       </div>
                       
-                      <div>
-                        <span className="text-sm font-semibold text-green-600 block mb-1">Strengths</span>
-                        <ul className="text-xs space-y-1 pl-4 list-disc">
-                          {strategyData.strengths?.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-md">
+                          <CheckCircle2 className="h-4 w-4" /> Key Strengths
+                        </h4>
+                        <ul className="text-sm space-y-2 pl-2">
+                          {strategyData.strengths?.map((s: string, i: number) => (
+                            <li key={i} className="flex gap-2"><span className="text-green-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{s}</span></li>
+                          ))}
                         </ul>
                       </div>
                       
-                      <div>
-                        <span className="text-sm font-semibold text-red-600 block mb-1">Critical Gaps</span>
-                        <ul className="text-xs space-y-1 pl-4 list-disc">
-                          {strategyData.critical_gaps?.map((g: string, i: number) => <li key={i}>{g}</li>)}
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1.5 rounded-md">
+                          <Activity className="h-4 w-4" /> Critical Gaps
+                        </h4>
+                        <ul className="text-sm space-y-2 pl-2">
+                          {strategyData.critical_gaps?.map((g: string, i: number) => (
+                            <li key={i} className="flex gap-2"><span className="text-red-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{g}</span></li>
+                          ))}
                         </ul>
                       </div>
                       
-                      <div>
-                        <span className="text-sm font-semibold block mb-1">Action Plan</span>
-                        <ul className="text-xs space-y-1 pl-4 list-decimal">
-                          {strategyData.action_plan?.map((a: string, i: number) => <li key={i}>{a}</li>)}
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
+                          <Target className="h-4 w-4" /> Immediate Action Plan
+                        </h4>
+                        <ul className="text-sm space-y-3 pl-2">
+                          {strategyData.action_plan?.map((a: string, i: number) => (
+                            <li key={i} className="flex gap-3 items-start">
+                              <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold mt-0.5">{i+1}</span>
+                              <span className="text-foreground/90 leading-snug">{a}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     </div>
