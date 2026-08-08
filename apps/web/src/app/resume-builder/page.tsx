@@ -211,7 +211,13 @@ export default function ResumeBuilderPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        setGeneratedBullets(data)
+        if (!data || data.length === 0) {
+          alert("AI generation failed or returned no results. Please try again.")
+        } else {
+          setGeneratedBullets(data)
+        }
+      } else {
+        alert("Failed to connect to AI generation server. Please try again.")
       }
     } catch (e) {
       console.error(e)
@@ -815,40 +821,24 @@ export default function ResumeBuilderPage() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {generatedBullets.map((bullet, idx) => (
-                  <Card key={idx} className="border-border/60 shadow-sm hover:shadow-md hover:border-primary/40 transition-all flex flex-col group">
-                    <CardHeader className="py-4 bg-muted/20 border-b relative">
+                  <Card key={idx} className="border-2 border-border/50 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all flex flex-col group bg-card">
+                    <CardHeader className="py-4 bg-muted/10 border-b relative">
                       <div className="flex justify-between items-center">
-                        <Badge variant="secondary" className="bg-background border shadow-sm font-semibold tracking-wide text-xs px-3 py-1">
-                          {bullet.variant_type.replace('_', ' ').toUpperCase()}
+                        <Badge variant="outline" className="bg-background text-foreground/80 font-bold tracking-widest text-[11px] px-3 py-1 uppercase">
+                          {bullet.variant_type.replace('_', ' ')}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="py-6 flex-1 bg-background flex flex-col justify-between">
-                      <p className="text-[15px] leading-relaxed text-foreground/90 mb-4">{highlightMetrics(bullet.bullet_text)}</p>
-                      {bullet.scores && (
-                        <div className="flex gap-3 mt-2 border-t pt-4">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Impact</span>
-                            <span className="text-sm font-semibold">{bullet.scores.impact || 0}/100</span>
-                          </div>
-                          <div className="w-px bg-border" />
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Quantification</span>
-                            <span className="text-sm font-semibold">{bullet.scores.quantification || 0}/100</span>
-                          </div>
-                          <div className="w-px bg-border" />
-                          <div className="flex flex-col">
-                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Role Fit</span>
-                            <span className="text-sm font-semibold">{bullet.scores.role_fit || 0}/100</span>
-                          </div>
-                        </div>
-                      )}
+                    <CardContent className="p-8 flex-1 flex items-center justify-center">
+                      <p className="text-lg md:text-xl font-medium leading-relaxed text-foreground text-center">
+                        {highlightMetrics(bullet.bullet_text)}
+                      </p>
                     </CardContent>
-                    <div className="p-4 border-t bg-muted/5 flex justify-end gap-2 mt-auto">
+                    <div className="p-4 border-t bg-muted/5 flex justify-end gap-3 mt-auto">
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="text-muted-foreground hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground font-medium"
                         onClick={() => navigator.clipboard.writeText(bullet.bullet_text)}
                       >
                         <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -859,15 +849,12 @@ export default function ResumeBuilderPage() {
                       <Button 
                         size="sm" 
                         variant={bullet.is_saved ? "secondary" : "default"}
-                        className={`shadow-sm ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
+                        className={`shadow-sm font-medium ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
                         onClick={() => saveBullet(bullet)}
                         disabled={bullet.is_saved}
                       >
-                        {bullet.is_saved ? (
-                          <><CheckCircle2 className="h-4 w-4 mr-2"/> Saved to Bank</>
-                        ) : (
-                          <><Save className="h-4 w-4 mr-2"/> Save to Point Bank</>
-                        )}
+                        <Save className="h-4 w-4 mr-1.5" />
+                        {bullet.is_saved ? "Saved" : "Save to Point Bank"}
                       </Button>
                     </div>
                   </Card>
