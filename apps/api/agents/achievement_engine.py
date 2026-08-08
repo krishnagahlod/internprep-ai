@@ -270,7 +270,7 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
         
     response_text = cerebras_client.generate_chat_completion(
         messages=cerebras_messages,
-        model="llama3.1-70b", # Using standard reliable model
+        model="gpt-oss-120b", # Using standard reliable model
         temperature=0.7,
         response_format={"type": "json_object"}
     )

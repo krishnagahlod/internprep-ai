@@ -59,7 +59,7 @@ export default function ResumeBuilderPage() {
   const [pointBank, setPointBank] = useState<GeneratedBullet[]>([])
   const [strategyData, setStrategyData] = useState<any>(null)
   const [isStrategyLoading, setIsStrategyLoading] = useState(false)
-  const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
+
 
   // Refs
   const chatScrollRef = useRef<HTMLDivElement>(null)
@@ -254,12 +254,12 @@ export default function ResumeBuilderPage() {
     if (!user) return
     setIsStrategyLoading(true)
     try {
-      const res = await fetch(`${apiBase}/builder/strategy`, {
+      const res = await fetch(`${apiBase}/resume-builder/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          target_role: strategyTargetRole
+          target_role: targetRole
         })
       })
       if (res.ok) {
@@ -669,18 +669,45 @@ export default function ResumeBuilderPage() {
                   <div className="relative">
                     <select 
                       id="achievement-select"
-                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[15px] shadow-sm hover:border-primary/50 focus:border-primary focus:ring-0 focus:outline-none transition-colors cursor-pointer"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
                       value={selectedAchievement || ""}
                       onChange={(e) => setSelectedAchievement(e.target.value)}
                       aria-label="Select an achievement"
                     >
                       <option value="" disabled>-- Select an achievement from your vault --</option>
-                      {achievements.map(a => (
-                        <option key={a.id} value={a.id}>{a.title} ({a.parent_experience})</option>
-                      ))}
+                      {(() => {
+                        const sectionOrder = ["Scholastic Achievements", "Professional Experience", "Positions of Responsibility", "Projects", "Extracurriculars"];
+                        const grouped = achievements.reduce((acc, ach) => {
+                          const section = ach.section_type || "Experience";
+                          if (!acc[section]) acc[section] = {};
+                          const parent = ach.parent_experience || "Other";
+                          if (!acc[section][parent]) acc[section][parent] = [];
+                          acc[section][parent].push(ach);
+                          return acc;
+                        }, {} as Record<string, Record<string, Achievement[]>>);
+                        
+                        const sorted = Object.keys(grouped).sort((a, b) => {
+                          const idxA = sectionOrder.indexOf(a);
+                          const idxB = sectionOrder.indexOf(b);
+                          if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                          if (idxA === -1) return 1;
+                          if (idxB === -1) return -1;
+                          return idxA - idxB;
+                        });
+                        
+                        return sorted.map(section => (
+                          Object.entries(grouped[section]).map(([parent, achs]) => (
+                            <optgroup key={`${section}-${parent}`} label={`${section} • ${parent}`}>
+                              {achs.map(ach => (
+                                <option key={ach.id} value={ach.id}>{ach.title}</option>
+                              ))}
+                            </optgroup>
+                          ))
+                        ));
+                      })()}
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                      <ChevronRight className="h-5 w-5 rotate-90" />
                     </div>
                   </div>
                 </div>
@@ -692,7 +719,7 @@ export default function ResumeBuilderPage() {
                   <div className="relative">
                     <select 
                       id="role-select"
-                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[15px] shadow-sm hover:border-primary/50 focus:border-primary focus:ring-0 focus:outline-none transition-colors cursor-pointer"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
                       value={targetRole}
                       onChange={(e) => setTargetRole(e.target.value)}
                       aria-label="Select target role"
@@ -703,8 +730,8 @@ export default function ResumeBuilderPage() {
                       <option value="analytics">Data & Analytics</option>
                       <option value="it-software">Software Engineering / IT</option>
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                      <ChevronRight className="h-5 w-5 rotate-90" />
                     </div>
                   </div>
                 </div>
@@ -851,19 +878,22 @@ export default function ResumeBuilderPage() {
                     <div className="relative">
                       <select 
                         id="strategy-role-select"
-                        className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[14px] shadow-sm focus:border-primary focus:ring-0 focus:outline-none hover:border-primary/50 transition-colors cursor-pointer"
-                        value={strategyTargetRole}
-                        onChange={(e) => setStrategyTargetRole(e.target.value)}
+                        className="appearance-none flex h-12 w-full items-center justify-between rounded-lg border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
+                        value={targetRole}
+                        onChange={(e) => {
+                          setTargetRole(e.target.value);
+                          setStrategyData(null); // Reset strategy when role changes
+                        }}
                         aria-label="Select target role for strategy report"
                       >
                         <option value="consult">Management Consulting</option>
-                        <option value="finance">Finance / IB</option>
+                        <option value="finance">Finance / Investment Banking</option>
                         <option value="product management">Product Management</option>
                         <option value="analytics">Data & Analytics</option>
-                        <option value="it-software">Software Engineering</option>
+                        <option value="it-software">Software Engineering / IT</option>
                       </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                        <ChevronRight className="h-4 w-4 rotate-90" />
                       </div>
                     </div>
                   </div>
