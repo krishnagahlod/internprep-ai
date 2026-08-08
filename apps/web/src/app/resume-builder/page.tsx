@@ -26,15 +26,30 @@ type Achievement = {
   user_notes?: string
 }
 
-type GeneratedBullet = {
-  id: string
-  achievement_id: string
-  target_role: string
-  bullet_text: string
-  variant_type: string
-  scores: any
-  is_saved: boolean
+interface GeneratedBullet {
+  id: string;
+  achievement_id: string;
+  target_role: string;
+  bullet_text: string;
+  variant_type: string;
+  scores: any;
+  is_saved?: boolean;
 }
+
+// Helper to highlight numbers and percentages in text
+const highlightMetrics = (text: string) => {
+  const parts = text.split(/(\d+(?:,\d+)*(?:\.\d+)?%?)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (/^\d+(?:,\d+)*(?:\.\d+)?%?$/.test(part)) {
+          return <span key={i} className="font-bold text-primary">{part}</span>;
+        }
+        return part;
+      })}
+    </>
+  );
+};
 
 export default function ResumeBuilderPage() {
   const [activeTab, setActiveTab] = useState("vault")
@@ -51,7 +66,8 @@ export default function ResumeBuilderPage() {
   // Lab State
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
   const [targetRole, setTargetRole] = useState("consulting")
-  const [benchmarkText, setBenchmarkText] = useState("")
+  const [targetCompany, setTargetCompany] = useState("")
+  const [lengthLevel, setLengthLevel] = useState("medium")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
   
@@ -189,7 +205,8 @@ export default function ResumeBuilderPage() {
           user_id: user.id,
           achievement_id: selectedAchievement,
           target_role: targetRole,
-          benchmark_text: benchmarkText
+          target_company: targetCompany,
+          length_level: lengthLevel
         })
       })
       if (res.ok) {
@@ -736,17 +753,39 @@ export default function ResumeBuilderPage() {
                   </div>
                 </div>
                 
-                <div className="space-y-3 md:col-span-2">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="benchmark-text">
-                    Benchmark Bullet (Optional Length Constraint)
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="target-company">
+                    Target Company (Optional)
                   </label>
-                  <Textarea
-                    id="benchmark-text"
-                    placeholder="Paste a sample bullet here to force the AI to match its exact length and density... (Leave blank to default to original length)"
-                    className="h-20 bg-background resize-none border-2 border-input hover:border-primary/50 focus:border-primary transition-colors text-[15px]"
-                    value={benchmarkText}
-                    onChange={(e) => setBenchmarkText(e.target.value)}
+                  <input
+                    id="target-company"
+                    placeholder="e.g. McKinsey, Google, Goldman Sachs"
+                    className="flex h-14 w-full rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-muted-foreground/60"
+                    value={targetCompany}
+                    onChange={(e) => setTargetCompany(e.target.value)}
                   />
+                </div>
+                
+                <div className="space-y-3">
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="length-level">
+                    Length Constraint
+                  </label>
+                  <div className="relative">
+                    <select 
+                      id="length-level"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
+                      value={lengthLevel}
+                      onChange={(e) => setLengthLevel(e.target.value)}
+                      aria-label="Select bullet length"
+                    >
+                      <option value="short">Short (1 line, highly concise)</option>
+                      <option value="medium">Medium (Standard, 1.5 lines)</option>
+                      <option value="detailed">Detailed (2 lines, maximum density)</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                      <ChevronRight className="h-5 w-5 rotate-90" />
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -784,8 +823,26 @@ export default function ResumeBuilderPage() {
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="py-6 flex-1 bg-background">
-                      <p className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</p>
+                    <CardContent className="py-6 flex-1 bg-background flex flex-col justify-between">
+                      <p className="text-[15px] leading-relaxed text-foreground/90 mb-4">{highlightMetrics(bullet.bullet_text)}</p>
+                      {bullet.scores && (
+                        <div className="flex gap-3 mt-2 border-t pt-4">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Impact</span>
+                            <span className="text-sm font-semibold">{bullet.scores.impact || 0}/100</span>
+                          </div>
+                          <div className="w-px bg-border" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Quantification</span>
+                            <span className="text-sm font-semibold">{bullet.scores.quantification || 0}/100</span>
+                          </div>
+                          <div className="w-px bg-border" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Role Fit</span>
+                            <span className="text-sm font-semibold">{bullet.scores.role_fit || 0}/100</span>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                     <div className="p-4 border-t bg-muted/5 flex justify-end gap-2 mt-auto">
                       <Button 

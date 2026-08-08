@@ -44,7 +44,8 @@ class GenerateBulletsRequest(BaseModel):
     user_id: str
     achievement_id: str
     target_role: str
-    benchmark_text: Optional[str] = None
+    target_company: Optional[str] = None
+    length_level: Optional[str] = "medium"
 
 class SaveBulletRequest(BaseModel):
     user_id: str
@@ -208,7 +209,13 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
         achievement = ach_res.data[0]
         
         # Generate
-        variants = generate_bullet_variants(supabase, achievement, req.target_role, benchmark_text=req.benchmark_text or "")
+        variants = generate_bullet_variants(
+            supabase, 
+            achievement, 
+            req.target_role, 
+            target_company=req.target_company or "",
+            length_level=req.length_level or "medium"
+        )
         
         # Save to generated_bullets table
         db_records = []

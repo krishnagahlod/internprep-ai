@@ -158,30 +158,64 @@ def get_placement_rag_context(supabase_client, target_role: str, description: st
         print(f"RAG fetch failed: {e}")
         return ""
 
-def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, benchmark_text: str = "") -> List[Dict[str, Any]]:
+def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", length_level: str = "medium") -> List[Dict[str, Any]]:
     # 1. Fetch RAG context
     desc = achievement.get('original_description', '')
     notes = achievement.get('user_notes', '')
     tags = achievement.get('competency_tags', [])
-    combined_desc = f"{desc}\nAdditional Notes: {notes}"
+    
+    combined_desc = f"{desc}\n\nAdditional Context/Notes: {notes}" if notes else desc
     
     rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, tags)
     
     # Setup length constraint
-    if benchmark_text and benchmark_text.strip():
-        target_words = len(benchmark_text.strip().split())
-        min_words = max(5, target_words - 2)
-        max_words = target_words + 2
-        length_constraint = f"CRITICAL LENGTH CONSTRAINT: Analyze the user-provided benchmark bullet: '{benchmark_text.strip()}'. Your generated variants MUST be EXACTLY between {min_words} and {max_words} words long. Count the words before outputting. If a variant exceeds {max_words} words, YOU FAIL."
+    if length_level == "short":
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Keep bullets under 12 words. Extremely concise, 1 line only."
+    elif length_level == "detailed":
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Target 20-25 words. Highly dense, potentially 1.5 - 2 lines."
     else:
-        target_words = len(desc.split()) if desc else 15
-        min_words = max(5, target_words - 4)
-        max_words = target_words + 4
-        length_constraint = f"CRITICAL LENGTH CONSTRAINT: Your generated variants MUST be EXACTLY between {min_words} and {max_words} words long (matching the original text). Count the words before outputting. Do not output more than {max_words} words."
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Target 13-18 words. Standard 1-line length."
 
-    # 2. Generate variants using Gemini
+    # Define variants dynamically based on role
+    role_lower = target_role.lower()
+    if "consult" in role_lower or "finance" in role_lower:
+        variants_instructions = """
+    1. 'strategic_impact': Focus heavily on the strategic business results, revenue/cost impact, and high-level outcomes.
+    2. 'financial_roi': Focus specifically on financial metrics, cost savings, valuation, or profitability changes.
+    3. 'leadership': Focus on stakeholder management, leading teams, cross-functional alignment, and ownership.
+    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+        """
+        variant_enum = '"strategic_impact" | "financial_roi" | "leadership" | "concise"'
+    elif "product" in role_lower:
+        variants_instructions = """
+    1. 'growth_metrics': Focus on MAU, retention, engagement, adoption rate, and core product KPIs.
+    2. 'cross_functional': Focus on leading engineering/design teams, stakeholder alignment, and product vision.
+    3. 'go_to_market': Focus on launch success, market penetration, user feedback, and iteration.
+    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+        """
+        variant_enum = '"growth_metrics" | "cross_functional" | "go_to_market" | "concise"'
+    elif "software" in role_lower or "it" in role_lower:
+        variants_instructions = """
+    1. 'architecture_scale': Focus heavily on system architecture, handling high TPS/scale, and infrastructure.
+    2. 'optimization': Focus on latency reduction, memory/cost savings, algorithm efficiency, and performance.
+    3. 'feature_impact': Focus on the business impact of the shipped feature, user adoption, and technical execution.
+    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+        """
+        variant_enum = '"architecture_scale" | "optimization" | "feature_impact" | "concise"'
+    else:
+        variants_instructions = """
+    1. 'impact_heavy': Focus heavily on the quantified results and business/end-user value.
+    2. 'leadership_heavy': Focus on ownership, stakeholder management, and driving the initiative.
+    3. 'technical_heavy': Focus on the specific tools, methods, frameworks, and technical execution.
+    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+        """
+        variant_enum = '"impact_heavy" | "leadership_heavy" | "technical_heavy" | "concise"'
+
+    company_target = f"Specifically, the user is targeting a role at '{target_company}'." if target_company else ""
+
+    # 2. Generate variants using Cerebras
     system_prompt = f"""
-    You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role.
+    You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role. {company_target}
     Take their raw achievement data and generate 4 distinct, high-impact resume bullet variants.
     
     {rag_context}
@@ -196,16 +230,13 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     {length_constraint}
     
     Generate 4 variants of the bullet:
-    1. 'impact_heavy': Focus heavily on the quantified results and business/end-user value.
-    2. 'leadership_heavy': Focus on ownership, stakeholder management, and driving the initiative.
-    3. 'technical_heavy': Focus on the specific tools, methods, frameworks, and technical execution.
-    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+    {variants_instructions}
     
     Return strictly a JSON object with a "variants" key that contains an array of exactly 4 objects matching this schema:
     {{
         "variants": [
             {{
-                "variant_type": "impact_heavy" | "leadership_heavy" | "technical_heavy" | "concise",
+                "variant_type": {variant_enum},
                 "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
                 "scores": {{
                     "impact": 0-100,
