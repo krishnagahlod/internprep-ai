@@ -13,20 +13,28 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. 
-    2. If a single experience or project has 5 distinct technical, leadership, or quantitative achievements, extract them as 5 separate items.
-    3. A typical dense 1-page resume should yield 15-25 distinct granular achievements.
+    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
+    3. If a single experience or project has 5 distinct technical, leadership, or quantitative achievements, extract them as 5 separate items under the same parent.
+    4. A typical dense 1-page resume should yield 15-25 distinct granular achievements across all sections.
     
-    Return ONLY a valid JSON array of objects.
-    Each object must strictly follow this schema:
-    {
-        "title": "A short 3-5 word descriptive title (e.g. 'Automated Data Pipeline')",
-        "parent_experience": "The company, organization, or project name",
-        "timeline": "e.g., 'May 2025 - Jul 2025' or '2024'",
-        "original_description": "The full original text/bullets associated with this achievement",
-        "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
-        "competency_tags": ["array of 1-3 tags from the allowed list"],
-        "extraction_confidence": 0.95
-    }
+    Return ONLY a valid JSON array of section objects.
+    Strictly follow this JSON schema:
+    [
+      {
+        "section_type": "The major section heading (e.g. 'Professional Experience', 'Projects', 'Positions of Responsibility')",
+        "parent_experience": "The company, organization, or overall project name",
+        "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
+        "achievements": [
+          {
+            "title": "A short 3-5 word descriptive title (e.g. 'Automated Data Pipeline')",
+            "original_description": "The full original text/bullets associated with this specific achievement",
+            "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
+            "competency_tags": ["array of 1-3 tags from the allowed list"],
+            "extraction_confidence": 0.95
+          }
+        ]
+      }
+    ]
     
     Allowed competency_tags:
     - strategic_problem_solving
@@ -62,19 +70,27 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets.
-    2. If a project has 5 distinct achievements, extract them as 5 separate items.
+    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
+    3. If a project has 5 distinct achievements, extract them as 5 separate items under the same parent.
     
-    Return ONLY a valid JSON array of objects.
-    Each object must strictly follow this schema:
-    {
-        "title": "A short 3-5 word descriptive title",
-        "parent_experience": "The company, organization, or project name (if evident, otherwise 'Independent')",
-        "timeline": "Timeline if mentioned, otherwise null",
-        "original_description": "The original text describing this achievement",
-        "quantified_metrics": {"metric_name": value},
-        "competency_tags": ["array of 1-3 tags from the allowed list"],
-        "extraction_confidence": 0.9
-    }
+    Return ONLY a valid JSON array of section objects.
+    Strictly follow this JSON schema:
+    [
+      {
+        "section_type": "The major section heading (e.g. 'Professional Experience', 'Projects', 'Positions of Responsibility')",
+        "parent_experience": "The company, organization, or overall project name",
+        "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
+        "achievements": [
+          {
+            "title": "A short 3-5 word descriptive title (e.g. 'Automated Data Pipeline')",
+            "original_description": "The full original text/bullets associated with this specific achievement",
+            "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
+            "competency_tags": ["array of 1-3 tags from the allowed list"],
+            "extraction_confidence": 0.95
+          }
+        ]
+      }
+    ]
     
     Allowed competency_tags:
     - strategic_problem_solving
@@ -150,9 +166,15 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     
     # Setup length constraint
     if benchmark_text and benchmark_text.strip():
-        length_constraint = f"Analyze the length and density of this user-provided benchmark bullet: '{benchmark_text.strip()}'. Ensure all generated variants match this exact length and structural density so it fits perfectly on their resume."
+        target_words = len(benchmark_text.strip().split())
+        min_words = max(5, target_words - 2)
+        max_words = target_words + 2
+        length_constraint = f"CRITICAL LENGTH CONSTRAINT: Analyze the user-provided benchmark bullet: '{benchmark_text.strip()}'. Your generated variants MUST be EXACTLY between {min_words} and {max_words} words long. Count the words before outputting. If a variant exceeds {max_words} words, YOU FAIL."
     else:
-        length_constraint = f"Constrain the character count of each variant to be roughly similar (+/- 15%) to the length of the original description."
+        target_words = len(desc.split()) if desc else 15
+        min_words = max(5, target_words - 4)
+        max_words = target_words + 4
+        length_constraint = f"CRITICAL LENGTH CONSTRAINT: Your generated variants MUST be EXACTLY between {min_words} and {max_words} words long (matching the original text). Count the words before outputting. Do not output more than {max_words} words."
 
     # 2. Generate variants using Gemini
     system_prompt = f"""

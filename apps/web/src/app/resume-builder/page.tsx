@@ -16,6 +16,7 @@ import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSq
 type Achievement = {
   id: string
   title: string
+  section_type: string
   parent_experience: string
   timeline: string
   original_description: string
@@ -388,51 +389,68 @@ export default function ResumeBuilderPage() {
                 <p>Upload a resume or paste notes above to extract your first achievement.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                {achievements.map(ach => (
-                  <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group">
-                    <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
-                      <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="pr-10">
-                        <CardTitle className="text-lg font-semibold leading-tight mb-1 group-hover:text-primary transition-colors">{ach.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 font-medium">
-                          <span className="text-foreground/80">{ach.parent_experience}</span> 
-                          <span className="text-muted-foreground/50">•</span> 
-                          <span className="text-muted-foreground">{ach.timeline}</span>
-                        </CardDescription>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 pt-4">
-                      <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 mb-5">
-                        {ach.original_description}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {ach.competency_tags?.map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-[10px] uppercase tracking-wider font-semibold bg-primary/5 text-primary border border-primary/10">
-                            {tag.replace(/_/g, ' ')}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                    <CardFooter className="pt-0 flex gap-3 justify-between p-4 bg-muted/10 border-t border-border/30 mt-auto">
-                      <Button variant="outline" size="sm" className="flex-1 h-9 bg-background shadow-sm hover:bg-primary/5 hover:text-primary border-primary/20" onClick={() => {
-                        setActiveChatAchievement(ach)
-                        setChatMessages([])
-                      }}>
-                        <MessageSquare className="h-4 w-4 mr-2 text-primary" /> Metrics Chat
-                      </Button>
-                      <Button size="sm" className="flex-1 h-9 shadow-sm" onClick={() => {
-                        setSelectedAchievement(ach.id);
-                        setActiveTab("lab");
-                      }}>
-                        Go to Lab <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
+              <div className="space-y-12">
+                {Object.entries(
+                  achievements.reduce((acc, ach) => {
+                    const section = ach.section_type || "Experience";
+                    if (!acc[section]) acc[section] = [];
+                    acc[section].push(ach);
+                    return acc;
+                  }, {} as Record<string, Achievement[]>)
+                ).map(([section, achs]) => (
+                  <div key={section} className="space-y-6">
+                    <h3 className="text-xl font-bold text-foreground/90 border-b border-border/50 pb-2 flex items-center gap-2">
+                      <div className="w-2 h-6 bg-primary rounded-full"></div>
+                      {section}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                      {achs.map(ach => (
+                        <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group">
+                          <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
+                            <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="pr-10">
+                              <CardTitle className="text-lg font-semibold leading-tight mb-1 group-hover:text-primary transition-colors">{ach.title}</CardTitle>
+                              <CardDescription className="flex items-center gap-2 font-medium">
+                                <span className="text-foreground/80">{ach.parent_experience}</span> 
+                                <span className="text-muted-foreground/50">•</span> 
+                                <span className="text-muted-foreground">{ach.timeline || "N/A"}</span>
+                              </CardDescription>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="flex-1 pt-4">
+                            <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 mb-5">
+                              {ach.original_description}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {ach.competency_tags?.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-[10px] uppercase tracking-wider font-semibold bg-primary/5 text-primary border border-primary/10">
+                                  {tag.replace(/_/g, ' ')}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                          <CardFooter className="pt-0 flex gap-3 justify-between p-4 bg-muted/10 border-t border-border/30 mt-auto">
+                            <Button variant="outline" size="sm" className="flex-1 h-9 bg-background shadow-sm hover:bg-primary/5 hover:text-primary border-primary/20" onClick={() => {
+                              setActiveChatAchievement(ach)
+                              setChatMessages([])
+                            }}>
+                              <MessageSquare className="h-4 w-4 mr-2 text-primary" /> Metrics Chat
+                            </Button>
+                            <Button size="sm" className="flex-1 h-9 shadow-sm" onClick={() => {
+                              setSelectedAchievement(ach.id);
+                              setActiveTab("lab");
+                            }}>
+                              Go to Lab <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                          </CardFooter>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

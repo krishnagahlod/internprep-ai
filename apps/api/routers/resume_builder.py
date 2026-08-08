@@ -80,19 +80,23 @@ async def extract_from_pdf(
         # Save to Supabase
         from agents.resume_analyzer import supabase
         db_records = []
-        for ach in extracted:
-            db_records.append({
-                "user_id": user_id,
-                "title": ach.get("title", "Untitled"),
-                "parent_experience": ach.get("parent_experience", "Unknown"),
-                "timeline": ach.get("timeline"),
-                "original_description": ach.get("original_description", ""),
-                "quantified_metrics": ach.get("quantified_metrics", {}),
-                "competency_tags": ach.get("competency_tags", []),
-                "extraction_confidence": ach.get("extraction_confidence", 1.0),
-                "source_type": "resume_upload",
-                "status": "pending"
-            })
+        for section in extracted:
+            section_type = section.get("section_type", "Experience")
+            parent_experience = section.get("parent_experience", "Unknown")
+            for ach in section.get("achievements", []):
+                db_records.append({
+                    "user_id": user_id,
+                    "section_type": section_type,
+                    "title": ach.get("title", "Untitled"),
+                    "parent_experience": parent_experience,
+                    "timeline": ach.get("timeline") or section.get("timeline"),
+                    "original_description": ach.get("original_description", ""),
+                    "quantified_metrics": ach.get("quantified_metrics", {}),
+                    "competency_tags": ach.get("competency_tags", []),
+                    "extraction_confidence": ach.get("extraction_confidence", 1.0),
+                    "source_type": "resume_upload",
+                    "status": "pending"
+                })
             
         if db_records:
             res = supabase.table('achievements').insert(db_records).execute()
@@ -111,19 +115,23 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
         
         from agents.resume_analyzer import supabase
         db_records = []
-        for ach in extracted:
-            db_records.append({
-                "user_id": body.user_id,
-                "title": ach.get("title", "Untitled"),
-                "parent_experience": ach.get("parent_experience", "Unknown"),
-                "timeline": ach.get("timeline"),
-                "original_description": ach.get("original_description", ""),
-                "quantified_metrics": ach.get("quantified_metrics", {}),
-                "competency_tags": ach.get("competency_tags", []),
-                "extraction_confidence": ach.get("extraction_confidence", 1.0),
-                "source_type": "text_paste",
-                "status": "pending"
-            })
+        for section in extracted:
+            section_type = section.get("section_type", "Experience")
+            parent_experience = section.get("parent_experience", "Unknown")
+            for ach in section.get("achievements", []):
+                db_records.append({
+                    "user_id": body.user_id,
+                    "section_type": section_type,
+                    "title": ach.get("title", "Untitled"),
+                    "parent_experience": parent_experience,
+                    "timeline": ach.get("timeline") or section.get("timeline"),
+                    "original_description": ach.get("original_description", ""),
+                    "quantified_metrics": ach.get("quantified_metrics", {}),
+                    "competency_tags": ach.get("competency_tags", []),
+                    "extraction_confidence": ach.get("extraction_confidence", 1.0),
+                    "source_type": "text_paste",
+                    "status": "pending"
+                })
             
         if db_records:
             res = supabase.table('achievements').insert(db_records).execute()
