@@ -3,6 +3,7 @@ import os
 import time
 from typing import List, Dict, Any
 from services.gemini_client import gemini_client
+from services.cerebras_client import cerebras_client
 import google.generativeai as genai
 from services.embeddings import get_query_embedding
 
@@ -246,37 +247,40 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
     Current Metrics: {json.dumps(achievement.get('quantified_metrics', {}))}
     
     Guidelines:
-    1. Do NOT ask more than 1 or 2 questions at a time. Keep it conversational.
-    2. Suggest proxy metrics if they don't have exact numbers (e.g., 'If you don't know the exact revenue, can you estimate the time saved per week?').
-    3. If the user provides new metrics or context, acknowledge them, then ask the next logical question to drill deeper.
-    4. When you feel you have enough metrics to write a strong bullet, tell them 'I think we have enough to generate a great bullet now!'
+    1. Ask exactly 1 short, focused question. Keep it conversational.
+    2. Use proxy metrics: If they don't know exact revenue, ask about time saved, team size, scale of the project, or user base.
+    3. Push for scale and context (e.g. "You built a bot. How many queries does it handle daily?").
+    4. Focus on the best practices of IIT Bombay resumes: STAR format, highlighting magnitude of impact, and strong action verbs.
+    5. Once you have solid metrics, tell them "I think we have enough to generate a great bullet now!"
     
-    You must return a JSON object with:
-    - "response": Your chat response to the user.
-    - "extracted_metrics_update": Any NEW metrics you've confidently extracted from the conversation so far (as a dictionary). If none yet, return an empty dictionary.
-    - "new_context_summary": A concise summary of any new context or notes the user provided in this turn that should be appended to the achievement (or empty string if none).
+    You must return a valid JSON object matching this schema exactly:
+    {{
+      "response": "Your chat response to the user.",
+      "extracted_metrics_update": {{ "metric_name": "metric_value" }},
+      "new_context_summary": "A concise summary of any new context or notes the user provided in this turn that should be appended to the achievement (or empty string if none)."
+    }}
     """
     
-    # Convert messages to Gemini format
-    gemini_messages = []
+    # Convert messages to Cerebras (OpenAI-compatible) format
+    cerebras_messages = [{"role": "system", "content": system_prompt}]
     for msg in messages:
-        role = "model" if msg["role"] in ["assistant", "model"] else "user"
-        gemini_messages.append({"role": role, "parts": [msg["content"]]})
+        # Cerebras takes 'assistant' instead of 'model'
+        role = "assistant" if msg["role"] in ["assistant", "model"] else "user"
+        cerebras_messages.append({"role": role, "content": msg["content"]})
         
-    response = gemini_client.generate_content_with_history(
-        model_name="gemini-3.5-flash",
-        system_instruction=system_prompt,
-        history=gemini_messages[:-1] if gemini_messages else [],
-        new_message=gemini_messages[-1]["parts"][0] if gemini_messages else "Hello! Let's quantify this achievement.",
-        generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.7)
+    response_text = cerebras_client.generate_chat_completion(
+        messages=cerebras_messages,
+        model="llama3.1-70b", # Using standard reliable model
+        temperature=0.7,
+        response_format={"type": "json_object"}
     )
     
     try:
-        data = json.loads(response.text)
+        data = json.loads(response_text)
         return data
     except Exception as e:
         print(f"Failed to parse metric chat JSON: {e}")
-        return {"response": response.text, "extracted_metrics_update": {}}
+        return {"response": response_text, "extracted_metrics_update": {}, "new_context_summary": ""}
 
 def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str) -> Dict[str, Any]:
     """Analyzes the user's current vault and bank to provide a placement strategy."""

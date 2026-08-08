@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
@@ -61,6 +61,9 @@ export default function ResumeBuilderPage() {
   const [isStrategyLoading, setIsStrategyLoading] = useState(false)
   const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
 
+  // Refs
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+
   // Chat State
   const [activeChatAchievement, setActiveChatAchievement] = useState<Achievement | null>(null)
   const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([])
@@ -93,6 +96,13 @@ export default function ResumeBuilderPage() {
       router.push("/login")
     }
   }, [mounted, user, router])
+
+  // Auto-scroll chat
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [chatMessages, isChatLoading])
 
   if (!mounted || !user) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -444,22 +454,55 @@ export default function ResumeBuilderPage() {
               </div>
             ) : (
               <div className="space-y-12">
-                {Object.entries(
-                  achievements.reduce((acc, ach) => {
+                {(() => {
+                  const sectionOrder = ["Scholastic Achievements", "Professional Experience", "Positions of Responsibility", "Projects", "Extracurriculars"];
+                  const groupedAchievements = achievements.reduce((acc, ach) => {
                     const section = ach.section_type || "Experience";
-                    if (!acc[section]) acc[section] = [];
-                    acc[section].push(ach);
+                    if (!acc[section]) acc[section] = {};
+                    
+                    const parent = ach.parent_experience || "Other";
+                    if (!acc[section][parent]) acc[section][parent] = [];
+                    
+                    acc[section][parent].push(ach);
                     return acc;
-                  }, {} as Record<string, Achievement[]>)
-                ).map(([section, achs]) => (
-                  <div key={section} className="space-y-6">
-                    <h3 className="text-xl font-bold text-foreground/90 border-b border-border/50 pb-2 flex items-center gap-2">
-                      <div className="w-2 h-6 bg-primary rounded-full"></div>
-                      {section}
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-                      {achs.map(ach => (
-                        <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group">
+                  }, {} as Record<string, Record<string, Achievement[]>>);
+
+                  const sortedSections = Object.keys(groupedAchievements).sort((a, b) => {
+                    const indexA = sectionOrder.indexOf(a);
+                    const indexB = sectionOrder.indexOf(b);
+                    if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                    if (indexA === -1) return 1;
+                    if (indexB === -1) return -1;
+                    return indexA - indexB;
+                  });
+
+                  return sortedSections.map(section => (
+                    <div key={section} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 fade-in">
+                      <h3 className="text-xl font-bold text-foreground/90 border-b border-border/50 pb-2 flex items-center gap-2">
+                        <div className="w-2 h-6 bg-primary rounded-full"></div>
+                        {section}
+                      </h3>
+                      <div className="space-y-4">
+                        {Object.entries(groupedAchievements[section]).map(([parent, achs]) => (
+                          <details key={parent} className="group border border-border/50 rounded-xl bg-card shadow-sm overflow-hidden [&_summary::-webkit-details-marker]:hidden">
+                            <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors select-none">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm border border-primary/20 shadow-sm">
+                                  {parent.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-lg leading-tight">{parent}</h4>
+                                  <p className="text-sm text-muted-foreground font-medium">{achs.length} achievement{achs.length !== 1 ? 's' : ''}</p>
+                                </div>
+                              </div>
+                              <div className="w-8 h-8 flex items-center justify-center rounded-full bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                <ChevronRight className="w-5 h-5 group-open:rotate-90 transition-transform duration-300" />
+                              </div>
+                            </summary>
+                            <div className="p-4 pt-0 border-t border-border/30 bg-muted/5">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-4">
+                                {achs.map(ach => (
+                                  <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group/card bg-background">
                           <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
                             <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
@@ -469,8 +512,6 @@ export default function ResumeBuilderPage() {
                             <div className="pr-10">
                               <CardTitle className="text-lg font-semibold leading-tight mb-1 group-hover:text-primary transition-colors">{ach.title}</CardTitle>
                               <CardDescription className="flex items-center gap-2 font-medium">
-                                <span className="text-foreground/80">{ach.parent_experience}</span> 
-                                <span className="text-muted-foreground/50">•</span> 
                                 <span className="text-muted-foreground">{ach.timeline || "N/A"}</span>
                               </CardDescription>
                             </div>
@@ -503,14 +544,19 @@ export default function ResumeBuilderPage() {
                               Go to Lab <ChevronRight className="h-4 w-4 ml-1" />
                             </Button>
                           </CardFooter>
-                        </Card>
-                      ))}
+                          </Card>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </details>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          ))
+        })()}
+      </div>
+    )}
+  </div>
           
           {/* Chat Modal */}
           {activeChatAchievement && (
@@ -557,6 +603,7 @@ export default function ResumeBuilderPage() {
                       </div>
                     </div>
                   )}
+                  <div ref={chatScrollRef} />
                 </div>
                 
                 <div className="p-4 border-t bg-background">
