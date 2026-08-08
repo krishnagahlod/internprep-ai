@@ -277,14 +277,6 @@ def metric_chat(req: MetricChatRequest):
             raise HTTPException(status_code=404, detail="Achievement not found")
         
         result = run_metric_reconstruction_turn(ach_res.data[0], req.messages)
-        
-        # If new metrics were extracted, update the achievement
-        new_metrics = result.get("extracted_metrics_update")
-        if new_metrics:
-            current = ach_res.data[0].get("quantified_metrics") or {}
-            current.update(new_metrics)
-            supabase.table('achievements').update({"quantified_metrics": current}).eq('id', req.achievement_id).execute()
-            
         return result
     except Exception as e:
         print(f"Error in metric_chat: {e}")

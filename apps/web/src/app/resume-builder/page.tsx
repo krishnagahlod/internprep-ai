@@ -23,6 +23,7 @@ type Achievement = {
   competency_tags: string[]
   status: string
   quantified_metrics: any
+  user_notes?: string
 }
 
 type GeneratedBullet = {
@@ -64,19 +65,33 @@ export default function ResumeBuilderPage() {
   const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([])
   const [chatInput, setChatInput] = useState("")
   const [isChatLoading, setIsChatLoading] = useState(false)
+  const [pendingMetricsUpdate, setPendingMetricsUpdate] = useState<any>(null)
+  const [pendingContextSummary, setPendingContextSummary] = useState("")
   
   // API Base
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000"
 
+  const [mounted, setMounted] = useState(false)
+  
   // Fetch initial data
   useEffect(() => {
-    if (!user) {
-      router.push("/login")
-      return
+    setMounted(true)
+    if (user) {
+      fetchAchievements()
+      fetchPointBank()
     }
-    fetchAchievements()
-    fetchPointBank()
   }, [user])
+
+  // Auth protection
+  useEffect(() => {
+    if (mounted && !user) {
+      router.push("/login")
+    }
+  }, [mounted, user, router])
+
+  if (!mounted || !user) {
+    return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+  }
 
   const fetchAchievements = async () => {
     if (!user) return
@@ -262,10 +277,44 @@ export default function ResumeBuilderPage() {
         const data = await res.json()
         setChatMessages([...newMessages, { role: "assistant", content: data.response }])
         
-        // If metrics were updated, refresh achievements silently
         if (data.extracted_metrics_update && Object.keys(data.extracted_metrics_update).length > 0) {
-          fetchAchievements()
+          setPendingMetricsUpdate(data.extracted_metrics_update)
         }
+        if (data.new_context_summary) {
+          setPendingContextSummary(data.new_context_summary)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    }
+    setIsChatLoading(false)
+  }
+
+  const applyMetricsToVault = async () => {
+    if (!activeChatAchievement) return
+    setIsChatLoading(true)
+    
+    try {
+      const existingMetrics = activeChatAchievement.quantified_metrics || {}
+      const updatedMetrics = { ...existingMetrics, ...(pendingMetricsUpdate || {}) }
+      
+      // Compute new user notes
+      const existingNotes = activeChatAchievement.user_notes || ""
+      const newNotes = pendingContextSummary ? (existingNotes ? `${existingNotes}\n${pendingContextSummary}` : pendingContextSummary) : existingNotes
+      
+      const updateData: any = { quantified_metrics: updatedMetrics }
+      if (newNotes) updateData.user_notes = newNotes
+
+      const res = await fetch(`${apiBase}/builder/achievements/${activeChatAchievement.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData)
+      })
+      if (res.ok) {
+        await fetchAchievements()
+        setActiveChatAchievement(null)
+        setPendingMetricsUpdate(null)
+        setPendingContextSummary("")
       }
     } catch (e) {
       console.error(e)
@@ -422,7 +471,7 @@ export default function ResumeBuilderPage() {
                             </div>
                           </CardHeader>
                           <CardContent className="flex-1 pt-4">
-                            <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3 mb-5">
+                            <p className="text-sm text-foreground/80 leading-relaxed mb-5 whitespace-pre-wrap">
                               {ach.original_description}
                             </p>
                             <div className="flex flex-wrap gap-1.5">
@@ -437,6 +486,8 @@ export default function ResumeBuilderPage() {
                             <Button variant="outline" size="sm" className="flex-1 h-9 bg-background shadow-sm hover:bg-primary/5 hover:text-primary border-primary/20" onClick={() => {
                               setActiveChatAchievement(ach)
                               setChatMessages([])
+                              setPendingMetricsUpdate(null)
+                              setPendingContextSummary("")
                             }}>
                               <MessageSquare className="h-4 w-4 mr-2 text-primary" /> Metrics Chat
                             </Button>
@@ -504,6 +555,21 @@ export default function ResumeBuilderPage() {
                 </div>
                 
                 <div className="p-4 border-t bg-background">
+                  {(pendingMetricsUpdate || pendingContextSummary) ? (
+                    <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-between animate-in slide-in-from-bottom-2">
+                      <div>
+                        <p className="text-sm font-semibold text-primary flex items-center gap-1.5"><Sparkles className="h-4 w-4"/> New details discovered!</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {pendingContextSummary ? "Context notes ready. " : ""} 
+                          {pendingMetricsUpdate && Object.keys(pendingMetricsUpdate).length > 0 ? `Found: ${Object.keys(pendingMetricsUpdate).join(", ")}.` : ""}
+                        </p>
+                      </div>
+                      <Button onClick={applyMetricsToVault} disabled={isChatLoading} size="sm" className="shadow-sm whitespace-nowrap ml-4">
+                        {isChatLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        Apply to Vault
+                      </Button>
+                    </div>
+                  ) : null}
                   <div className="flex gap-3 relative">
                     <Textarea 
                       value={chatInput} 

@@ -16,6 +16,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
     3. If a single experience or project has 5 distinct technical, leadership, or quantitative achievements, extract them as 5 separate items under the same parent.
     4. A typical dense 1-page resume should yield 15-25 distinct granular achievements across all sections.
+    5. Deduplication (CRITICAL): Do NOT extract overlapping points. If a project has multiple sentences describing the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
     
     Return ONLY a valid JSON array of section objects.
     Strictly follow this JSON schema:
@@ -72,6 +73,7 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets.
     2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
     3. If a project has 5 distinct achievements, extract them as 5 separate items under the same parent.
+    4. Deduplication (CRITICAL): Do NOT extract overlapping points. If a project has multiple sentences describing the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
     
     Return ONLY a valid JSON array of section objects.
     Strictly follow this JSON schema:
@@ -252,6 +254,7 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
     You must return a JSON object with:
     - "response": Your chat response to the user.
     - "extracted_metrics_update": Any NEW metrics you've confidently extracted from the conversation so far (as a dictionary). If none yet, return an empty dictionary.
+    - "new_context_summary": A concise summary of any new context or notes the user provided in this turn that should be appended to the achievement (or empty string if none).
     """
     
     # Convert messages to Gemini format
