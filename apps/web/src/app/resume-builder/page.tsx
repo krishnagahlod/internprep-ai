@@ -48,6 +48,7 @@ export default function ResumeBuilderPage() {
   // Lab State
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
   const [targetRole, setTargetRole] = useState("consulting")
+  const [benchmarkText, setBenchmarkText] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
   
@@ -156,7 +157,8 @@ export default function ResumeBuilderPage() {
         body: JSON.stringify({
           user_id: user.id,
           achievement_id: selectedAchievement,
-          target_role: targetRole
+          target_role: targetRole,
+          benchmark_text: benchmarkText
         })
       })
       if (res.ok) {
@@ -569,6 +571,19 @@ export default function ResumeBuilderPage() {
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                     </div>
                   </div>
+                </div>
+                
+                <div className="space-y-3 md:col-span-2">
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="benchmark-text">
+                    Benchmark Bullet (Optional Length Constraint)
+                  </label>
+                  <Textarea
+                    id="benchmark-text"
+                    placeholder="Paste a sample bullet here to force the AI to match its exact length and density... (Leave blank to default to original length)"
+                    className="h-20 bg-background resize-none border-2 border-input hover:border-primary/50 focus:border-primary transition-colors text-[15px]"
+                    value={benchmarkText}
+                    onChange={(e) => setBenchmarkText(e.target.value)}
+                  />
                 </div>
               </div>
               

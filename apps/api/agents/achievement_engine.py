@@ -11,6 +11,11 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from this PDF resume.
     
+    CRITICAL EXTRACTION RULES:
+    1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. 
+    2. If a single experience or project has 5 distinct technical, leadership, or quantitative achievements, extract them as 5 separate items.
+    3. A typical dense 1-page resume should yield 15-25 distinct granular achievements.
+    
     Return ONLY a valid JSON array of objects.
     Each object must strictly follow this schema:
     {
@@ -33,7 +38,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     """
     
     response = gemini_client.generate_content(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-3.5-flash",
         prompt=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1),
         pdf_bytes=pdf_bytes
@@ -54,6 +59,10 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     system_prompt = """
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from the provided text notes.
+    
+    CRITICAL EXTRACTION RULES:
+    1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets.
+    2. If a project has 5 distinct achievements, extract them as 5 separate items.
     
     Return ONLY a valid JSON array of objects.
     Each object must strictly follow this schema:
@@ -77,7 +86,7 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     """
     
     response = gemini_client.generate_content(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-3.5-flash",
         prompt=system_prompt + "\n\nUser Text:\n" + text,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
     )
@@ -130,7 +139,7 @@ def get_placement_rag_context(supabase_client, target_role: str, description: st
         print(f"RAG fetch failed: {e}")
         return ""
 
-def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str) -> List[Dict[str, Any]]:
+def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, benchmark_text: str = "") -> List[Dict[str, Any]]:
     # 1. Fetch RAG context
     desc = achievement.get('original_description', '')
     notes = achievement.get('user_notes', '')
@@ -139,6 +148,12 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     
     rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, tags)
     
+    # Setup length constraint
+    if benchmark_text and benchmark_text.strip():
+        length_constraint = f"Analyze the length and density of this user-provided benchmark bullet: '{benchmark_text.strip()}'. Ensure all generated variants match this exact length and structural density so it fits perfectly on their resume."
+    else:
+        length_constraint = f"Constrain the character count of each variant to be roughly similar (+/- 15%) to the length of the original description."
+
     # 2. Generate variants using Gemini
     system_prompt = f"""
     You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role.
@@ -152,11 +167,14 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     - Description: {combined_desc}
     - Known Metrics: {json.dumps(achievement.get('quantified_metrics', {}))}
     
+    LENGTH CONSTRAINT:
+    {length_constraint}
+    
     Generate 4 variants of the bullet:
     1. 'impact_heavy': Focus heavily on the quantified results and business/end-user value.
     2. 'leadership_heavy': Focus on ownership, stakeholder management, and driving the initiative.
     3. 'technical_heavy': Focus on the specific tools, methods, frameworks, and technical execution.
-    4. 'concise': A highly punchy, single-line version prioritizing extreme brevity while maintaining the core outcome.
+    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
     
     Return strictly a JSON array of objects, with each object matching this schema:
     {{
@@ -175,7 +193,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     """
     
     response = gemini_client.generate_content(
-        model_name="gemini-1.5-pro", # Use pro for high-quality writing
+        model_name="gemini-3.5-flash",
         prompt=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.4)
     )
@@ -221,7 +239,7 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
         gemini_messages.append({"role": role, "parts": [msg["content"]]})
         
     response = gemini_client.generate_content_with_history(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-3.5-flash",
         system_instruction=system_prompt,
         history=gemini_messages[:-1] if gemini_messages else [],
         new_message=gemini_messages[-1]["parts"][0] if gemini_messages else "Hello! Let's quantify this achievement.",
@@ -266,7 +284,7 @@ def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: 
     """
     
     response = gemini_client.generate_content(
-        model_name="gemini-1.5-pro",
+        model_name="gemini-3.5-flash",
         prompt=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
     )
