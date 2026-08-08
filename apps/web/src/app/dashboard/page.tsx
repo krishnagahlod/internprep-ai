@@ -278,7 +278,11 @@ export default function DashboardPage() {
           </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/resume")}>
             <FileText className="mr-3 h-4 w-4" />
-            Resumes
+            Resume Review
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/resume-builder")}>
+            <UploadCloud className="mr-3 h-4 w-4" />
+            Resume Builder
           </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/interview")}>
             <Briefcase className="mr-3 h-4 w-4" />
@@ -421,10 +425,27 @@ export default function DashboardPage() {
               </div>
             </motion.div>
 
+            {/* Resume Builder Card (Spans 2 columns) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume-builder")}>
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/50 dark:from-emerald-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-emerald-100 dark:border-emerald-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                  <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-xs font-semibold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-800/50">BUILDER</span>
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-2xl font-bold mb-2 group-hover:text-emerald-700 transition-colors font-outfit">Placement Builder</h2>
+                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
+                  Turn raw experiences into high-impact, role-tailored bullets using the Achievement Vault.
+                </p>
+              </div>
+            </motion.div>
+
             {/* Analytics Card */}
             <motion.div 
               variants={itemVariants} 
-              className="md:col-span-1 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors"
+              className="md:col-span-2 lg:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors"
               onClick={() => router.push("/dashboard/analytics")}
             >
               <div className="flex items-start justify-between">
@@ -439,7 +460,7 @@ export default function DashboardPage() {
             </motion.div>
 
             {/* Settings/Progress Placeholder */}
-            <motion.div variants={itemVariants} className="md:col-span-1 glass-card rounded-3xl p-6 flex flex-col justify-between border border-gray-300 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/40 hover:bg-white/80 dark:hover:bg-slate-800/60 cursor-pointer group transition-colors" onClick={() => router.push("/history")}>
+            <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-2 glass-card rounded-3xl p-6 flex flex-col justify-between border border-gray-300 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/40 hover:bg-white/80 dark:hover:bg-slate-800/60 cursor-pointer group transition-colors" onClick={() => router.push("/history")}>
               <div className="h-12 w-12 rounded-2xl bg-white/80 dark:bg-neutral-800/80 flex items-center justify-center border border-gray-200 dark:border-neutral-700 shadow-sm group-hover:scale-110 transition-transform">
                 <Clock className="h-6 w-6 text-gray-700 dark:text-gray-300" />
               </div>

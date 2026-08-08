@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import resume, interview, feedback, gratitude
+from routers import resume, interview, feedback, gratitude, resume_builder
 import os
 import sentry_sdk
 
@@ -39,6 +39,7 @@ app.add_middleware(
 )
 
 app.include_router(resume.router)
+app.include_router(resume_builder.router)
 app.include_router(interview.router)
 app.include_router(feedback.router)
 app.include_router(gratitude.router)

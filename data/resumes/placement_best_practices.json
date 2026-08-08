@@ -1,0 +1,20 @@
+{
+    "rules": [
+        "Bullet points should be grammatically complete sentences.",
+        "Do not use full stops at the end of bullet points.",
+        "Follow an \"Impact Word + What + Effect + How\" structure for bullet points.",
+        "Quantify your points as much as possible using numbers and percentages.",
+        "Highlight the business or technical impact you made (e.g., % increase in efficiency, hours saved, % output increase, % waste decrease).",
+        "Avoid repeating action words across the resume.",
+        "Ensure bullet points fit on a single line. Avoid 2-line points or 1.5-line points; ensure sub-points complete a single line.",
+        "Avoid explaining too much in a single point; focus on the outcome.",
+        "Keep information short and to the point.",
+        "Keep usage of italics minimal; do not use them in points.",
+        "Ensure all headings and bullet points start at the same vertical location.",
+        "Organize sub-points sequentially, or with the most impactful/important first.",
+        "Utilize the STAR (Situation, Task, Action, Result) framework for documenting project progress.",
+        "For Professional/Research Experience, detail responsibilities (team, role, aim), methods (platforms, equipment, software), and quantifiable impact.",
+        "For Technical/Key Projects, explain completed work, mention software, algorithms, libraries, and achieved efficiency/results.",
+        "For Positions of Responsibility, quantify team/budget size, number of people/students affected, describe your role, unique contributions, new initiatives, and the effect of your work."
+    ]
+}

@@ -83,6 +83,35 @@ class GeminiClient:
                     
         raise Exception("Max retries exceeded for generate_content")
         
+    def generate_content_with_history(self, model_name: str, system_instruction: str, history: List[Dict[str, Any]], new_message: str, generation_config: genai.GenerationConfig = None, max_retries: int = 6) -> Any:
+        current_model_name = model_name
+        for attempt in range(max_retries):
+            key = self._get_next_healthy_key()
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel(current_model_name, system_instruction=system_instruction)
+            
+            try:
+                chat = model.start_chat(history=history)
+                if generation_config:
+                    return chat.send_message(new_message, generation_config=generation_config)
+                return chat.send_message(new_message)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
+                    self._mark_key_cooldown(key)
+                    if attempt == max_retries - 1:
+                        raise e
+                    time.sleep(2 * (attempt + 1) + random.uniform(0, 1))
+                elif "404" in error_msg or "notfound" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
+                    print(f"Model {current_model_name} not found, falling back to gemini-3.1-flash-lite")
+                    current_model_name = "gemini-3.1-flash-lite"
+                    if attempt == max_retries - 1:
+                        raise e
+                else:
+                    raise e
+                    
+        raise Exception("Max retries exceeded for generate_content_with_history")
+        
     def start_chat(self, model_name: str, history: List[Dict[str, Any]] = None) -> Any:
         # For start_chat, we just configure with a healthy key and return the chat object.
         # It's less resilient to mid-chat 429s unless we wrap the chat object, but it's acceptable for now.

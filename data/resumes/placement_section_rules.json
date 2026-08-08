@@ -1,0 +1,69 @@
+{
+  "experience": {
+    "rules": [
+      "Must follow STAR format strictly: Situation -> Task -> Action -> Result",
+      "Lead with a strong, non-repetitive action verb (Spearheaded, Engineered, Orchestrated — not 'Worked on' or 'Helped')",
+      "Quantify impact with at least one hard metric (%, ₹, hours, users) positioned towards the end of the sentence",
+      "Mention tools/technologies/frameworks used explicitly",
+      "Keep to exactly 1 line per sub-point (no 2-line or 1.5-line points)",
+      "For internships: specify team size, project scope, and business impact",
+      "Include the client/industry context when the company name alone doesn't convey scale"
+    ],
+    "iitb_conventions": [
+      "Placement resumes usually have 2-3 significant experience entries (internships/co-ops) with 3-5 sub-points each",
+      "Focus heavily on business outcomes and scale (e.g. 'driving $2M revenue' or 'affecting 10k users')",
+      "Strong emphasis on ownership and independent execution"
+    ]
+  },
+  "project": {
+    "rules": [
+      "Must follow Action + Methodology + Result structure",
+      "Explicitly mention the tech stack (languages, libraries, hardware) used",
+      "Quantify the performance improvement or result (e.g., 'achieved 95% accuracy', 'reduced latency by 200ms')",
+      "Focus on the work done, not the course or professor",
+      "No vague statements like 'learned a lot' or 'successfully completed'"
+    ],
+    "iitb_conventions": [
+      "Placement resumes often list 3-5 key projects, prioritizing BTP (B.Tech Project), DDP (Dual Degree Project), and major independent projects",
+      "Technical depth and complexity are prioritized",
+      "Impact should be quantifiable even for academic projects (e.g., benchmark comparisons)"
+    ]
+  },
+  "por": {
+    "rules": [
+      "Quantify the scale of responsibility (team size, budget managed, event footfall, number of colleges)",
+      "Describe unique initiatives taken, not just standard responsibilities",
+      "Focus on leadership and organizational impact (e.g. 'Mentored a team of 15', 'Managed a budget of ₹5 Lakhs')",
+      "Demonstrate cross-functional stakeholder management"
+    ],
+    "iitb_conventions": [
+      "Usually 2-4 PORs listed. High-tier PORs (Institute Secretary, Core Committee Member, ISMP Mentor) are heavily weighted",
+      "Emphasis is on demonstrating leadership, teamwork, and ability to handle scale"
+    ]
+  },
+  "scholastic": {
+    "rules": [
+      "State the rank/percentile clearly (e.g., 'All India Rank 45 among 1.5 Lakh candidates')",
+      "Mention the specific olympiad, scholarship, or exam",
+      "Do not use full sentences; use punchy phrases",
+      "Include year of achievement"
+    ],
+    "iitb_conventions": [
+      "Typically 3-5 bullet points",
+      "Includes JEE Advanced rank, KVPY, NTSE, Olympiads, and Institute Academic Awards (e.g., AP grade, Institute Academic Prize)",
+      "For placements, CPI/GPA is often listed separately, but academic awards carry weight"
+    ]
+  },
+  "extracurricular": {
+    "rules": [
+      "Highlight competitive success (e.g., 'Secured 1st position among 50 teams')",
+      "Include inter-IIT, national, or international level achievements",
+      "Mention specific skills demonstrated (e.g., debating, sports, cultural arts)",
+      "Quantify participation scale if applicable"
+    ],
+    "iitb_conventions": [
+      "Often categorized into Sports, Cultural, and Technical",
+      "Inter-IIT achievements and Inter-Hostel (GC) achievements are highly valued as indicators of all-round excellence and competitiveness"
+    ]
+  }
+}
