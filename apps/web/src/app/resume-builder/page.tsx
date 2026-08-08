@@ -289,67 +289,82 @@ export default function ResumeBuilderPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-8">
-        <TabsList className="flex flex-col sm:flex-row w-full h-auto bg-muted/50 p-1.5 rounded-xl shadow-sm border border-border/50">
-          <TabsTrigger value="vault" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-            1. Achievement Vault
+        <TabsList className="flex flex-col sm:flex-row w-full h-auto bg-muted/30 p-1.5 rounded-xl shadow-sm border border-border/50">
+          <TabsTrigger value="vault" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+            <UploadCloud className="w-4 h-4 mr-2" /> Achievement Vault
           </TabsTrigger>
-          <TabsTrigger value="lab" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-            2. Bullet Laboratory
+          <TabsTrigger value="lab" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+            <Activity className="w-4 h-4 mr-2" /> Bullet Laboratory
           </TabsTrigger>
-          <TabsTrigger value="bank" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
-            3. Point Bank & Strategy
+          <TabsTrigger value="bank" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
+            <Save className="w-4 h-4 mr-2" /> Point Bank & Strategy
           </TabsTrigger>
         </TabsList>
 
         {/* VAULT TAB */}
         <TabsContent value="vault" className="space-y-8 animate-in fade-in-50 duration-500">
           <div className="grid md:grid-cols-2 gap-6">
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-gradient-to-br from-background to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-md text-primary">
-                    <UploadCloud className="h-5 w-5" />
+            <Card className="border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all bg-card relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
+                    <UploadCloud className="h-6 w-6" />
                   </div>
                   Extract from PDF
                 </CardTitle>
-                <CardDescription>Upload an old resume to auto-extract achievements</CardDescription>
+                <CardDescription className="text-sm mt-2">Upload your old resume. We'll automatically parse and extract your achievements into the vault.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  <Input 
-                    type="file" 
-                    accept="application/pdf"
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    className="file:bg-primary/10 file:text-primary file:border-0 file:rounded-md file:px-4 file:py-2 file:mr-4 file:font-medium hover:file:bg-primary/20 cursor-pointer h-14 pt-3"
-                  />
-                  <Button onClick={handleFileUpload} disabled={!file || isExtracting} className="w-full h-11 text-base">
-                    {isExtracting ? <RefreshCw className="h-5 w-5 animate-spin mr-2"/> : <UploadCloud className="h-5 w-5 mr-2"/>}
-                    Extract Achievements
+              <CardContent className="relative z-10">
+                <div className="flex flex-col gap-5">
+                  <div className="relative group/input">
+                    <Input 
+                      type="file" 
+                      accept="application/pdf"
+                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      aria-label="Upload PDF Resume"
+                    />
+                    <div className={`flex items-center justify-between border-2 border-dashed rounded-xl p-4 transition-colors ${file ? 'border-primary bg-primary/5' : 'border-border group-hover/input:border-primary/50 group-hover/input:bg-muted/30'}`}>
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <FileText className={`h-6 w-6 flex-shrink-0 ${file ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-sm font-medium truncate text-foreground/80">
+                          {file ? file.name : "Click or drag PDF here to upload"}
+                        </span>
+                      </div>
+                      {file && <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />}
+                    </div>
+                  </div>
+                  <Button onClick={handleFileUpload} disabled={!file || isExtracting} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5">
+                    {isExtracting ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
+                    {isExtracting ? "Extracting achievements..." : "Auto-Extract Achievements"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="border-primary/10 shadow-md hover:shadow-lg transition-shadow bg-gradient-to-bl from-background to-muted/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-md text-primary">
-                    <Edit3 className="h-5 w-5" />
+            <Card className="border-border shadow-sm hover:shadow-md hover:border-primary/30 transition-all bg-card relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
+                    <Edit3 className="h-6 w-6" />
                   </div>
                   Extract from Raw Text
                 </CardTitle>
-                <CardDescription>Paste rough project descriptions or unformatted notes</CardDescription>
+                <CardDescription className="text-sm mt-2">Paste rough project descriptions or unformatted notes to extract structured achievements.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="relative z-10 space-y-5">
                 <Textarea 
                   placeholder="E.g., I worked on a machine learning model to predict churn. It improved retention by 15%..." 
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
-                  className="h-[76px] resize-none focus-visible:ring-primary/20"
+                  className="h-[74px] resize-none rounded-xl border-border focus-visible:ring-primary/30 focus-visible:border-primary/50 text-[15px] p-3 shadow-sm"
+                  aria-label="Raw text for extraction"
                 />
-                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtracting} className="w-full h-11 text-base" variant="secondary">
-                  {isExtracting ? <RefreshCw className="h-5 w-5 animate-spin mr-2"/> : <Plus className="h-5 w-5 mr-2"/>}
-                  Extract from Text
+                <Button onClick={handleTextUpload} disabled={!rawText.trim() || isExtracting} className="w-full h-12 text-base font-semibold shadow-sm transition-all hover:-translate-y-0.5" variant="secondary">
+                  {isExtracting ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Plus className="h-5 w-5 mr-2"/>}
+                  {isExtracting ? "Processing text..." : "Add to Vault manually"}
                 </Button>
               </CardContent>
             </Card>
@@ -510,38 +525,50 @@ export default function ResumeBuilderPage() {
             <CardContent className="space-y-8 pt-8">
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="achievement-select">
                     Select Achievement Source
                   </label>
-                  <select 
-                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                    value={selectedAchievement || ""}
-                    onChange={(e) => setSelectedAchievement(e.target.value)}
-                  >
-                    <option value="" disabled>-- Select an achievement from your vault --</option>
-                    {achievements.map(a => (
-                      <option key={a.id} value={a.id}>{a.title} ({a.parent_experience})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select 
+                      id="achievement-select"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[15px] shadow-sm hover:border-primary/50 focus:border-primary focus:ring-0 focus:outline-none transition-colors cursor-pointer"
+                      value={selectedAchievement || ""}
+                      onChange={(e) => setSelectedAchievement(e.target.value)}
+                      aria-label="Select an achievement"
+                    >
+                      <option value="" disabled>-- Select an achievement from your vault --</option>
+                      {achievements.map(a => (
+                        <option key={a.id} value={a.id}>{a.title} ({a.parent_experience})</option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="space-y-3">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="role-select">
                     Select Target Industry Role
                   </label>
-                  <select 
-                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-background px-4 py-2 text-sm shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                    value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                  >
-                    <option value="consult">Management Consulting</option>
-                    <option value="finance">Finance / Investment Banking</option>
-                    <option value="product management">Product Management</option>
-                    <option value="analytics">Data & Analytics</option>
-                    <option value="it-software">Software Engineering / IT</option>
-                  </select>
+                  <div className="relative">
+                    <select 
+                      id="role-select"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[15px] shadow-sm hover:border-primary/50 focus:border-primary focus:ring-0 focus:outline-none transition-colors cursor-pointer"
+                      value={targetRole}
+                      onChange={(e) => setTargetRole(e.target.value)}
+                      aria-label="Select target role"
+                    >
+                      <option value="consult">Management Consulting</option>
+                      <option value="finance">Finance / Investment Banking</option>
+                      <option value="product management">Product Management</option>
+                      <option value="analytics">Data & Analytics</option>
+                      <option value="it-software">Software Engineering / IT</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -668,19 +695,26 @@ export default function ResumeBuilderPage() {
                   <CardDescription>Analyze your vault and point bank against top-tier placement standards.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Target Role for Analysis</label>
-                    <select 
-                      className="flex h-11 w-full items-center justify-between rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary"
-                      value={strategyTargetRole}
-                      onChange={(e) => setStrategyTargetRole(e.target.value)}
-                    >
-                      <option value="consult">Management Consulting</option>
-                      <option value="finance">Finance / IB</option>
-                      <option value="product management">Product Management</option>
-                      <option value="analytics">Data & Analytics</option>
-                      <option value="it-software">Software Engineering</option>
-                    </select>
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-role-select">Target Role for Analysis</label>
+                    <div className="relative">
+                      <select 
+                        id="strategy-role-select"
+                        className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border-2 border-input bg-background px-4 py-2 text-[14px] shadow-sm focus:border-primary focus:ring-0 focus:outline-none hover:border-primary/50 transition-colors cursor-pointer"
+                        value={strategyTargetRole}
+                        onChange={(e) => setStrategyTargetRole(e.target.value)}
+                        aria-label="Select target role for strategy report"
+                      >
+                        <option value="consult">Management Consulting</option>
+                        <option value="finance">Finance / IB</option>
+                        <option value="product management">Product Management</option>
+                        <option value="analytics">Data & Analytics</option>
+                        <option value="it-software">Software Engineering</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                      </div>
+                    </div>
                   </div>
                   
                   <Button className="w-full h-12 shadow-sm font-medium" onClick={generateStrategy} disabled={isStrategyLoading}>

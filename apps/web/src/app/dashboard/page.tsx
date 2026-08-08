@@ -435,9 +435,9 @@ export default function DashboardPage() {
                 <span className="text-xs font-semibold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-800/50">BUILDER</span>
               </div>
               <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2 group-hover:text-emerald-700 transition-colors font-outfit">Placement Builder</h2>
+                <h2 className="text-2xl font-bold mb-2 group-hover:text-emerald-700 transition-colors font-outfit">Resume Builder</h2>
                 <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
-                  Turn raw experiences into high-impact, role-tailored bullets using the Achievement Vault.
+                  Turn raw experiences into high-impact, placement-focused bullets using the Achievement Vault.
                 </p>
               </div>
             </motion.div>
