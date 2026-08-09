@@ -20,10 +20,10 @@ def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[st
     B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
     """
     
-    system_prompt = f"""
+    system_prompt = """
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from this PDF resume.
-    {vault_context}
+    %s
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
@@ -61,7 +61,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[st
     - financial_quantitative_rigor
     - leadership_stakeholder_mgmt
     - entrepreneurial_ownership
-    """
+    """ % vault_context
     
     response = gemini_client.generate_content(
         model_name="gemini-3.5-flash",
@@ -107,10 +107,10 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[D
     B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
     """
         
-    system_prompt = f"""
+    system_prompt = """
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from the provided document text.
-    {vault_context}
+    %s
     
     CRITICAL NOISE FILTERING RULE:
     This text is NOT a standard resume. It may be a project report, college transcript, presentation, or certificate.
@@ -153,7 +153,7 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[D
     - financial_quantitative_rigor
     - leadership_stakeholder_mgmt
     - entrepreneurial_ownership
-    """
+    """ % vault_context
     
     messages = [
         {"role": "system", "content": system_prompt},
@@ -202,10 +202,10 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
     B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
     """
 
-    system_prompt = f"""
+    system_prompt = """
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from the provided text notes.
-    {vault_context}
+    %s
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
@@ -242,7 +242,7 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
     - financial_quantitative_rigor
     - leadership_stakeholder_mgmt
     - entrepreneurial_ownership
-    """
+    """ % vault_context
     
     response = gemini_client.generate_content(
         model_name="gemini-3.5-flash",
