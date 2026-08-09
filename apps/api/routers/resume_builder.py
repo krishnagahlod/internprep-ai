@@ -349,7 +349,6 @@ def save_bullet(req: SaveBulletRequest):
             "target_role": req.target_role,
             "bullet_text": req.bullet_text,
             "variant_type": req.variant_type,
-            "recruiter_notes": req.recruiter_notes,
             "is_saved": True
         }).execute()
         return res.data[0]
