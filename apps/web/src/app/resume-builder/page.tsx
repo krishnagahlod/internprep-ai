@@ -67,6 +67,7 @@ export default function ResumeBuilderPage() {
   const [isExtractingText, setIsExtractingText] = useState(false)
   const [rawText, setRawText] = useState("")
   const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null)
+  const [extractionSuccessData, setExtractionSuccessData] = useState<{count: number, achievements: any[]} | null>(null)
   
   // Lab State
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
@@ -170,6 +171,8 @@ export default function ResumeBuilderPage() {
         body: formData
       })
       if (res.ok) {
+        const data = await res.json()
+        setExtractionSuccessData({ count: data.achievements?.length || 0, achievements: data.achievements || [] })
         await fetchAchievements()
         setFile(null)
       }
@@ -190,6 +193,8 @@ export default function ResumeBuilderPage() {
         body: JSON.stringify({ user_id: user.id, text: rawText })
       })
       if (res.ok) {
+        const data = await res.json()
+        setExtractionSuccessData({ count: data.achievements?.length || 0, achievements: data.achievements || [] })
         await fetchAchievements()
         setRawText("")
       }
@@ -1141,6 +1146,36 @@ export default function ResumeBuilderPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Extraction Success Dialog */}
+      <Dialog open={!!extractionSuccessData} onOpenChange={(open) => !open && setExtractionSuccessData(null)}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              Extraction Complete
+            </DialogTitle>
+            <DialogDescription>
+              We successfully extracted and organized {extractionSuccessData?.count || 0} achievements into your Vault.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
+            {extractionSuccessData?.achievements.map((ach, i) => (
+              <div key={i} className="border p-4 rounded-xl shadow-sm bg-muted/20">
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="font-semibold text-[15px] text-foreground">{ach.title || "Achievement"}</h4>
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{ach.section_type}</Badge>
+                </div>
+                <p className="text-sm font-medium text-primary mb-2">{ach.parent_experience}</p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">{ach.original_description}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button onClick={() => setExtractionSuccessData(null)} className="w-full sm:w-auto">Got it</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
