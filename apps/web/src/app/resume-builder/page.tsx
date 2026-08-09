@@ -23,6 +23,8 @@ type Achievement = {
   original_description: string
   competency_tags: string[]
   status: string
+  quantified_metrics: any
+  user_notes?: string
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -43,15 +45,6 @@ const SECTION_ORDER: Record<string, number> = {
   "Extracurriculars": 5,
   "Other": 6
 };
-  section_type: string
-  parent_experience: string
-  timeline: string
-  original_description: string
-  competency_tags: string[]
-  status: string
-  quantified_metrics: any
-  user_notes?: string
-}
 
 interface GeneratedBullet {
   id: string;
