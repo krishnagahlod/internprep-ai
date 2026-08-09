@@ -106,6 +106,7 @@ export default function ResumeBuilderPage() {
   const [strategyJobDescription, setStrategyJobDescription] = useState("")
   const [strategyData, setStrategyData] = useState<any>(null)
   const [isStrategyLoading, setIsStrategyLoading] = useState(false)
+  const [isStrategyModalOpen, setIsStrategyModalOpen] = useState(false)
   // Refs
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
@@ -368,13 +369,18 @@ export default function ResumeBuilderPage() {
   const generateStrategy = async () => {
     if (!user) return
     setIsStrategyLoading(true)
+    
+    // Determine the role to run strategy for (using the currently selected point bank domain)
+    const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
+    const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
+
     try {
       const res = await fetch(`${apiBase}/resume-builder/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          target_role: targetRole,
+          target_role: displayRole,
           target_company: strategyTargetCompany || undefined,
           job_description: strategyJobDescription || undefined
         })
@@ -1011,17 +1017,8 @@ export default function ResumeBuilderPage() {
 
         {/* POINT BANK TAB */}
         <TabsContent value="bank" className="space-y-6 animate-in fade-in-50 duration-500">
-          <Tabs defaultValue="bullets" className="w-full">
-            <div className="flex justify-between items-center mb-6">
-              <TabsList className="h-12 bg-muted/30">
-                <TabsTrigger value="bullets" className="text-sm px-6 h-10"><Save className="w-4 h-4 mr-2" /> Point Bank View</TabsTrigger>
-                <TabsTrigger value="strategy" className="text-sm px-6 h-10"><Target className="w-4 h-4 mr-2" /> Strategy Analysis</TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <TabsContent value="bullets" className="mt-0">
-              <Card className="border-border/60 shadow-md">
-                <CardHeader className="border-b bg-muted/5 pb-5">
+          <Card className="border-border/60 shadow-md">
+            <CardHeader className="border-b bg-muted/5 pb-5">
                   <CardTitle className="text-2xl flex items-center gap-2">
                     <Save className="h-6 w-6 text-primary" /> Point Bank
                   </CardTitle>
@@ -1039,23 +1036,34 @@ export default function ResumeBuilderPage() {
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      <div className="flex flex-wrap gap-3 mb-8 border-b border-border/50 pb-5">
-                        {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
-                          const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
-                          return (
-                            <button
-                              key={role} 
-                              onClick={() => setActivePointBankRole(role)}
-                              className={`px-5 py-2.5 rounded-full text-sm font-bold tracking-wide capitalize transition-all ${
-                                isActive
-                                  ? "bg-primary text-primary-foreground shadow-md scale-105" 
-                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                              }`}
-                            >
-                              {role}
-                            </button>
-                          );
-                        })}
+                      <div className="flex flex-wrap gap-3 mb-8 border-b border-border/50 pb-5 items-center justify-between">
+                        <div className="flex flex-wrap gap-3">
+                          {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
+                            const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
+                            return (
+                              <button
+                                key={role} 
+                                onClick={() => setActivePointBankRole(role)}
+                                className={`px-5 py-2.5 rounded-full text-sm font-bold tracking-wide capitalize transition-all ${
+                                  isActive
+                                    ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                }`}
+                              >
+                                {role}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <Button 
+                          onClick={() => {
+                            setIsStrategyModalOpen(true);
+                            setStrategyData(null);
+                          }}
+                          className="font-semibold shadow-sm"
+                        >
+                          <Target className="h-4 w-4 mr-2" /> Generate Strategy Report
+                        </Button>
                       </div>
 
                       {(() => {
@@ -1144,146 +1152,135 @@ export default function ResumeBuilderPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-            
-            <TabsContent value="strategy" className="mt-0">
-              <Card className="bg-gradient-to-b from-primary/5 via-background to-background border-primary/20 shadow-md max-w-4xl mx-auto">
-                <CardHeader className="border-b border-primary/10 pb-5">
-                  <CardTitle className="flex items-center gap-2 text-xl text-primary">
-                    <Target className="h-6 w-6" /> Strategy Engine
-                  </CardTitle>
-                  <CardDescription>Analyze your vault and point bank against top-tier placement standards.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 pt-6">
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-role-select">Target Role for Analysis</label>
-                    <div className="relative">
-                      <select 
-                        id="strategy-role-select"
-                        className="appearance-none flex h-12 w-full items-center justify-between rounded-lg border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
-                        value={targetRole}
-                        onChange={(e) => {
-                          setTargetRole(e.target.value);
-                          setStrategyData(null); // Reset strategy when role changes
-                        }}
-                        aria-label="Select target role for strategy report"
-                      >
-                        <option value="consult">Management Consulting</option>
-                        <option value="finance">Finance / Investment Banking</option>
-                        <option value="product management">Product Management</option>
-                        <option value="analytics">Data & Analytics</option>
-                        <option value="it-software">Software Engineering / IT</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                        <ChevronRight className="h-4 w-4 rotate-90" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-company">Target Company (Optional)</label>
-                    <Input 
-                      id="strategy-company"
-                      placeholder="e.g. McKinsey, Google, Goldman Sachs"
-                      value={strategyTargetCompany}
-                      onChange={(e) => setStrategyTargetCompany(e.target.value)}
-                      className="h-12 border-input/60 bg-muted/5 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-jd">Job Description snippet (Optional)</label>
-                    <Textarea 
-                      id="strategy-jd"
-                      placeholder="Paste key responsibilities or requirements here..."
-                      value={strategyJobDescription}
-                      onChange={(e) => setStrategyJobDescription(e.target.value)}
-                      className="min-h-[80px] border-input/60 bg-muted/5 shadow-sm resize-none"
-                    />
-                  </div>
-                  
-                  <Button className="w-full h-12 shadow-sm font-medium" onClick={generateStrategy} disabled={isStrategyLoading}>
-                    {isStrategyLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
-                    Generate Strategy Report
-                  </Button>
-                  
-                  {strategyData && (
-                    <div className="mt-8 space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
-                      <div className="flex flex-col items-center justify-center p-6 bg-background rounded-xl border shadow-sm">
-                        <span className="text-sm font-medium text-muted-foreground mb-2">Overall Readiness</span>
-                        <div className="flex items-end gap-1">
-                          <span className={`text-4xl font-extrabold ${strategyData.overall_readiness_score > 70 ? "text-green-600" : strategyData.overall_readiness_score > 40 ? "text-amber-500" : "text-destructive"}`}>
-                            {strategyData.overall_readiness_score}
-                          </span>
-                          <span className="text-muted-foreground font-medium mb-1">/100</span>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-bold flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-md">
-                          <CheckCircle2 className="h-4 w-4" /> Key Strengths
-                        </h4>
-                        <ul className="text-sm space-y-2 pl-2">
-                          {strategyData.strengths?.map((s: string, i: number) => (
-                            <li key={i} className="flex gap-2"><span className="text-green-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{s}</span></li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-bold flex items-center gap-2 text-red-600 bg-red-50 px-3 py-1.5 rounded-md">
-                          <Activity className="h-4 w-4" /> Critical Gaps
-                        </h4>
-                        <ul className="text-sm space-y-2 pl-2">
-                          {strategyData.critical_gaps?.map((g: string, i: number) => (
-                            <li key={i} className="flex gap-2"><span className="text-red-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{g}</span></li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {strategyData.action_plan && strategyData.action_plan.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
-                            <Target className="h-4 w-4" /> Recommended Action Plan
-                          </h4>
-                          <ul className="text-sm space-y-2 pl-2">
-                            {strategyData.action_plan.map((action: string, i: number) => (
-                              <li key={i} className="flex gap-2"><span className="text-primary font-bold">•</span><span className="text-foreground/80 leading-snug">{action}</span></li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {strategyData.vault_recommendations && strategyData.vault_recommendations.length > 0 && (
-                        <div className="space-y-3 mt-6 border-t pt-5">
-                          <h4 className="text-sm font-bold flex items-center gap-2 text-foreground">
-                            <Sparkles className="h-4 w-4 text-amber-500" /> Vault Extraction Recommendations
-                          </h4>
-                          <p className="text-xs text-muted-foreground mb-2">We found these existing achievements in your vault that perfectly match your critical gaps. Generate bullets for them in the Laboratory!</p>
-                          <div className="space-y-3">
-                            {strategyData.vault_recommendations.map((rec: any, i: number) => {
-                              const ach = achievements.find(a => a.id === rec.achievement_id);
-                              if (!ach) return null;
-                              return (
-                                <div key={i} className="bg-muted/30 border rounded-lg p-3">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="font-semibold text-sm">{ach.title}</span>
-                                    <Badge variant="outline" className="text-[10px]">{ach.parent_experience}</Badge>
-                                  </div>
-                                  <p className="text-[13px] text-primary/80 font-medium mt-2"><span className="text-muted-foreground font-normal">Why:</span> {rec.reason}</p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
         </TabsContent>
+        
+        {/* Strategy Engine Modal */}
+        <Dialog open={isStrategyModalOpen} onOpenChange={setIsStrategyModalOpen}>
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl text-primary">
+                <Target className="h-6 w-6" /> Strategy Engine
+              </DialogTitle>
+              <DialogDescription>
+                Analyze your vault and point bank against top-tier placement standards for {
+                  (() => {
+                    const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
+                    return activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
+                  })()
+                }.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {!strategyData ? (
+              <div className="space-y-5 py-4">
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-foreground" htmlFor="strategy-company">Target Company (Optional)</label>
+                  <Input 
+                    id="strategy-company"
+                    placeholder="e.g. McKinsey, Google, Goldman Sachs"
+                    value={strategyTargetCompany}
+                    onChange={(e) => setStrategyTargetCompany(e.target.value)}
+                    className="h-12 border-input/60 bg-muted/5 shadow-sm"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-foreground" htmlFor="strategy-jd">Job Description snippet (Optional)</label>
+                  <Textarea 
+                    id="strategy-jd"
+                    placeholder="Paste key responsibilities or requirements here..."
+                    value={strategyJobDescription}
+                    onChange={(e) => setStrategyJobDescription(e.target.value)}
+                    className="min-h-[100px] border-input/60 bg-muted/5 shadow-sm resize-none"
+                  />
+                </div>
+                
+                <Button className="w-full h-12 shadow-sm font-medium mt-4" onClick={generateStrategy} disabled={isStrategyLoading}>
+                  {isStrategyLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
+                  {isStrategyLoading ? "Analyzing..." : "Generate Strategy Report"}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6 py-4 animate-in slide-in-from-bottom-4 fade-in duration-500">
+                <div className="flex flex-col items-center justify-center p-6 bg-background rounded-xl border shadow-sm">
+                  <span className="text-sm font-medium text-muted-foreground mb-2">Overall Readiness</span>
+                  <div className="flex items-end gap-1">
+                    <span className={`text-4xl font-extrabold ${strategyData.overall_readiness_score > 70 ? "text-green-600" : strategyData.overall_readiness_score > 40 ? "text-amber-500" : "text-destructive"}`}>
+                      {strategyData.overall_readiness_score}
+                    </span>
+                    <span className="text-muted-foreground font-medium mb-1">/100</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-md">
+                    <CheckCircle2 className="h-4 w-4" /> Key Strengths
+                  </h4>
+                  <ul className="text-sm space-y-2 pl-2">
+                    {strategyData.strengths?.map((s: string, i: number) => (
+                      <li key={i} className="flex gap-2"><span className="text-green-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{s}</span></li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="text-sm font-bold flex items-center gap-2 text-destructive bg-destructive/10 px-3 py-1.5 rounded-md">
+                    <AlertTitle className="m-0 text-sm h-4 w-4" /> Critical Gaps
+                  </h4>
+                  <ul className="text-sm space-y-2 pl-2">
+                    {strategyData.critical_gaps?.map((g: string, i: number) => (
+                      <li key={i} className="flex gap-2"><span className="text-destructive font-bold">•</span><span className="text-foreground/80 leading-snug">{g}</span></li>
+                    ))}
+                  </ul>
+                </div>
+
+                {strategyData.action_plan && strategyData.action_plan.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
+                      <Target className="h-4 w-4" /> Recommended Action Plan
+                    </h4>
+                    <ul className="text-sm space-y-2 pl-2">
+                      {strategyData.action_plan.map((action: string, i: number) => (
+                        <li key={i} className="flex gap-2"><span className="text-primary font-bold">•</span><span className="text-foreground/80 leading-snug">{action}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {strategyData.vault_recommendations && strategyData.vault_recommendations.length > 0 && (
+                  <div className="space-y-3 mt-6 border-t pt-5">
+                    <h4 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                      <Sparkles className="h-4 w-4 text-amber-500" /> Vault Extraction Recommendations
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-2">We found these existing achievements in your vault that perfectly match your critical gaps. Generate bullets for them in the Laboratory!</p>
+                    <div className="space-y-3">
+                      {strategyData.vault_recommendations.map((rec: any, i: number) => {
+                        const ach = achievements.find(a => a.id === rec.achievement_id);
+                        if (!ach) return null;
+                        return (
+                          <div key={i} className="bg-muted/30 border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-semibold text-sm">{ach.title}</span>
+                              <Badge variant="outline" className="text-[10px]">{ach.parent_experience}</Badge>
+                            </div>
+                            <p className="text-[13px] text-primary/80 font-medium mt-2"><span className="text-muted-foreground font-normal">Why:</span> {rec.reason}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <Button 
+                  className="w-full mt-4" 
+                  variant="outline" 
+                  onClick={() => setStrategyData(null)}
+                >
+                  Generate New Strategy
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
       </Tabs>
 
