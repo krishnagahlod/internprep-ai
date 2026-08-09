@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText } from "lucide-react"
+import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy } from "lucide-react"
 
 // Types
 type Achievement = {
@@ -826,51 +826,51 @@ export default function ResumeBuilderPage() {
                 <div className="h-px bg-border flex-1"></div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-4">
                 {generatedBullets.map((bullet, idx) => (
-                  <Card key={idx} className="border-l-4 border-l-primary/60 border-t border-r border-b border-border shadow-sm hover:shadow-md transition-all flex flex-col group bg-card">
-                    <CardHeader className="py-4 bg-muted/5 border-b relative">
-                      <div className="flex justify-between items-center">
-                        <Badge variant="secondary" className="bg-muted text-muted-foreground font-semibold tracking-widest text-[10px] px-3 py-1 uppercase shadow-none border-0">
-                          {bullet.variant_type.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6 md:p-8 flex-1 flex flex-col items-start">
+                  <Card key={idx} className="border-l-4 border-l-primary/60 border-t border-r border-b border-border shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row bg-card overflow-hidden">
+                    
+                    {/* Main Content Area */}
+                    <div className="flex-1 p-5 md:p-6 flex flex-col gap-4 justify-center">
                       <div className="flex gap-4 items-start w-full">
-                        <div className="mt-1 hidden sm:block">
-                          <div className="h-2 w-2 rounded-full bg-primary/40"></div>
+                        <div className="mt-1.5 hidden sm:block shrink-0">
+                          <div className="h-2 w-2 rounded-full bg-primary/50"></div>
                         </div>
-                        <div className="w-full">
-                          <p className="text-base md:text-[17px] font-medium leading-relaxed text-foreground text-left">
+                        <div className="w-full flex-1">
+                          <div className="mb-2.5">
+                            <Badge variant="secondary" className="bg-primary/10 text-primary font-bold tracking-widest text-[10px] px-2.5 py-1 uppercase border-0">
+                              {bullet.variant_type.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          <p className="text-[16px] font-medium leading-relaxed text-foreground text-left pr-2">
                             {highlightMetrics(bullet.bullet_text)}
                           </p>
                           
                           {/* Character Limit Checker */}
                           {benchmarkText && (
-                            <div className="flex items-center gap-2 mt-4 w-full">
+                            <div className="flex items-center gap-3 mt-4 max-w-xl">
                               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                                 <div 
-                                  className={`h-full ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'bg-red-500' : 'bg-primary'}`} 
+                                  className={`h-full transition-all duration-500 ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'bg-red-500' : 'bg-primary'}`} 
                                   style={{ width: `${Math.min((bullet.bullet_text.length / benchmarkText.length) * 100, 100)}%` }}
                                 ></div>
                               </div>
-                              <span className={`text-[11px] font-medium ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                              <span className={`text-[12px] font-bold ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'text-red-500' : 'text-muted-foreground'}`}>
                                 {bullet.bullet_text.length} / {benchmarkText.length} chars
                               </span>
                             </div>
                           )}
 
-                          {/* Recruiter Notes */}
+                          {/* AI Coach Suggestions */}
                           {bullet.recruiter_notes && (
-                            <div className="mt-5 w-full rounded-lg bg-primary/5 border border-primary/10 p-3">
+                            <div className="mt-5 max-w-3xl rounded-xl bg-muted/30 border border-border/50 p-3.5">
                               <details className="group">
-                                <summary className="flex items-center cursor-pointer list-none text-[13px] font-bold text-primary">
-                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> 
-                                  💡 Recruiter Insights & Coaching
-                                  <ChevronRight className="h-3.5 w-3.5 ml-auto transition-transform group-open:rotate-90" />
+                                <summary className="flex items-center cursor-pointer list-none text-[13px] font-bold text-foreground/80 hover:text-primary transition-colors">
+                                  <Sparkles className="h-4 w-4 mr-2 text-primary" /> 
+                                  AI Coach Suggestions
+                                  <ChevronRight className="h-4 w-4 ml-auto transition-transform group-open:rotate-90 text-muted-foreground" />
                                 </summary>
-                                <p className="text-[13px] text-foreground/80 mt-3 leading-relaxed pl-3 border-l-2 border-primary/20">
+                                <p className="text-[13.5px] text-muted-foreground mt-3 leading-relaxed pl-3 border-l-2 border-primary/30">
                                   {bullet.recruiter_notes}
                                 </p>
                               </details>
@@ -878,30 +878,31 @@ export default function ResumeBuilderPage() {
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                    <div className="p-4 border-t bg-muted/5 flex justify-end gap-3 mt-auto">
+                    </div>
+
+                    {/* Actions Panel */}
+                    <div className="bg-muted/5 border-t md:border-t-0 md:border-l border-border p-4 md:p-6 flex flex-row md:flex-col gap-3 justify-end md:justify-center shrink-0 md:w-48">
                       <Button 
                         variant="outline" 
                         size="sm"
-                        className="text-muted-foreground hover:text-foreground font-medium"
+                        className="text-muted-foreground hover:text-foreground font-medium w-full h-10 shadow-sm"
                         onClick={() => navigator.clipboard.writeText(bullet.bullet_text)}
                       >
-                        <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
+                        <Copy className="h-4 w-4 mr-2" />
                         Copy
                       </Button>
                       <Button 
                         size="sm" 
                         variant={bullet.is_saved ? "secondary" : "default"}
-                        className={`shadow-sm font-medium ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
+                        className={`font-medium w-full h-10 shadow-sm transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
                         onClick={() => saveBullet(bullet)}
                         disabled={bullet.is_saved}
                       >
-                        <Save className="h-4 w-4 mr-1.5" />
-                        {bullet.is_saved ? "Saved" : "Save to Point Bank"}
+                        {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        {bullet.is_saved ? "Saved" : "Save"}
                       </Button>
                     </div>
+
                   </Card>
                 ))}
               </div>
