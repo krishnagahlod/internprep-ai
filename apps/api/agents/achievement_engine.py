@@ -129,12 +129,12 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]
     
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Document Text:\n{raw_text[:40000]}"}
+        {"role": "user", "content": f"Document Text:\n{raw_text[:25000]}"}
     ]
     
     try:
         response_text = cerebras_client.generate_chat_completion(
-            model="llama3.1-70b",
+            model="gpt-oss-120b",
             messages=messages,
             temperature=0.1,
             max_tokens=4000
