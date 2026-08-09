@@ -45,7 +45,8 @@ class GenerateBulletsRequest(BaseModel):
     achievement_id: str
     target_role: str
     target_company: Optional[str] = None
-    length_level: Optional[str] = "medium"
+    benchmark_text: Optional[str] = None
+    existing_bullets: Optional[List[str]] = None
 
 class SaveBulletRequest(BaseModel):
     user_id: str
@@ -53,7 +54,7 @@ class SaveBulletRequest(BaseModel):
     target_role: str
     bullet_text: str
     variant_type: str
-    scores: Optional[Dict[str, Any]] = None
+    recruiter_notes: Optional[str] = None
 
 class MetricChatRequest(BaseModel):
     achievement_id: str
@@ -214,7 +215,8 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
             achievement, 
             req.target_role, 
             target_company=req.target_company or "",
-            length_level=req.length_level or "medium"
+            benchmark_text=req.benchmark_text or "",
+            existing_bullets=req.existing_bullets or []
         )
         
         # Save to generated_bullets table
@@ -226,7 +228,7 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
                 "target_role": req.target_role,
                 "bullet_text": v.get("bullet_text", ""),
                 "variant_type": v.get("variant_type", "unknown"),
-                "scores": v.get("scores", {}),
+                "recruiter_notes": v.get("recruiter_notes", ""),
                 "is_saved": False
             })
             
@@ -252,14 +254,13 @@ def get_point_bank(user_id: str):
 def save_bullet(req: SaveBulletRequest):
     from agents.resume_analyzer import supabase
     try:
-        # Create a new saved bullet record
         res = supabase.table('generated_bullets').insert({
             "achievement_id": req.achievement_id,
             "user_id": req.user_id,
             "target_role": req.target_role,
             "bullet_text": req.bullet_text,
             "variant_type": req.variant_type,
-            "scores": req.scores,
+            "recruiter_notes": req.recruiter_notes,
             "is_saved": True
         }).execute()
         return res.data[0]

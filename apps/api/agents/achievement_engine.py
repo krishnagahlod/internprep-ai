@@ -158,7 +158,7 @@ def get_placement_rag_context(supabase_client, target_role: str, description: st
         print(f"RAG fetch failed: {e}")
         return ""
 
-def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", length_level: str = "medium") -> List[Dict[str, Any]]:
+def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", benchmark_text: str = "", existing_bullets: List[str] = None) -> List[Dict[str, Any]]:
     # 1. Fetch RAG context
     desc = achievement.get('original_description', '')
     notes = achievement.get('user_notes', '')
@@ -169,12 +169,25 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, tags)
     
     # Setup length constraint
-    if length_level == "short":
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Keep bullets under 12 words. Extremely concise, 1 line only."
-    elif length_level == "detailed":
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Target 20-25 words. Highly dense, potentially 1.5 - 2 lines."
+    if benchmark_text:
+        length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
     else:
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Target 13-18 words. Standard 1-line length."
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Match the length of the original description closely. Standard 1-line length (approx 13-18 words)."
+
+    # Setup context awareness
+    context_rules = ""
+    if existing_bullets:
+        context_rules = f"""
+    CONTEXT AWARENESS (ANTI-FRANKENSTEIN RULE):
+    The user already has these bullets saved for this project:
+    {json.dumps(existing_bullets)}
+    You MUST NOT reuse the action verbs or exact sentence structures found in these existing bullets to ensure variety.
+        """
+        
+    action_verb_dictionary = """
+    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed.
+    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
+    """
 
     # Define variants dynamically based on role
     role_lower = target_role.lower()
@@ -226,8 +239,11 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     - Description: {combined_desc}
     - Known Metrics: {json.dumps(achievement.get('quantified_metrics', {}))}
     
-    LENGTH CONSTRAINT:
     {length_constraint}
+    
+    {context_rules}
+    
+    {action_verb_dictionary}
     
     Generate 4 variants of the bullet:
     {variants_instructions}
@@ -238,17 +254,13 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             {{
                 "variant_type": {variant_enum},
                 "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
-                "scores": {{
-                    "impact": 0-100,
-                    "quantification": 0-100,
-                    "role_fit": 0-100
-                }}
+                "recruiter_notes": "1-2 sentences explaining why this bullet is elite, and actively suggesting exactly which metric could be further quantified to make it even stronger."
             }}
         ]
     }}
     
     CRITICAL: 
-    - Follow standard Day 1 resume rules (Start with strong action verb, quantify, single line).
+    - Follow standard Day 1 resume rules (Start with strong elite action verb, quantify, single line).
     - Do NOT hallucinate metrics; use the provided metrics or abstract them safely (e.g. 'significant improvement').
     - NEVER put a full stop (period) at the end of the bullet point.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
@@ -300,10 +312,11 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
     
     Guidelines:
     1. Ask exactly 1 short, focused question. Keep it conversational.
-    2. Use proxy metrics: If they don't know exact revenue, ask about time saved, team size, scale of the project, or user base.
+    2. BE HIGHLY PROACTIVE WITH PROXY METRICS: If they don't know exact revenue, actively suggest a proxy metric (e.g., "If you don't know the exact revenue, let's estimate the engineering hours saved or the percentage speedup?").
     3. Push for scale and context (e.g. "You built a bot. How many queries does it handle daily?").
     4. Focus on the best practices of IIT Bombay resumes: STAR format, highlighting magnitude of impact, and strong action verbs.
-    5. Once you have solid metrics, tell them "I think we have enough to generate a great bullet now!"
+    5. BS DETECTION: If the user claims a highly improbable metric for a student (e.g., increased revenue by 5000%, managed a team of 50) or uses extremely vague language, professionally challenge them like a McKinsey interviewer. Ask them to refine the metric to reflect their specific, defensible contribution.
+    6. Once you have solid metrics, tell them "I think we have enough to generate a great bullet now!"
     
     You must return a valid JSON object matching this schema exactly:
     {{

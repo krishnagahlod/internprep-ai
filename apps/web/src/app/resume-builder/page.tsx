@@ -32,7 +32,7 @@ interface GeneratedBullet {
   target_role: string;
   bullet_text: string;
   variant_type: string;
-  scores: any;
+  recruiter_notes?: string;
   is_saved?: boolean;
 }
 
@@ -69,7 +69,7 @@ export default function ResumeBuilderPage() {
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
   const [targetRole, setTargetRole] = useState("consulting")
   const [targetCompany, setTargetCompany] = useState("")
-  const [lengthLevel, setLengthLevel] = useState("medium")
+  const [benchmarkText, setBenchmarkText] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
   
@@ -196,8 +196,21 @@ export default function ResumeBuilderPage() {
   }
   
   const generateVariants = async () => {
-    if (!selectedAchievement || !user) return
+    if (!user || !selectedAchievement) return
     setIsGenerating(true)
+    
+    // Context-Awareness: Get bullets already saved for this project/experience
+    let existing_bullets: string[] = [];
+    const achievementObj = achievements.find(a => a.id === selectedAchievement);
+    if (achievementObj) {
+      const sibling_achievement_ids = achievements
+        .filter(a => a.parent_experience === achievementObj.parent_experience)
+        .map(a => a.id);
+        
+      existing_bullets = pointBank
+        .filter(b => sibling_achievement_ids.includes(b.achievement_id))
+        .map(b => b.bullet_text);
+    }
     
     try {
       const res = await fetch(`${apiBase}/builder/generate`, {
@@ -208,7 +221,8 @@ export default function ResumeBuilderPage() {
           achievement_id: selectedAchievement,
           target_role: targetRole,
           target_company: targetCompany,
-          length_level: lengthLevel
+          benchmark_text: benchmarkText,
+          existing_bullets: existing_bullets
         })
       })
       if (res.ok) {
@@ -239,7 +253,7 @@ export default function ResumeBuilderPage() {
           target_role: targetRole,
           bullet_text: bullet.bullet_text,
           variant_type: bullet.variant_type,
-          scores: bullet.scores
+          recruiter_notes: bullet.recruiter_notes
         })
       })
       if (res.ok) {
@@ -775,25 +789,16 @@ export default function ResumeBuilderPage() {
                 </div>
                 
                 <div className="space-y-3">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="length-level">
-                    Length Constraint
+                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="benchmark-text">
+                    Benchmark Bullet (Optional)
                   </label>
-                  <div className="relative">
-                    <select 
-                      id="length-level"
-                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
-                      value={lengthLevel}
-                      onChange={(e) => setLengthLevel(e.target.value)}
-                      aria-label="Select bullet length"
-                    >
-                      <option value="short">Short (1 line, highly concise)</option>
-                      <option value="medium">Medium (Standard, 1.5 lines)</option>
-                      <option value="detailed">Detailed (2 lines, maximum density)</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                      <ChevronRight className="h-5 w-5 rotate-90" />
-                    </div>
-                  </div>
+                  <Textarea
+                    id="benchmark-text"
+                    placeholder="Paste a point from your LaTeX template. AI will strictly match its character length."
+                    className="min-h-[80px] w-full rounded-xl border border-input/60 bg-muted/5 px-4 py-3 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none placeholder:text-muted-foreground/60"
+                    value={benchmarkText}
+                    onChange={(e) => setBenchmarkText(e.target.value)}
+                  />
                 </div>
               </div>
               
@@ -831,14 +836,47 @@ export default function ResumeBuilderPage() {
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-6 md:p-8 flex-1 flex items-start">
-                      <div className="flex gap-4 items-start">
+                    <CardContent className="p-6 md:p-8 flex-1 flex flex-col items-start">
+                      <div className="flex gap-4 items-start w-full">
                         <div className="mt-1 hidden sm:block">
                           <div className="h-2 w-2 rounded-full bg-primary/40"></div>
                         </div>
-                        <p className="text-base md:text-[17px] font-medium leading-relaxed text-foreground text-left">
-                          {highlightMetrics(bullet.bullet_text)}
-                        </p>
+                        <div className="w-full">
+                          <p className="text-base md:text-[17px] font-medium leading-relaxed text-foreground text-left">
+                            {highlightMetrics(bullet.bullet_text)}
+                          </p>
+                          
+                          {/* Character Limit Checker */}
+                          {benchmarkText && (
+                            <div className="flex items-center gap-2 mt-4 w-full">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'bg-red-500' : 'bg-primary'}`} 
+                                  style={{ width: `${Math.min((bullet.bullet_text.length / benchmarkText.length) * 100, 100)}%` }}
+                                ></div>
+                              </div>
+                              <span className={`text-[11px] font-medium ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                                {bullet.bullet_text.length} / {benchmarkText.length} chars
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Recruiter Notes */}
+                          {bullet.recruiter_notes && (
+                            <div className="mt-5 w-full rounded-lg bg-primary/5 border border-primary/10 p-3">
+                              <details className="group">
+                                <summary className="flex items-center cursor-pointer list-none text-[13px] font-bold text-primary">
+                                  <Sparkles className="h-3.5 w-3.5 mr-1.5" /> 
+                                  💡 Recruiter Insights & Coaching
+                                  <ChevronRight className="h-3.5 w-3.5 ml-auto transition-transform group-open:rotate-90" />
+                                </summary>
+                                <p className="text-[13px] text-foreground/80 mt-3 leading-relaxed pl-3 border-l-2 border-primary/20">
+                                  {bullet.recruiter_notes}
+                                </p>
+                              </details>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                     <div className="p-4 border-t bg-muted/5 flex justify-end gap-3 mt-auto">
