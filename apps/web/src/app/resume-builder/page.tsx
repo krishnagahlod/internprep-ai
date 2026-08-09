@@ -826,44 +826,52 @@ export default function ResumeBuilderPage() {
                 <div className="h-px bg-border flex-1"></div>
               </div>
               
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-5">
                 {generatedBullets.map((bullet, idx) => (
-                  <Card key={idx} className="border-l-4 border-l-primary/60 border-t border-r border-b border-border shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row bg-card overflow-hidden">
-                    
-                    {/* Main Content Area */}
-                    <div className="flex-1 p-5 md:p-6 flex flex-col gap-4 justify-center">
-                      <div className="flex gap-4 items-start w-full">
-                        <div className="mt-1.5 hidden sm:block shrink-0">
-                          <div className="h-2 w-2 rounded-full bg-primary/50"></div>
-                        </div>
-                        <div className="w-full flex-1">
-                          <div className="mb-2.5">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary font-bold tracking-widest text-[10px] px-2.5 py-1 uppercase border-0">
-                              {bullet.variant_type.replace('_', ' ')}
-                            </Badge>
-                          </div>
-                          <p className="text-[16px] font-medium leading-relaxed text-foreground text-left pr-2">
-                            {highlightMetrics(bullet.bullet_text)}
-                          </p>
-                          
-                          {/* Character Limit Checker */}
-                          {benchmarkText && (
-                            <div className="flex items-center gap-3 mt-4 max-w-xl">
-                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full transition-all duration-500 ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'bg-red-500' : 'bg-primary'}`} 
-                                  style={{ width: `${Math.min((bullet.bullet_text.length / benchmarkText.length) * 100, 100)}%` }}
-                                ></div>
-                              </div>
-                              <span className={`text-[12px] font-bold ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                {bullet.bullet_text.length} / {benchmarkText.length} chars
-                              </span>
-                            </div>
-                          )}
+                  <Card key={idx} className="border border-border shadow-sm hover:shadow-md transition-all bg-card overflow-hidden">
+                    <div className="p-5 md:p-7 flex flex-col">
+                      
+                      {/* Top Row: Tag & Copy Button */}
+                      <div className="flex justify-between items-start mb-4">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary font-bold tracking-widest text-[10px] px-3 py-1.5 uppercase border-0">
+                          {bullet.variant_type.replace('_', ' ')}
+                        </Badge>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 font-medium h-8 px-3"
+                          onClick={() => navigator.clipboard.writeText(bullet.bullet_text)}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy
+                        </Button>
+                      </div>
 
-                          {/* AI Coach Suggestions */}
-                          {bullet.recruiter_notes && (
-                            <div className="mt-5 max-w-3xl rounded-xl bg-muted/30 border border-border/50 p-3.5">
+                      {/* Middle: Bullet Text */}
+                      <p className="text-[16px] md:text-[17px] font-medium leading-relaxed text-foreground text-left w-full">
+                        {highlightMetrics(bullet.bullet_text)}
+                      </p>
+                      
+                      {/* Character Limit Checker */}
+                      {benchmarkText && (
+                        <div className="flex items-center gap-3 mt-4 w-full md:w-2/3">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all duration-500 ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'bg-red-500' : 'bg-primary'}`} 
+                              style={{ width: `${Math.min((bullet.bullet_text.length / benchmarkText.length) * 100, 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className={`text-[12px] font-bold ${bullet.bullet_text.length > benchmarkText.length + 5 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {bullet.bullet_text.length} / {benchmarkText.length} chars
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Bottom Row: AI Coach Suggestions & Save Button */}
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mt-6 gap-4 border-t border-border/50 pt-5">
+                        <div className="flex-1 w-full max-w-4xl">
+                          {bullet.recruiter_notes ? (
+                            <div className="rounded-xl bg-muted/30 border border-border/50 p-3.5">
                               <details className="group">
                                 <summary className="flex items-center cursor-pointer list-none text-[13px] font-bold text-foreground/80 hover:text-primary transition-colors">
                                   <Sparkles className="h-4 w-4 mr-2 text-primary" /> 
@@ -875,34 +883,23 @@ export default function ResumeBuilderPage() {
                                 </p>
                               </details>
                             </div>
+                          ) : (
+                            <div></div>
                           )}
                         </div>
+
+                        <Button 
+                          size="default" 
+                          variant={bullet.is_saved ? "secondary" : "default"}
+                          className={`font-medium min-w-[120px] shadow-sm transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
+                          onClick={() => saveBullet(bullet)}
+                          disabled={bullet.is_saved}
+                        >
+                          {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          {bullet.is_saved ? "Saved" : "Save"}
+                        </Button>
                       </div>
                     </div>
-
-                    {/* Actions Panel */}
-                    <div className="bg-muted/5 border-t md:border-t-0 md:border-l border-border p-4 md:p-6 flex flex-row md:flex-col gap-3 justify-end md:justify-center shrink-0 md:w-48">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground font-medium w-full h-10 shadow-sm"
-                        onClick={() => navigator.clipboard.writeText(bullet.bullet_text)}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant={bullet.is_saved ? "secondary" : "default"}
-                        className={`font-medium w-full h-10 shadow-sm transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
-                        onClick={() => saveBullet(bullet)}
-                        disabled={bullet.is_saved}
-                      >
-                        {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                        {bullet.is_saved ? "Saved" : "Save"}
-                      </Button>
-                    </div>
-
                   </Card>
                 ))}
               </div>
