@@ -534,20 +534,26 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
         print(f"Failed to parse metric chat JSON: {e}")
         return {"response": response_text, "extracted_metrics_update": {}, "new_context_summary": ""}
 
-def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str) -> Dict[str, Any]:
+def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str, target_company: str = None, job_description: str = None) -> Dict[str, Any]:
     """Analyzes the user's current vault and bank to provide a placement strategy."""
     
+    target_context = f"Target Role: {target_role}"
+    if target_company:
+        target_context += f"\n    - Target Company: {target_company}"
+    if job_description:
+        target_context += f"\n    - Job Description / Requirements: {job_description}"
+
     system_prompt = f"""
-    You are a placement strategy engine for an IIT Bombay student targeting a '{target_role}' role.
+    You are a placement strategy engine for an IIT Bombay student.
     Analyze the user's achievements and saved bullets to identify gaps, suggest a resume structure, and provide actionable advice.
     
     Input Data:
+    - {target_context}
     - Number of Achievements: {len(achievements)}
     - Number of Saved Bullets: {len(saved_bullets)}
-    - Target Role: {target_role}
     
     Achievements Data (Summarized):
-    {json.dumps([{ 'title': a.get('title'), 'tags': a.get('competency_tags', []) } for a in achievements])}
+    {json.dumps([{ 'id': a.get('id'), 'title': a.get('title'), 'section': a.get('section_type'), 'parent': a.get('parent_experience'), 'tags': a.get('competency_tags', []) } for a in achievements])}
     
     Saved Bullets:
     {json.dumps([b.get('bullet_text') for b in saved_bullets])}
@@ -557,10 +563,10 @@ def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: 
         "overall_readiness_score": 0-100,
         "strengths": ["list of 2-3 strong points"],
         "critical_gaps": ["list of 2-3 missing skills/experiences for this role"],
-        "recommended_sections": [
-            {{"name": "e.g., Professional Experience", "focus": "What to highlight here"}}
-        ],
-        "action_plan": ["list of 3 actionable steps to improve the resume"]
+        "action_plan": ["list of 3 actionable steps to improve the resume or which metrics to hunt down"],
+        "vault_recommendations": [
+            {{"achievement_id": "id from achievements list above", "reason": "Why they should generate a bullet for this specific vault item to fill a critical gap"}}
+        ]
     }}
     """
     

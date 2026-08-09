@@ -62,7 +62,9 @@ class SaveBulletRequest(BaseModel):
     target_role: str
     bullet_text: str
     variant_type: str
-    recruiter_notes: Optional[str] = None
+
+class EditBulletRequest(BaseModel):
+    bullet_text: str
 
 class MetricChatRequest(BaseModel):
     achievement_id: str
@@ -71,6 +73,8 @@ class MetricChatRequest(BaseModel):
 class StrategyRequest(BaseModel):
     user_id: str
     target_role: str
+    target_company: Optional[str] = None
+    job_description: Optional[str] = None
 
 # Extract endpoints
 @router.post("/extract/pdf")
@@ -364,6 +368,17 @@ def delete_saved_bullet(bullet_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.put("/point-bank/{bullet_id}")
+def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
+    from agents.resume_analyzer import supabase
+    try:
+        res = supabase.table('generated_bullets').update({
+            "bullet_text": req.bullet_text
+        }).eq('id', bullet_id).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/metric-chat")
 def metric_chat(req: MetricChatRequest):
     from agents.resume_analyzer import supabase
@@ -389,7 +404,13 @@ async def get_strategy(request: Request, req: StrategyRequest):
         # Fetch user's saved bullets for this role
         bullets_res = supabase.table('generated_bullets').select("*").eq('user_id', req.user_id).eq('is_saved', True).eq('target_role', req.target_role).execute()
         
-        strategy = generate_resume_strategy(ach_res.data or [], bullets_res.data or [], req.target_role)
+        strategy = generate_resume_strategy(
+            ach_res.data or [], 
+            bullets_res.data or [], 
+            req.target_role, 
+            req.target_company, 
+            req.job_description
+        )
         return strategy
     except Exception as e:
         print(f"Error in get_strategy: {e}")

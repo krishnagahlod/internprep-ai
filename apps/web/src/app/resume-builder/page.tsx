@@ -79,10 +79,14 @@ export default function ResumeBuilderPage() {
   
   // Point Bank State
   const [pointBank, setPointBank] = useState<GeneratedBullet[]>([])
+  const [activePointBankRole, setActivePointBankRole] = useState<string>("all")
+  const [editingPointBankBullet, setEditingPointBankBullet] = useState<string | null>(null)
+  const [editPointBankText, setEditPointBankText] = useState("")
+  
+  const [strategyTargetCompany, setStrategyTargetCompany] = useState("")
+  const [strategyJobDescription, setStrategyJobDescription] = useState("")
   const [strategyData, setStrategyData] = useState<any>(null)
   const [isStrategyLoading, setIsStrategyLoading] = useState(false)
-
-
   // Refs
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
@@ -335,7 +339,9 @@ export default function ResumeBuilderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          target_role: targetRole
+          target_role: targetRole,
+          target_company: strategyTargetCompany || undefined,
+          job_description: strategyJobDescription || undefined
         })
       })
       if (res.ok) {
@@ -990,33 +996,100 @@ export default function ResumeBuilderPage() {
                       <Button className="mt-6" variant="outline" onClick={() => setActiveTab("lab")}>Go to Laboratory</Button>
                     </div>
                   ) : (
-                    <div className="space-y-10">
-                      {/* Group by target role */}
-                      {Array.from(new Set(pointBank.map(b => b.target_role))).map(role => (
-                        <div key={role} className="space-y-4">
-                          <div className="flex items-center gap-3 border-b border-border/50 pb-3">
-                            <Badge variant="secondary" className="px-3 py-1 text-sm bg-primary/10 text-primary capitalize font-bold tracking-wide">
-                              {role} Role
-                            </Badge>
-                            <span className="text-sm font-medium text-muted-foreground">{pointBank.filter(b => b.target_role === role).length} bullets</span>
-                          </div>
-                          <ul className="space-y-4">
-                            {pointBank.filter(b => b.target_role === role).map(bullet => (
-                              <li key={bullet.id} className="flex gap-4 items-start group p-4 rounded-xl border border-border/40 bg-background hover:bg-muted/20 hover:border-border/80 hover:shadow-sm transition-all">
-                                <div className="mt-1">
-                                  <div className="h-2 w-2 rounded-full bg-primary/60"></div>
+                    <div className="space-y-6">
+                      <div className="flex flex-wrap gap-2 mb-6 border-b border-border/50 pb-4">
+                        {Array.from(new Set(pointBank.map(b => b.target_role))).map(role => (
+                          <Badge 
+                            key={role} 
+                            variant={activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => b.target_role)))[0] === role) ? "default" : "secondary"} 
+                            className="px-4 py-1.5 text-sm cursor-pointer capitalize font-bold tracking-wide transition-all"
+                            onClick={() => setActivePointBankRole(role)}
+                          >
+                            {role}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      {(() => {
+                        const availableRoles = Array.from(new Set(pointBank.map(b => b.target_role)));
+                        const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : activePointBankRole;
+                        const roleBullets = pointBank.filter(b => b.target_role === displayRole);
+                        
+                        // Group by section type then parent experience
+                        const grouped: Record<string, Record<string, typeof roleBullets>> = {};
+                        roleBullets.forEach(bullet => {
+                          const ach = achievements.find(a => a.id === bullet.achievement_id);
+                          const section = ach?.section_type || "Other";
+                          const parent = ach?.parent_experience || "General";
+                          if (!grouped[section]) grouped[section] = {};
+                          if (!grouped[section][parent]) grouped[section][parent] = [];
+                          grouped[section][parent].push(bullet);
+                        });
+
+                        return (
+                          <div className="space-y-10">
+                            {Object.entries(grouped).map(([section, parents]) => (
+                              <div key={section} className="space-y-6">
+                                <h3 className="text-xl font-extrabold text-foreground border-b-2 border-primary/20 pb-2 inline-block pr-8 uppercase tracking-wider">{section}</h3>
+                                <div className="space-y-8 pl-1 md:pl-2">
+                                  {Object.entries(parents).map(([parent, bullets]) => (
+                                    <div key={parent} className="space-y-4">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="font-bold text-lg text-foreground/90 flex items-center gap-2">
+                                          <Target className="h-5 w-5 text-primary" /> {parent}
+                                        </h4>
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="text-xs h-8 text-primary hover:bg-primary/10"
+                                          onClick={() => navigator.clipboard.writeText(bullets.map(b => `• ${b.bullet_text}`).join('\n'))}
+                                        >
+                                          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Section
+                                        </Button>
+                                      </div>
+                                      <ul className="space-y-3">
+                                        {bullets.map(bullet => (
+                                          <li key={bullet.id} className="group relative rounded-xl border border-border/40 bg-background hover:bg-muted/10 hover:border-border/80 hover:shadow-sm transition-all overflow-hidden">
+                                            {editingPointBankBullet === bullet.id ? (
+                                              <div className="p-4 flex flex-col gap-3">
+                                                <Textarea
+                                                  value={editPointBankText}
+                                                  onChange={(e) => setEditPointBankText(e.target.value)}
+                                                  className="min-h-[100px] w-full text-[15px] resize-none border-primary/40 focus:ring-primary/20"
+                                                  autoFocus
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                  <Button variant="ghost" size="sm" onClick={() => setEditingPointBankBullet(null)}>Cancel</Button>
+                                                  <Button size="sm" onClick={() => handleSavePointBankEdit(bullet.id)}>Save Edit</Button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="p-4 pr-16 flex gap-4 items-start">
+                                                <div className="mt-2 h-1.5 w-1.5 rounded-full bg-primary/60 shrink-0"></div>
+                                                <div className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</div>
+                                                
+                                                {/* Action Buttons Overlay */}
+                                                <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-2">
+                                                  <Button variant="ghost" size="icon" onClick={() => {setEditingPointBankBullet(bullet.id); setEditPointBankText(bullet.bullet_text);}} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full shadow-sm">
+                                                    <Edit3 className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="h-8 w-8 hover:bg-red-50 hover:text-red-600 text-muted-foreground rounded-full shadow-sm">
+                                                    <Trash2 className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ))}
                                 </div>
-                                <div className="flex-1 text-[15px] leading-relaxed text-foreground/90 pr-4">
-                                  {bullet.bullet_text}
-                                </div>
-                                <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-red-50 hover:text-red-600 rounded-full h-8 w-8">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </li>
+                              </div>
                             ))}
-                          </ul>
-                        </div>
-                      ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </CardContent>
@@ -1055,6 +1128,28 @@ export default function ResumeBuilderPage() {
                         <ChevronRight className="h-4 w-4 rotate-90" />
                       </div>
                     </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-company">Target Company (Optional)</label>
+                    <Input 
+                      id="strategy-company"
+                      placeholder="e.g. McKinsey, Google, Goldman Sachs"
+                      value={strategyTargetCompany}
+                      onChange={(e) => setStrategyTargetCompany(e.target.value)}
+                      className="h-12 border-input/60 bg-muted/5 shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-sm font-semibold text-foreground" htmlFor="strategy-jd">Job Description snippet (Optional)</label>
+                    <Textarea 
+                      id="strategy-jd"
+                      placeholder="Paste key responsibilities or requirements here..."
+                      value={strategyJobDescription}
+                      onChange={(e) => setStrategyJobDescription(e.target.value)}
+                      className="min-h-[80px] border-input/60 bg-muted/5 shadow-sm resize-none"
+                    />
                   </div>
                   
                   <Button className="w-full h-12 shadow-sm font-medium" onClick={generateStrategy} disabled={isStrategyLoading}>
@@ -1095,20 +1190,43 @@ export default function ResumeBuilderPage() {
                           ))}
                         </ul>
                       </div>
-                      
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
-                          <Target className="h-4 w-4" /> Immediate Action Plan
-                        </h4>
-                        <ul className="text-sm space-y-3 pl-2">
-                          {strategyData.action_plan?.map((a: string, i: number) => (
-                            <li key={i} className="flex gap-3 items-start">
-                              <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary text-[10px] font-bold mt-0.5">{i+1}</span>
-                              <span className="text-foreground/90 leading-snug">{a}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+
+                      {strategyData.action_plan && strategyData.action_plan.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
+                            <Target className="h-4 w-4" /> Recommended Action Plan
+                          </h4>
+                          <ul className="text-sm space-y-2 pl-2">
+                            {strategyData.action_plan.map((action: string, i: number) => (
+                              <li key={i} className="flex gap-2"><span className="text-primary font-bold">•</span><span className="text-foreground/80 leading-snug">{action}</span></li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {strategyData.vault_recommendations && strategyData.vault_recommendations.length > 0 && (
+                        <div className="space-y-3 mt-6 border-t pt-5">
+                          <h4 className="text-sm font-bold flex items-center gap-2 text-foreground">
+                            <Sparkles className="h-4 w-4 text-amber-500" /> Vault Extraction Recommendations
+                          </h4>
+                          <p className="text-xs text-muted-foreground mb-2">We found these existing achievements in your vault that perfectly match your critical gaps. Generate bullets for them in the Laboratory!</p>
+                          <div className="space-y-3">
+                            {strategyData.vault_recommendations.map((rec: any, i: number) => {
+                              const ach = achievements.find(a => a.id === rec.achievement_id);
+                              if (!ach) return null;
+                              return (
+                                <div key={i} className="bg-muted/30 border rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-semibold text-sm">{ach.title}</span>
+                                    <Badge variant="outline" className="text-[10px]">{ach.parent_experience}</Badge>
+                                  </div>
+                                  <p className="text-[13px] text-primary/80 font-medium mt-2"><span className="text-muted-foreground font-normal">Why:</span> {rec.reason}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
