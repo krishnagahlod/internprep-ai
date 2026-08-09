@@ -1151,31 +1151,52 @@ export default function ResumeBuilderPage() {
 
       {/* Extraction Success Dialog */}
       <Dialog open={!!extractionSuccessData} onOpenChange={(open) => !open && setExtractionSuccessData(null)}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-              Extraction Complete
-            </DialogTitle>
-            <DialogDescription>
-              We successfully extracted and organized {extractionSuccessData?.count || 0} achievements into your Vault.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
-            {extractionSuccessData?.achievements.map((ach, i) => (
-              <div key={i} className="border p-4 rounded-xl shadow-sm bg-muted/20">
-                <div className="flex justify-between items-start mb-1">
-                  <h4 className="font-semibold text-[15px] text-foreground">{ach.title || "Achievement"}</h4>
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{ach.section_type}</Badge>
-                </div>
-                <p className="text-sm font-medium text-primary mb-2">{ach.parent_experience}</p>
-                <p className="text-[13px] text-muted-foreground leading-relaxed line-clamp-3">{ach.original_description}</p>
-              </div>
-            ))}
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden border-0 shadow-2xl">
+          <div className={`p-6 pb-4 border-b ${extractionSuccessData?.count === 0 ? 'bg-orange-50 dark:bg-orange-950/20' : 'bg-green-50 dark:bg-green-950/20'}`}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-xl">
+                {extractionSuccessData?.count === 0 ? (
+                  <Activity className="h-6 w-6 text-orange-500" />
+                ) : (
+                  <CheckCircle2 className="h-6 w-6 text-green-500" />
+                )}
+                {extractionSuccessData?.count === 0 ? "No New Achievements Extracted" : "Extraction Complete!"}
+              </DialogTitle>
+              <DialogDescription className="text-[15px] pt-1">
+                {extractionSuccessData?.count === 0 
+                  ? "We couldn't confidently extract any distinct, non-overlapping professional achievements from the document you provided. You may need to add them manually or try a different document."
+                  : `We successfully extracted and organized ${extractionSuccessData?.count} distinct achievements into your Vault.`}
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <DialogFooter className="pt-2">
-            <Button onClick={() => setExtractionSuccessData(null)} className="w-full sm:w-auto">Got it</Button>
-          </DialogFooter>
+          
+          <div className="flex-1 overflow-y-auto bg-muted/10 p-6">
+            {extractionSuccessData?.count === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-10">
+                <FileText className="h-16 w-16 text-muted-foreground/30 mb-4" />
+                <p className="text-muted-foreground font-medium">Nothing found to extract.</p>
+                <p className="text-sm text-muted-foreground/80 mt-1 max-w-sm">Make sure the text contains clear action-oriented bullets with professional context.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {extractionSuccessData?.achievements.map((ach, i) => (
+                  <div key={i} className="bg-background border rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary/60 transition-colors"></div>
+                    <div className="flex justify-between items-start gap-4 mb-2">
+                      <h4 className="font-bold text-[16px] text-foreground leading-snug">{ach.title || "Achievement"}</h4>
+                      <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary uppercase tracking-wider font-semibold shrink-0">{ach.section_type}</Badge>
+                    </div>
+                    <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><Target className="h-3.5 w-3.5"/> {ach.parent_experience}</p>
+                    <p className="text-[14px] text-foreground/80 leading-relaxed line-clamp-3 bg-muted/30 p-3 rounded-lg">{ach.original_description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="p-4 border-t bg-background flex justify-end">
+            <Button onClick={() => setExtractionSuccessData(null)} className="w-full sm:w-auto font-medium px-8" size="lg">Continue</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

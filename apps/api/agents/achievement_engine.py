@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import json_repair
 from typing import List, Dict, Any
 from services.gemini_client import gemini_client
 from services.cerebras_client import cerebras_client
@@ -80,8 +81,17 @@ def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[st
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse extraction JSON: {e}")
-        return []
+        print(f"Failed to parse PDF extraction JSON: {e}. Attempting repair...")
+        try:
+            repaired_data = json_repair.loads(response.text.strip())
+            if isinstance(repaired_data, dict):
+                for k, v in repaired_data.items():
+                    if isinstance(v, list): return v
+                return [repaired_data]
+            return repaired_data if isinstance(repaired_data, list) else []
+        except Exception as repair_e:
+            print(f"Failed to repair JSON: {repair_e}")
+            return []
 
 def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     import fitz # PyMuPDF
@@ -190,8 +200,17 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[D
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse other PDF extraction JSON: {e}")
-        return []
+        print(f"Failed to parse other PDF extraction JSON: {e}. Attempting repair...")
+        try:
+            repaired_data = json_repair.loads(response_text.strip())
+            if isinstance(repaired_data, dict):
+                for k, v in repaired_data.items():
+                    if isinstance(v, list): return v
+                return [repaired_data]
+            return repaired_data if isinstance(repaired_data, list) else []
+        except Exception as repair_e:
+            print(f"Failed to repair JSON: {repair_e}")
+            return []
 
 def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     vault_context = ""
@@ -264,8 +283,17 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse text extraction JSON: {e}")
-        return []
+        print(f"Failed to parse text extraction JSON: {e}. Attempting repair...")
+        try:
+            repaired_data = json_repair.loads(response.text.strip())
+            if isinstance(repaired_data, dict):
+                for k, v in repaired_data.items():
+                    if isinstance(v, list): return v
+                return [repaired_data]
+            return repaired_data if isinstance(repaired_data, list) else []
+        except Exception as repair_e:
+            print(f"Failed to repair JSON: {repair_e}")
+            return []
 
 def get_placement_rag_context(supabase_client, target_role: str, description: str, tags: List[str]) -> str:
     """Fetches relevant placement-tier golden bullets to use as few-shot examples."""
