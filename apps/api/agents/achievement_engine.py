@@ -67,6 +67,100 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
         print(f"Failed to parse extraction JSON: {e}")
         return []
 
+def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
+    import fitz # PyMuPDF
+    
+    try:
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        raw_text = ""
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document[page_num]
+            raw_text += page.get_text()
+        pdf_document.close()
+    except Exception as e:
+        print(f"Failed to parse PDF text locally: {e}")
+        return []
+        
+    system_prompt = """
+    You are an expert career counselor helping a user build their 'Achievement Vault'.
+    Extract all distinct professional, academic, or extracurricular achievements from the provided document text.
+    
+    CRITICAL NOISE FILTERING RULE:
+    This text is NOT a standard resume. It may be a project report, college transcript, presentation, or certificate.
+    It contains a lot of boilerplate, generic company/project descriptions, and irrelevant noise.
+    YOU MUST AGGRESSIVELY FILTER OUT NOISE. Only extract concrete, personal achievements that belong strictly to the user.
+    Ignore general descriptions of what a project is. Focus ONLY on what the user DID and ACHIEVED.
+    
+    CRITICAL EXTRACTION RULES:
+    1. Be Exhaustive & Granular for true achievements. Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
+    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects), then the parent organization/project, and list granular achievements underneath it.
+    3. Deduplication (CRITICAL): Do NOT extract overlapping points. If multiple sentences describe the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
+    4. Capitalization & Action Verbs (CRITICAL): The `original_description` MUST ALWAYS start with a capitalized Action Verb (e.g., "Built a local-first..." instead of "built a...").
+    5. Standalone Independence (CRITICAL): Resolve pronouns (it, they, the framework, the work) and implicit references. Each extracted description MUST be completely understandable on its own without needing the surrounding text.
+    6. No Raw Slicing & Tone Enforcement: Do NOT blindly copy-paste raw substrings from the middle of sentences. Reconstruct fragments into grammatically correct, standalone achievements. Remove first-person pronouns ("I", "my") and maintain a strict professional resume tone.
+    
+    Return ONLY a valid JSON array of section objects.
+    Strictly follow this JSON schema:
+    [
+      {
+        "section_type": "The major section heading (e.g. 'Professional Experience', 'Projects')",
+        "parent_experience": "The company, organization, or overall project name",
+        "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
+        "achievements": [
+          {
+            "title": "A short 3-5 word descriptive title",
+            "original_description": "The full original text/bullets associated with this specific achievement",
+            "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
+            "competency_tags": ["array of 1-3 tags from the allowed list"],
+            "extraction_confidence": 0.95
+          }
+        ]
+      }
+    ]
+    
+    Allowed competency_tags:
+    - strategic_problem_solving
+    - product_technical_execution
+    - sustainability_impact
+    - financial_quantitative_rigor
+    - leadership_stakeholder_mgmt
+    - entrepreneurial_ownership
+    """
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": f"Document Text:\n{raw_text[:40000]}"}
+    ]
+    
+    try:
+        response_text = cerebras_client.generate_chat_completion(
+            model="llama3.1-70b",
+            messages=messages,
+            temperature=0.1,
+            max_tokens=4000
+        )
+        
+        # Clean JSON markdown if present
+        response_text = response_text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+                
+        data = json.loads(response_text.strip())
+        if isinstance(data, dict):
+            for k, v in data.items():
+                if isinstance(v, list): return v
+            return [data]
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        print(f"Failed to parse other PDF extraction JSON: {e}")
+        return []
+
 def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     system_prompt = """
     You are an expert career counselor helping a user build their 'Achievement Vault'.

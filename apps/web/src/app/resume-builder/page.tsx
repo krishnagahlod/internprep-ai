@@ -61,6 +61,7 @@ export default function ResumeBuilderPage() {
   // Vault State
   const [achievements, setAchievements] = useState<Achievement[]>([])
   const [file, setFile] = useState<File | null>(null)
+  const [pdfDocumentType, setPdfDocumentType] = useState<"resume" | "other">("resume")
   const [isExtractingPDF, setIsExtractingPDF] = useState(false)
   const [isExtractingText, setIsExtractingText] = useState(false)
   const [rawText, setRawText] = useState("")
@@ -159,6 +160,7 @@ export default function ResumeBuilderPage() {
     const formData = new FormData()
     formData.append("file", file)
     formData.append("user_id", user.id)
+    formData.append("document_type", pdfDocumentType)
     
     try {
       const res = await fetch(`${apiBase}/builder/extract/pdf`, {
@@ -423,13 +425,34 @@ export default function ResumeBuilderPage() {
               </CardHeader>
               <CardContent className="relative z-10">
                 <div className="flex flex-col gap-5">
+                  <div className="flex bg-muted/50 p-1 rounded-lg">
+                    <button 
+                      className={`flex-1 text-sm py-2 px-3 rounded-md font-medium transition-all ${pdfDocumentType === 'resume' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setPdfDocumentType('resume')}
+                    >
+                      Old Resume
+                    </button>
+                    <button 
+                      className={`flex-1 text-sm py-2 px-3 rounded-md font-medium transition-all ${pdfDocumentType === 'other' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={() => setPdfDocumentType('other')}
+                    >
+                      Other Document
+                    </button>
+                  </div>
+                  {pdfDocumentType === 'other' && (
+                    <div className="text-[12.5px] text-muted-foreground bg-primary/5 border border-primary/10 p-3 rounded-lg flex items-start gap-2.5">
+                      <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <p className="leading-snug">Supported: College transcripts, project reports, internship presentations, completion certificates, GitHub READMEs, etc.</p>
+                    </div>
+                  )}
+
                   <div className="relative group/input">
                     <Input 
                       type="file" 
                       accept="application/pdf"
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      aria-label="Upload PDF Resume"
+                      aria-label="Upload PDF Document"
                     />
                     <div className={`flex items-center justify-between border-2 border-dashed rounded-xl p-4 transition-colors ${file ? 'border-primary bg-primary/5' : 'border-border group-hover/input:border-primary/50 group-hover/input:bg-muted/30'}`}>
                       <div className="flex items-center gap-3 overflow-hidden">

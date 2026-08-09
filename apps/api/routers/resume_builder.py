@@ -8,6 +8,7 @@ from dependencies import limiter
 from agents.achievement_engine import (
     extract_achievements_from_pdf,
     extract_achievements_from_text,
+    extract_achievements_from_other_pdf,
     generate_bullet_variants,
     run_metric_reconstruction_turn,
     generate_resume_strategy
@@ -70,14 +71,18 @@ class StrategyRequest(BaseModel):
 async def extract_from_pdf(
     request: Request,
     file: UploadFile = File(...),
-    user_id: str = Form(...)
+    user_id: str = Form(...),
+    document_type: str = Form("resume")
 ):
     if not (file.filename.lower().endswith(".pdf") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
     try:
         pdf_bytes = await file.read()
-        extracted = extract_achievements_from_pdf(pdf_bytes)
+        if document_type == "other":
+            extracted = extract_achievements_from_other_pdf(pdf_bytes)
+        else:
+            extracted = extract_achievements_from_pdf(pdf_bytes)
         
         # Save to Supabase
         from agents.resume_analyzer import supabase
