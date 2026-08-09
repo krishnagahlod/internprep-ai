@@ -13,11 +13,13 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
     Extract all distinct professional, academic, or extracurricular achievements from this PDF resume.
     
     CRITICAL EXTRACTION RULES:
-    1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. 
-    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
-    3. If a single experience or project has 5 distinct technical, leadership, or quantitative achievements, extract them as 5 separate items under the same parent.
-    4. A typical dense 1-page resume should yield 15-25 distinct granular achievements across all sections.
-    5. Deduplication (CRITICAL): Do NOT extract overlapping points. If a project has multiple sentences describing the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
+    1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
+    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects), then the parent organization/project, and list granular achievements underneath it.
+    3. Deduplication (CRITICAL): Do NOT extract overlapping points. If multiple sentences describe the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
+    4. Capitalization & Action Verbs (CRITICAL): The `original_description` MUST ALWAYS start with a capitalized Action Verb (e.g., "Built a local-first..." instead of "built a...").
+    5. Standalone Independence (CRITICAL): Resolve pronouns (it, they, the framework, the work) and implicit references. Each extracted description MUST be completely understandable on its own without needing the surrounding text.
+    6. No Raw Slicing & Tone Enforcement: Do NOT blindly copy-paste raw substrings from the middle of sentences. Reconstruct fragments into grammatically correct, standalone achievements. Remove first-person pronouns ("I", "my") and maintain a strict professional resume tone.
+    7. A typical dense 1-page resume should yield 15-25 distinct granular achievements across all sections.
     
     Return ONLY a valid JSON array of section objects.
     Strictly follow this JSON schema:
@@ -71,10 +73,12 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
     Extract all distinct professional, academic, or extracurricular achievements from the provided text notes.
     
     CRITICAL EXTRACTION RULES:
-    1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets.
-    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects, Positions of Responsibility, Extracurriculars, Scholastic Achievements), then the parent organization/project, and list granular achievements underneath it.
-    3. If a project has 5 distinct achievements, extract them as 5 separate items under the same parent.
-    4. Deduplication (CRITICAL): Do NOT extract overlapping points. If a project has multiple sentences describing the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
+    1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
+    2. Group By Hierarchy: Identify the major section (e.g., Professional Experience, Projects), then the parent organization/project, and list granular achievements underneath it.
+    3. Deduplication (CRITICAL): Do NOT extract overlapping points. If multiple sentences describe the EXACT SAME core action, combine them into ONE achievement. Every extracted achievement must be mutually exclusive.
+    4. Capitalization & Action Verbs (CRITICAL): The `original_description` MUST ALWAYS start with a capitalized Action Verb (e.g., "Built a local-first..." instead of "built a...").
+    5. Standalone Independence (CRITICAL): Resolve pronouns (it, they, the framework, the work) and implicit references. Each extracted description MUST be completely understandable on its own without needing the surrounding text.
+    6. No Raw Slicing & Tone Enforcement: Do NOT blindly copy-paste raw substrings from the middle of sentences. Reconstruct fragments into grammatically correct, standalone achievements. Remove first-person pronouns ("I", "my") and maintain a strict professional resume tone.
     
     Return ONLY a valid JSON array of section objects.
     Strictly follow this JSON schema:
