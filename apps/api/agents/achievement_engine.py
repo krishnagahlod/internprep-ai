@@ -265,38 +265,41 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     - NEVER put a full stop (period) at the end of the bullet point.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
     """
-    
-    try:
-        response_text = cerebras_client.generate_chat_completion(
-            model="gpt-oss-120b",
-            messages=[{"role": "user", "content": system_prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.4,
-            max_tokens=1024
-        )
-        
-        # Clean up the JSON string
-        import re
-        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
-        if json_match:
-            response_text = json_match.group(1)
-        response_text = response_text.strip()
-        
-        # Remove trailing commas which break standard json.loads
-        response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
-        
-        data = json.loads(response_text)
-        variants = data.get("variants", [])
-        
-        # Ensure no full stops made it through
-        for v in variants:
-            if v.get("bullet_text") and v["bullet_text"].endswith("."):
-                v["bullet_text"] = v["bullet_text"][:-1]
-                
-        return variants
-    except Exception as e:
-        print(f"Failed to generate variants JSON: {e}")
-        return []
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            response_text = cerebras_client.generate_chat_completion(
+                model="gpt-oss-120b",
+                messages=[{"role": "user", "content": system_prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.4,
+                max_tokens=2048
+            )
+            
+            # Clean up the JSON string
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+            response_text = response_text.strip()
+            
+            # Remove trailing commas which break standard json.loads
+            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+            
+            data = json.loads(response_text)
+            variants = data.get("variants", [])
+            
+            # Ensure no full stops made it through
+            for v in variants:
+                if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                    v["bullet_text"] = v["bullet_text"][:-1]
+                    
+            return variants
+        except Exception as e:
+            print(f"Failed to generate variants JSON (attempt {attempt+1}): {e}")
+            if attempt == max_retries - 1:
+                return []
+    return []
 
 def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Runs a single turn of the metric reconstruction chat."""
