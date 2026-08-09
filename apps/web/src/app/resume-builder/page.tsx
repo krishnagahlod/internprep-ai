@@ -101,6 +101,7 @@ export default function ResumeBuilderPage() {
   const [activePointBankRole, setActivePointBankRole] = useState<string>("all")
   const [editingPointBankBullet, setEditingPointBankBullet] = useState<string | null>(null)
   const [editPointBankText, setEditPointBankText] = useState("")
+  const [pointBankQuickSaveItem, setPointBankQuickSaveItem] = useState<Achievement | null>(null)
   
   const [strategyTargetCompany, setStrategyTargetCompany] = useState("")
   const [strategyJobDescription, setStrategyJobDescription] = useState("")
@@ -394,6 +395,31 @@ export default function ResumeBuilderPage() {
     setIsStrategyLoading(false)
   }
 
+  const handleQuickSave = async (domain: string) => {
+    if (!user || !pointBankQuickSaveItem) return
+    setPointBankQuickSaveItem(null) // optimistically close
+    try {
+      const res = await fetch(`${apiBase}/resume-builder/save-bullet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          achievement_id: pointBankQuickSaveItem.id,
+          target_role: domain.toLowerCase(),
+          bullet_text: pointBankQuickSaveItem.original_description,
+          variant_type: "raw_extraction"
+        })
+      })
+      if (res.ok) {
+        const savedBullet = await res.json()
+        setPointBank(prev => [savedBullet, ...prev])
+      }
+    } catch (e) {
+      console.error("Failed to quick save:", e)
+    }
+  }
+
+  // Effect to load point bank
   const sendChatMessage = async (forceStart = false) => {
     if (!activeChatAchievement || (!chatInput.trim() && !forceStart) || !user) return
     
@@ -649,10 +675,13 @@ export default function ResumeBuilderPage() {
                                   <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group/card bg-background">
                           <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
                             <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => setEditingAchievement(ach)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-green-600 hover:bg-green-50" onClick={(e) => { e.stopPropagation(); setPointBankQuickSaveItem(ach); }} title="Quick Save to Point Bank">
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={(e) => { e.stopPropagation(); setEditingAchievement(ach); }}>
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); deleteAchievement(ach.id); }}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -1364,6 +1393,9 @@ export default function ResumeBuilderPage() {
                           {ach._is_merged ? 'Updated' : 'New'}
                         </Badge>
                         <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{ach.section_type}</Badge>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:bg-green-50 ml-1 rounded-full bg-green-50/50" onClick={() => setPointBankQuickSaveItem(ach)} title="Quick Save to Point Bank">
+                          <Save className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     </div>
                     <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><Target className="h-3.5 w-3.5"/> {ach.parent_experience}</p>
@@ -1376,6 +1408,32 @@ export default function ResumeBuilderPage() {
           
           <div className="p-4 border-t bg-background flex justify-end">
             <Button onClick={() => setExtractionSuccessData(null)} className="w-full sm:w-auto font-medium px-8" size="lg">Continue</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Save to Point Bank Dialog */}
+      <Dialog open={!!pointBankQuickSaveItem} onOpenChange={(open) => !open && setPointBankQuickSaveItem(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary text-xl">
+              <Save className="h-5 w-5" /> Save to Point Bank
+            </DialogTitle>
+            <DialogDescription>
+              Select the target domain to save this raw achievement under in your Point Bank.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-4">
+            {Array.from(new Set(Object.values(ROLE_LABELS))).map(domain => (
+              <Button 
+                key={domain} 
+                variant="outline" 
+                className="h-12 justify-start font-medium hover:bg-primary hover:text-primary-foreground border-primary/20 shadow-sm" 
+                onClick={() => handleQuickSave(domain)}
+              >
+                {domain}
+              </Button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
