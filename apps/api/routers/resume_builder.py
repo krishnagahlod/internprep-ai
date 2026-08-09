@@ -228,12 +228,14 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
                 "target_role": req.target_role,
                 "bullet_text": v.get("bullet_text", ""),
                 "variant_type": v.get("variant_type", "unknown"),
-                "recruiter_notes": v.get("recruiter_notes", ""),
                 "is_saved": False
             })
             
         if db_records:
             res = supabase.table('generated_bullets').insert(db_records).execute()
+            # Reattach recruiter_notes for the frontend
+            for i in range(len(res.data)):
+                res.data[i]['recruiter_notes'] = variants[i].get("recruiter_notes", "")
             return res.data
         return []
     except Exception as e:

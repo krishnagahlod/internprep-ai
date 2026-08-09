@@ -371,25 +371,30 @@ export default function ResumePage() {
                       onClick={() => setResumePhase('placement')}
                       disabled={isUploading}
                     >
-                      Final Placement
+                      Placement
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Benchmark</label>
-                  <select 
-                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground"
-                    value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                    disabled={isUploading}
-                  >
-                    <option value="consult">Management Consulting</option>
-                    <option value="finance">Finance / Investment Banking</option>
-                    <option value="product management">Product Management</option>
-                    <option value="analytics">Data & Analytics</option>
-                    <option value="it-software">Software Engineering / IT</option>
-                  </select>
+                  <div className="relative">
+                    <select 
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
+                      value={targetRole}
+                      onChange={(e) => setTargetRole(e.target.value)}
+                      disabled={isUploading}
+                    >
+                      <option value="consult">Management Consulting (McKinsey, BCG, Bain)</option>
+                      <option value="finance">Finance / Private Equity / Investment Banking</option>
+                      <option value="product management">Product Management & Strategy</option>
+                      <option value="analytics">Data Science & Analytics</option>
+                      <option value="it-software">Software Engineering & Systems</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                      <ChevronDown className="h-5 w-5 opacity-50" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
