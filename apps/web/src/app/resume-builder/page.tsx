@@ -67,7 +67,7 @@ export default function ResumeBuilderPage() {
   const [isExtractingText, setIsExtractingText] = useState(false)
   const [rawText, setRawText] = useState("")
   const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null)
-  const [extractionSuccessData, setExtractionSuccessData] = useState<{count: number, achievements: any[]} | null>(null)
+  const [extractionSuccessData, setExtractionSuccessData] = useState<{count: number, new_count: number, merged_count: number, achievements: any[]} | null>(null)
   
   // Lab State
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
@@ -172,7 +172,12 @@ export default function ResumeBuilderPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        setExtractionSuccessData({ count: data.achievements?.length || 0, achievements: data.achievements || [] })
+        setExtractionSuccessData({ 
+          count: data.achievements?.length || 0, 
+          new_count: data.new_count || 0,
+          merged_count: data.merged_count || 0,
+          achievements: data.achievements || [] 
+        })
         await fetchAchievements()
         setFile(null)
       }
@@ -194,7 +199,12 @@ export default function ResumeBuilderPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        setExtractionSuccessData({ count: data.achievements?.length || 0, achievements: data.achievements || [] })
+        setExtractionSuccessData({ 
+          count: data.achievements?.length || 0, 
+          new_count: data.new_count || 0,
+          merged_count: data.merged_count || 0,
+          achievements: data.achievements || [] 
+        })
         await fetchAchievements()
         setRawText("")
       }
@@ -1165,7 +1175,7 @@ export default function ResumeBuilderPage() {
               <DialogDescription className="text-[15px] pt-1">
                 {extractionSuccessData?.count === 0 
                   ? "We couldn't confidently extract any distinct, non-overlapping professional achievements from the document you provided. You may need to add them manually or try a different document."
-                  : `We successfully extracted and organized ${extractionSuccessData?.count} distinct achievements into your Vault.`}
+                  : `We successfully extracted ${extractionSuccessData?.new_count} new achievements and updated ${extractionSuccessData?.merged_count} existing achievements with additional context.`}
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -1184,7 +1194,12 @@ export default function ResumeBuilderPage() {
                     <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary/60 transition-colors"></div>
                     <div className="flex justify-between items-start gap-4 mb-2">
                       <h4 className="font-bold text-[16px] text-foreground leading-snug">{ach.title || "Achievement"}</h4>
-                      <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary uppercase tracking-wider font-semibold shrink-0">{ach.section_type}</Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge variant={ach._is_merged ? "default" : "secondary"} className={`text-[10px] uppercase tracking-wider font-semibold ${ach._is_merged ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' : 'bg-primary/10 text-primary'}`}>
+                          {ach._is_merged ? 'Updated' : 'New'}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{ach.section_type}</Badge>
+                      </div>
                     </div>
                     <p className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><Target className="h-3.5 w-3.5"/> {ach.parent_experience}</p>
                     <p className="text-[14px] text-foreground/80 leading-relaxed line-clamp-3 bg-muted/30 p-3 rounded-lg">{ach.original_description}</p>

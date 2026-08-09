@@ -130,14 +130,21 @@ async def extract_from_pdf(
         inserted_data = []
         if db_records_to_insert:
             res = supabase.table('achievements').insert(db_records_to_insert).execute()
-            inserted_data.extend(res.data)
+            if res.data:
+                for r in res.data: r['_is_merged'] = False
+                inserted_data.extend(res.data)
             
         for merge_id, record in updates:
             res = supabase.table('achievements').update(record).eq('id', merge_id).execute()
             if res.data:
+                for r in res.data: r['_is_merged'] = True
                 inserted_data.extend(res.data)
                 
-        return {"achievements": inserted_data}
+        return {
+            "achievements": inserted_data,
+            "new_count": len(db_records_to_insert),
+            "merged_count": len(updates)
+        }
         
     except Exception as e:
         print(f"Error in extract_from_pdf: {e}")
@@ -186,14 +193,21 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
         inserted_data = []
         if db_records_to_insert:
             res = supabase.table('achievements').insert(db_records_to_insert).execute()
-            inserted_data.extend(res.data)
+            if res.data:
+                for r in res.data: r['_is_merged'] = False
+                inserted_data.extend(res.data)
             
         for merge_id, record in updates:
             res = supabase.table('achievements').update(record).eq('id', merge_id).execute()
             if res.data:
+                for r in res.data: r['_is_merged'] = True
                 inserted_data.extend(res.data)
                 
-        return {"achievements": inserted_data}
+        return {
+            "achievements": inserted_data,
+            "new_count": len(db_records_to_insert),
+            "merged_count": len(updates)
+        }
     except Exception as e:
         print(f"Error in extract_from_text: {e}")
         raise HTTPException(status_code=500, detail=str(e))
