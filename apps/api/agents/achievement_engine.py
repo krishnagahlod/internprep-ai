@@ -7,10 +7,23 @@ from services.cerebras_client import cerebras_client
 import google.generativeai as genai
 from services.embeddings import get_query_embedding
 
-def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
-    system_prompt = """
+def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    vault_context = ""
+    if existing_vault:
+        vault_context = f"""
+    VAULT AWARENESS (CRITICAL):
+    Here is the user's existing achievement vault:
+    {json.dumps(existing_vault, indent=2)}
+    
+    Rules for integrating with existing vault:
+    A. HEADING ALIGNMENT: If an extracted achievement belongs to an organization/project ALREADY in the existing vault, you MUST use the EXACT SAME `section_type` and `parent_experience` strings.
+    B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
+    """
+    
+    system_prompt = f"""
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from this PDF resume.
+    {vault_context}
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
@@ -30,6 +43,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
         "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
         "achievements": [
           {
+            "merge_id": "optional string: the id of the existing achievement if merging, otherwise omit",
             "title": "A short 3-5 word descriptive title (e.g. 'Automated Data Pipeline')",
             "original_description": "The full original text/bullets associated with this specific achievement",
             "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
@@ -67,7 +81,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
         print(f"Failed to parse extraction JSON: {e}")
         return []
 
-def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]]:
+def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     import fitz # PyMuPDF
     
     try:
@@ -81,9 +95,22 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]
         print(f"Failed to parse PDF text locally: {e}")
         return []
         
-    system_prompt = """
+    vault_context = ""
+    if existing_vault:
+        vault_context = f"""
+    VAULT AWARENESS (CRITICAL):
+    Here is the user's existing achievement vault:
+    {json.dumps(existing_vault, indent=2)}
+    
+    Rules for integrating with existing vault:
+    A. HEADING ALIGNMENT: If an extracted achievement belongs to an organization/project ALREADY in the existing vault, you MUST use the EXACT SAME `section_type` and `parent_experience` strings.
+    B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
+    """
+        
+    system_prompt = f"""
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from the provided document text.
+    {vault_context}
     
     CRITICAL NOISE FILTERING RULE:
     This text is NOT a standard resume. It may be a project report, college transcript, presentation, or certificate.
@@ -108,6 +135,7 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]
         "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
         "achievements": [
           {
+            "merge_id": "optional string: the id of the existing achievement if merging, otherwise omit",
             "title": "A short 3-5 word descriptive title",
             "original_description": "The full original text/bullets associated with this specific achievement",
             "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},
@@ -161,10 +189,23 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes) -> List[Dict[str, Any]
         print(f"Failed to parse other PDF extraction JSON: {e}")
         return []
 
-def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
-    system_prompt = """
+def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    vault_context = ""
+    if existing_vault:
+        vault_context = f"""
+    VAULT AWARENESS (CRITICAL):
+    Here is the user's existing achievement vault:
+    {json.dumps(existing_vault, indent=2)}
+    
+    Rules for integrating with existing vault:
+    A. HEADING ALIGNMENT: If an extracted achievement belongs to an organization/project ALREADY in the existing vault, you MUST use the EXACT SAME `section_type` and `parent_experience` strings.
+    B. INFORMATION MERGING: If the extracted text describes the EXACT SAME core achievement as an existing one, DO NOT create a new duplicate. Provide the `merge_id` (the id of the existing achievement) in your JSON output, and write a new, comprehensive `original_description` that gracefully merges the new information into the old information without losing context.
+    """
+
+    system_prompt = f"""
     You are an expert career counselor helping a user build their 'Achievement Vault'.
     Extract all distinct professional, academic, or extracurricular achievements from the provided text notes.
+    {vault_context}
     
     CRITICAL EXTRACTION RULES:
     1. Be Exhaustive & Granular: Break down large paragraphs. Do not summarize or group unrelated points into broad buckets. Extract every distinct achievement.
@@ -183,6 +224,7 @@ def extract_achievements_from_text(text: str) -> List[Dict[str, Any]]:
         "timeline": "e.g., 'May 2025 - Jul 2025' or '2024' (if mentioned at the parent level)",
         "achievements": [
           {
+            "merge_id": "optional string: the id of the existing achievement if merging, otherwise omit",
             "title": "A short 3-5 word descriptive title (e.g. 'Automated Data Pipeline')",
             "original_description": "The full original text/bullets associated with this specific achievement",
             "quantified_metrics": {"metric_name_1": 500, "metric_name_2": "20%"},

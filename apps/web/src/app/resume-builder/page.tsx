@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
-import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2 } from "lucide-react"
 
 // Types
 type Achievement = {
@@ -65,6 +66,7 @@ export default function ResumeBuilderPage() {
   const [isExtractingPDF, setIsExtractingPDF] = useState(false)
   const [isExtractingText, setIsExtractingText] = useState(false)
   const [rawText, setRawText] = useState("")
+  const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null)
   
   // Lab State
   const [selectedAchievement, setSelectedAchievement] = useState<string | null>(null)
@@ -265,6 +267,24 @@ export default function ResumeBuilderPage() {
       }
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  const handleEditAchievementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingAchievement) return
+    try {
+      const res = await fetch(`${apiBase}/builder/achievements/${editingAchievement.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingAchievement)
+      })
+      if (res.ok) {
+        await fetchAchievements()
+        setEditingAchievement(null)
+      }
+    } catch (error) {
+      console.error("Failed to edit achievement", error)
     }
   }
 
@@ -567,11 +587,14 @@ export default function ResumeBuilderPage() {
                                   <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group/card bg-background">
                           <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
                             <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => setEditingAchievement(ach)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-50" onClick={() => deleteAchievement(ach.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                            <div className="pr-10">
+                            <div className="pr-20">
                               <CardTitle className="text-lg font-semibold leading-tight mb-1 group-hover:text-primary transition-colors">{ach.title}</CardTitle>
                               <CardDescription className="flex items-center gap-2 font-medium">
                                 <span className="text-muted-foreground">{ach.timeline || "N/A"}</span>
@@ -1080,6 +1103,46 @@ export default function ResumeBuilderPage() {
         </TabsContent>
 
       </Tabs>
+
+      {/* Edit Achievement Dialog */}
+      <Dialog open={!!editingAchievement} onOpenChange={(open) => !open && setEditingAchievement(null)}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Achievement</DialogTitle>
+            <DialogDescription>Modify your extracted achievement details below.</DialogDescription>
+          </DialogHeader>
+          {editingAchievement && (
+            <form onSubmit={handleEditAchievementSubmit} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Section Type</label>
+                <Input value={editingAchievement.section_type || ""} onChange={(e) => setEditingAchievement({...editingAchievement, section_type: e.target.value})} placeholder="Professional Experience" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Heading / Company (Parent Experience)</label>
+                <Input value={editingAchievement.parent_experience || ""} onChange={(e) => setEditingAchievement({...editingAchievement, parent_experience: e.target.value})} placeholder="Accenture" required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Title</label>
+                  <Input value={editingAchievement.title || ""} onChange={(e) => setEditingAchievement({...editingAchievement, title: e.target.value})} placeholder="Data Pipeline" required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Timeline</label>
+                  <Input value={editingAchievement.timeline || ""} onChange={(e) => setEditingAchievement({...editingAchievement, timeline: e.target.value})} placeholder="May 2024 - Jul 2024" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">Description</label>
+                <Textarea value={editingAchievement.original_description || ""} onChange={(e) => setEditingAchievement({...editingAchievement, original_description: e.target.value})} className="min-h-[120px]" required />
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setEditingAchievement(null)}>Cancel</Button>
+                <Button type="submit">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
