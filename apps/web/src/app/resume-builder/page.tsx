@@ -23,6 +23,32 @@ type Achievement = {
   original_description: string
   competency_tags: string[]
   status: string
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  "consult": "Consulting",
+  "consulting": "Consulting",
+  "finance": "Finance",
+  "product management": "Product Management",
+  "analytics": "Data & Analytics",
+  "it-software": "Software Engineering"
+};
+const getRoleLabel = (r: string) => ROLE_LABELS[r.toLowerCase()] || r;
+
+const SECTION_ORDER: Record<string, number> = {
+  "Scholastic Achievements": 1,
+  "Professional Experience": 2,
+  "Projects": 3,
+  "Positions of Responsibility": 4,
+  "Extracurriculars": 5,
+  "Other": 6
+};
+  section_type: string
+  parent_experience: string
+  timeline: string
+  original_description: string
+  competency_tags: string[]
+  status: string
   quantified_metrics: any
   user_notes?: string
 }
@@ -992,8 +1018,15 @@ export default function ResumeBuilderPage() {
 
         {/* POINT BANK TAB */}
         <TabsContent value="bank" className="space-y-6 animate-in fade-in-50 duration-500">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="md:col-span-2 space-y-6">
+          <Tabs defaultValue="bullets" className="w-full">
+            <div className="flex justify-between items-center mb-6">
+              <TabsList className="h-12 bg-muted/30">
+                <TabsTrigger value="bullets" className="text-sm px-6 h-10"><Save className="w-4 h-4 mr-2" /> Point Bank View</TabsTrigger>
+                <TabsTrigger value="strategy" className="text-sm px-6 h-10"><Target className="w-4 h-4 mr-2" /> Strategy Analysis</TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="bullets" className="mt-0">
               <Card className="border-border/60 shadow-md">
                 <CardHeader className="border-b bg-muted/5 pb-5">
                   <CardTitle className="text-2xl flex items-center gap-2">
@@ -1013,23 +1046,29 @@ export default function ResumeBuilderPage() {
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      <div className="flex flex-wrap gap-2 mb-6 border-b border-border/50 pb-4">
-                        {Array.from(new Set(pointBank.map(b => b.target_role))).map(role => (
-                          <Badge 
-                            key={role} 
-                            variant={activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => b.target_role)))[0] === role) ? "default" : "secondary"} 
-                            className="px-4 py-1.5 text-sm cursor-pointer capitalize font-bold tracking-wide transition-all"
-                            onClick={() => setActivePointBankRole(role)}
-                          >
-                            {role}
-                          </Badge>
-                        ))}
+                      <div className="flex flex-wrap gap-3 mb-8 border-b border-border/50 pb-5">
+                        {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
+                          const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
+                          return (
+                            <button
+                              key={role} 
+                              onClick={() => setActivePointBankRole(role)}
+                              className={`px-5 py-2.5 rounded-full text-sm font-bold tracking-wide capitalize transition-all ${
+                                isActive
+                                  ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              }`}
+                            >
+                              {role}
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {(() => {
-                        const availableRoles = Array.from(new Set(pointBank.map(b => b.target_role)));
-                        const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : activePointBankRole;
-                        const roleBullets = pointBank.filter(b => b.target_role === displayRole);
+                        const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
+                        const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
+                        const roleBullets = pointBank.filter(b => getRoleLabel(b.target_role) === displayRole);
                         
                         // Group by section type then parent experience
                         const grouped: Record<string, Record<string, typeof roleBullets>> = {};
@@ -1044,7 +1083,9 @@ export default function ResumeBuilderPage() {
 
                         return (
                           <div className="space-y-10">
-                            {Object.entries(grouped).map(([section, parents]) => (
+                            {Object.entries(grouped)
+                              .sort(([secA], [secB]) => (SECTION_ORDER[secA] || 99) - (SECTION_ORDER[secB] || 99))
+                              .map(([section, parents]) => (
                               <div key={section} className="space-y-6">
                                 <h3 className="text-xl font-extrabold text-foreground border-b-2 border-primary/20 pb-2 inline-block pr-8 uppercase tracking-wider">{section}</h3>
                                 <div className="space-y-8 pl-1 md:pl-2">
@@ -1110,10 +1151,10 @@ export default function ResumeBuilderPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+            </TabsContent>
             
-            <div className="md:col-span-1 space-y-6">
-              <Card className="bg-gradient-to-b from-primary/5 via-background to-background border-primary/20 shadow-md sticky top-6">
+            <TabsContent value="strategy" className="mt-0">
+              <Card className="bg-gradient-to-b from-primary/5 via-background to-background border-primary/20 shadow-md max-w-4xl mx-auto">
                 <CardHeader className="border-b border-primary/10 pb-5">
                   <CardTitle className="flex items-center gap-2 text-xl text-primary">
                     <Target className="h-6 w-6" /> Strategy Engine
@@ -1247,8 +1288,8 @@ export default function ResumeBuilderPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
       </Tabs>
