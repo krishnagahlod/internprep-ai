@@ -330,6 +330,22 @@ export default function ResumeBuilderPage() {
     }
   }
 
+  const handleSavePointBankEdit = async (bulletId: string) => {
+    try {
+      const res = await fetch(`${apiBase}/builder/point-bank/${bulletId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bullet_text: editPointBankText })
+      })
+      if (res.ok) {
+        setPointBank(pointBank.map(b => b.id === bulletId ? { ...b, bullet_text: editPointBankText } : b))
+        setEditingPointBankBullet(null)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const generateStrategy = async () => {
     if (!user) return
     setIsStrategyLoading(true)
