@@ -22,7 +22,8 @@ class WorkshopMessage(BaseModel):
 class WorkshopRequest(BaseModel):
     original_bullet: str
     section_type: str
-    target_role: Optional[str] = "consulting"
+    target_role: Optional[str] = "consult"
+    resume_phase: Optional[str] = "placement"
     messages: List[WorkshopMessage]
     overall_context: Optional[str] = None
 
@@ -123,7 +124,8 @@ async def upload_resume(
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...),
-    target_role: str = Form("consulting"),
+    target_role: str = Form("consult"),
+    resume_phase: str = Form("placement"),
     user_id: Optional[str] = Form(None)
 ):
     # Strict PDF Validation
@@ -169,7 +171,7 @@ async def analyze_resume(
 
         # Run analyzer with timeout wrapper
         analysis_json_str = await asyncio.wait_for(
-            asyncio.to_thread(analyze_resume_text, text, target_role, pdf_bytes),
+            asyncio.to_thread(analyze_resume_text, text, target_role, resume_phase, pdf_bytes),
             timeout=300.0
         )
         
@@ -213,6 +215,7 @@ async def resume_workshop(request: Request, body: WorkshopRequest):
                 body.original_bullet,
                 body.section_type,
                 body.target_role,
+                body.resume_phase,
                 [{"role": m.role, "content": m.content} for m in body.messages],
                 body.overall_context
             ),

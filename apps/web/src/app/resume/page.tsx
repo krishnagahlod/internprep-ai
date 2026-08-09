@@ -84,7 +84,8 @@ const RadarChart = ({ scores }: { scores: any }) => {
 
 export default function ResumePage() {
   const [file, setFile] = useState<File | null>(null)
-  const [targetRole, setTargetRole] = useState("consulting")
+  const [targetRole, setTargetRole] = useState("consult")
+  const [resumePhase, setResumePhase] = useState<"internship" | "placement">("placement")
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -167,6 +168,7 @@ export default function ResumePage() {
       const formData = new FormData()
       formData.append("file", file)
       formData.append("target_role", targetRole)
+      formData.append("resume_phase", resumePhase)
       if (user?.id) {
         formData.append("user_id", user.id)
       }
@@ -240,6 +242,7 @@ export default function ResumePage() {
           original_bullet: bullet.original_bullet,
           section_type: bullet.section_type || "experience",
           target_role: targetRole,
+          resume_phase: resumePhase,
           messages: newHistory,
           overall_context: overallContext
         })
@@ -352,20 +355,42 @@ export default function ResumePage() {
                 <p className="text-muted-foreground text-sm">Strictly PDF format. Max 5MB.</p>
               </div>
               
-              <div className="mb-8">
-                <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Benchmark</label>
-                <select 
-                  className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground"
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value)}
-                  disabled={isUploading}
-                >
-                  <option value="consulting">Management Consulting (McKinsey, Bain, BCG)</option>
-                  <option value="finance">Finance / PE / IB</option>
-                  <option value="product">Product Management</option>
-                  <option value="fmcg">FMCG / General Management</option>
-                  <option value="analytics">Data & Analytics</option>
-                </select>
+              <div className="mb-8 space-y-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Resume Phase</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'internship' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
+                      onClick={() => setResumePhase('internship')}
+                      disabled={isUploading}
+                    >
+                      Internship
+                    </button>
+                    <button
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'placement' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
+                      onClick={() => setResumePhase('placement')}
+                      disabled={isUploading}
+                    >
+                      Final Placement
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Benchmark</label>
+                  <select 
+                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground"
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    disabled={isUploading}
+                  >
+                    <option value="consult">Management Consulting</option>
+                    <option value="finance">Finance / Investment Banking</option>
+                    <option value="product management">Product Management</option>
+                    <option value="analytics">Data & Analytics</option>
+                    <option value="it-software">Software Engineering / IT</option>
+                  </select>
+                </div>
               </div>
 
               <div className="relative group mb-8">

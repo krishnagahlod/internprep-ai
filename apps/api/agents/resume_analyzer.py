@@ -143,7 +143,7 @@ CRITICAL INSTRUCTIONS:
         return extract_text(io.BytesIO(pdf_bytes))
 
 
-def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_bytes: bytes = None) -> str:
+def analyze_resume_text(resume_text: str, target_role: str = "consult", resume_phase: str = "placement", pdf_bytes: bytes = None) -> str:
     """
     Analyzes resume text using Two-Pass Adaptive RAG against Golden Resumes and Best Practices.
     """
@@ -187,7 +187,8 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
         
         for attempt in range(3):
             try:
-                rpc_res = supabase.rpc('match_golden_bullets', {
+                rpc_name = 'match_golden_bullets_placement' if resume_phase == 'placement' else 'match_golden_bullets'
+                rpc_res = supabase.rpc(rpc_name, {
                     'query_embedding': embedding,
                     'match_count': match_count,
                     'filter_section_type': section_type,
@@ -217,7 +218,19 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
 
     # Format Rules
     global_rules_text = "\n".join([f"- {r}" for r in BEST_PRACTICES])
-    section_rules_text = json.dumps(SECTION_RULES, indent=2)
+    
+    # Dynamically load section rules based on resume phase
+    active_section_rules = SECTION_RULES
+    if resume_phase == "placement":
+        PLACEMENT_RULES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/resumes/placement_section_rules.json"))
+        if os.path.exists(PLACEMENT_RULES_PATH):
+            try:
+                with open(PLACEMENT_RULES_PATH, 'r') as f:
+                    active_section_rules = json.load(f)
+            except Exception as e:
+                print(f"Failed to load placement section rules: {e}")
+                
+    section_rules_text = json.dumps(active_section_rules, indent=2)
     user_bullets_json = json.dumps(user_bullets, indent=2)
 
     final_prompt = f"""
@@ -352,8 +365,9 @@ def analyze_resume_text(resume_text: str, target_role: str = "consulting", pdf_b
 def run_workshop_turn(
     original_bullet: str, 
     section_type: str, 
-    target_role: str, 
-    messages: List[Dict[str, str]], 
+    target_role: str = "consult", 
+    resume_phase: str = "placement",
+    messages: List[Dict[str, str]] = None,
     overall_context: str = None
 ) -> Dict[str, Any]:
     """
@@ -362,11 +376,26 @@ def run_workshop_turn(
     Otherwise, uses RAG for bullet-level advice.
     """
     if section_type == "overall":
+        # Dynamically load section rules based on resume phase
+        active_section_rules = SECTION_RULES
+        if resume_phase == "placement":
+            PLACEMENT_RULES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/resumes/placement_section_rules.json"))
+            if os.path.exists(PLACEMENT_RULES_PATH):
+                try:
+                    with open(PLACEMENT_RULES_PATH, 'r') as f:
+                        active_section_rules = json.load(f)
+                except Exception:
+                    pass
+
         system_prompt = f"""
-        You are an elite IIT Bombay Day 1 Resume Interviewer conducting a 1-on-1 resume strategy session.
+        You are an elite IIT Bombay Day 1 Placement Resume Consultant. 
+        You are actively coaching a student in real-time.
         
         ### Overall Resume Context & Analysis:
         {overall_context}
+        
+        ### Section Rules for {section_type}:
+        {json.dumps(active_section_rules.get(section_type, {}), indent=2)}
         
         ### YOUR PERSONA & TASK:
         1. Act as a strict but helpful strategic advisor.
@@ -386,9 +415,10 @@ def run_workshop_turn(
         rag_context = ""
         if embedding:
             try:
-                rpc_res = supabase.rpc('match_golden_bullets', {
+                rpc_name = 'match_golden_bullets_placement' if resume_phase == 'placement' else 'match_golden_bullets'
+                rpc_res = supabase.rpc(rpc_name, {
                     'query_embedding': embedding,
-                    'match_count': 5,
+                    'match_count': 10,
                     'filter_section_type': section_type,
                     'filter_target_role': target_role
                 }).execute()
