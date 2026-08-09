@@ -484,7 +484,17 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
     )
     
     try:
-        data = json.loads(response_text)
+        response_text = response_text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+                
+        data = json.loads(response_text.strip())
         return data
     except Exception as e:
         print(f"Failed to parse metric chat JSON: {e}")

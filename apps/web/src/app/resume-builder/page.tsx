@@ -646,7 +646,7 @@ export default function ResumeBuilderPage() {
           {/* Chat Modal */}
           {activeChatAchievement && (
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div className="bg-background w-full max-w-lg rounded-xl shadow-xl flex flex-col h-[80vh]">
+              <div className="bg-background w-full max-w-3xl rounded-xl shadow-xl flex flex-col h-[85vh] max-h-[800px]">
                 <div className="p-4 border-b flex justify-between items-center">
                   <div>
                     <h3 className="font-bold">Metric Reconstruction</h3>
