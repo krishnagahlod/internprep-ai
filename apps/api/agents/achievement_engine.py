@@ -359,8 +359,9 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
         """
         
     action_verb_dictionary = """
-    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed.
+    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated, Streamlined, Modernized, Revamped, Overhauled, Championed, Maximized, Optimized, Transformed, Automated, Directed, Guided, Mentored, Shaped.
     BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
+    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary to ensure no repetition.
     """
 
     # Define variants dynamically based on role
@@ -497,8 +498,9 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~120-140 chars)."
 
     action_verb_dictionary = """
-    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated.
+    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated, Streamlined, Modernized, Revamped, Overhauled, Championed, Maximized, Optimized, Transformed, Automated, Directed, Guided, Mentored, Shaped.
     BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
+    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary to ensure no repetition.
     """
 
     role_lower = target_role.lower()

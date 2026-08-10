@@ -359,6 +359,17 @@ export default function ResumeBuilderPage() {
       if (res.ok) {
         // Mark locally as saved
         setGeneratedBullets(prev => prev.map(b => b.id === bullet.id ? {...b, is_saved: true} : b))
+        
+        if (composerResults) {
+          const newComposerResults = { ...composerResults };
+          for (let i = 0; i < newComposerResults.variant_sets.length; i++) {
+            newComposerResults.variant_sets[i].bullets = newComposerResults.variant_sets[i].bullets.map((b: any) => 
+              b.id === bullet.id ? { ...b, is_saved: true } : b
+            );
+          }
+          setComposerResults(newComposerResults);
+        }
+
         fetchPointBank()
       }
     } catch (e) {
@@ -1305,18 +1316,29 @@ export default function ResumeBuilderPage() {
                   <div className="bg-card border border-border shadow-md rounded-xl overflow-hidden">
                     <div className="p-4 bg-muted/30 border-b border-border flex justify-between items-center">
                       <h4 className="font-bold text-foreground">Drafted Points</h4>
-                      <Button 
-                        size="sm"
-                        onClick={async () => {
-                          const groupId = crypto.randomUUID();
-                          const bullets = composerResults.variant_sets[activeVariantSet].bullets;
-                          for (const bullet of bullets) {
-                             await saveBullet(bullet, groupId);
-                          }
-                        }}
-                      >
-                        <Save className="h-4 w-4 mr-2" /> Save Set to Point Bank
-                      </Button>
+                      {(() => {
+                        const allSaved = composerResults.variant_sets[activeVariantSet].bullets.every((b: any) => b.is_saved);
+                        return (
+                          <Button 
+                            size="sm"
+                            variant={allSaved ? "secondary" : "default"}
+                            className={`transition-all ${allSaved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200 font-medium' : ''}`}
+                            disabled={allSaved}
+                            onClick={async () => {
+                              const groupId = crypto.randomUUID();
+                              const bullets = composerResults.variant_sets[activeVariantSet].bullets;
+                              for (const bullet of bullets) {
+                                if (!bullet.is_saved) {
+                                  await saveBullet(bullet, groupId);
+                                }
+                              }
+                            }}
+                          >
+                            {allSaved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            {allSaved ? "Set Saved" : "Save Set to Point Bank"}
+                          </Button>
+                        )
+                      })()}
                     </div>
                     <div className="divide-y divide-border/50">
                       {composerResults.variant_sets[activeVariantSet].bullets.map((bullet: any, idx: number) => (
@@ -1338,14 +1360,17 @@ export default function ResumeBuilderPage() {
                                 <Sparkles className="h-4 w-4 mr-2" /> AI Refine
                               </Button>
                               <Button 
-                                variant="ghost" size="sm"
-                                className="text-muted-foreground hover:text-foreground shrink-0 justify-start"
+                                variant={bullet.is_saved ? "secondary" : "ghost"} 
+                                size="sm"
+                                className={`shrink-0 justify-start transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'text-muted-foreground hover:text-foreground'}`}
                                 onClick={async () => {
                                   const groupId = crypto.randomUUID();
                                   await saveBullet(bullet, groupId);
                                 }}
+                                disabled={bullet.is_saved}
                               >
-                                <Save className="h-4 w-4 mr-2" /> Save Single
+                                {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                                {bullet.is_saved ? "Saved" : "Save Single"}
                               </Button>
                             </div>
                           </div>
