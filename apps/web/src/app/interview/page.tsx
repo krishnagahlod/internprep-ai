@@ -537,8 +537,8 @@ function InterviewEngine() {
 
         {/* LEFT PANEL: CO-PILOT CHAT SIDEBAR / MAIN DOMAIN CHAT */}
         <div 
-          style={interviewMode === "case" ? { width: `${chatWidth}%` } : {}}
-          className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-500 
+          style={interviewMode === "case" ? { "--chat-width": `${chatWidth}%` } as React.CSSProperties : {}}
+          className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-500 w-full md:w-[var(--chat-width,auto)]
             ${interviewMode === "domain" 
               ? `w-full flex-1 max-w-5xl mx-auto bg-transparent border-none`
               : 'bg-white dark:bg-neutral-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-200/70 dark:border-neutral-800/70'
@@ -709,7 +709,7 @@ function InterviewEngine() {
 
         {/* DOMAIN RESUME PANEL */}
         {interviewMode === "domain" && showResumePanel && (
-          <div className="w-[500px] shrink-0 bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex flex-col relative">
+          <div className="hidden md:flex w-[500px] shrink-0 bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex-col relative">
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-800">
               <h3 className="font-semibold text-sm">Your Resume</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowResumePanel(false)} className="h-8 w-8 rounded-full">
@@ -735,7 +735,7 @@ function InterviewEngine() {
 
         {/* RIGHT PANEL: HERO CANVAS (Only for Case Mode) */}
         {interviewMode === "case" && (
-          <div className="flex-1 flex flex-col bg-slate-50/50 dark:bg-neutral-950/50 relative z-0 overflow-hidden">
+          <div className="hidden md:flex flex-1 flex-col bg-slate-50/50 dark:bg-neutral-950/50 relative z-0 overflow-hidden">
             {rightPanelState === "whiteboard" ? (
               <div className="absolute inset-0 animate-in fade-in duration-500">
                 <ExcalidrawWrapper />

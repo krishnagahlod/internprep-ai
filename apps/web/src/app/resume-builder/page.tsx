@@ -794,7 +794,7 @@ export default function ResumeBuilderPage() {
                                 {achs.map(ach => (
                                   <Card key={ach.id} className="flex flex-col overflow-hidden border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 group/card bg-background">
                           <CardHeader className="pb-3 bg-muted/20 border-b border-border/30 relative">
-                            <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute top-4 right-4 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-background/50 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none p-1 rounded-md">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-green-600 hover:bg-green-50" onClick={(e) => { e.stopPropagation(); setPointBankQuickSaveItem(ach); }} title="Quick Save to Point Bank">
                                 <Save className="h-4 w-4" />
                               </Button>
@@ -1524,7 +1524,7 @@ export default function ResumeBuilderPage() {
                                                 </div>
                                                 
                                                 {/* Action Buttons Overlay */}
-                                                <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-2">
+                                                <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-3 md:pr-4">
                                                   <Button variant="ghost" size="icon" onClick={() => {
                                                     setRefineTarget({ source: "bank", id: bullet.id, text: bullet.bullet_text, role: bullet.target_role });
                                                     setRefineInstruction("");

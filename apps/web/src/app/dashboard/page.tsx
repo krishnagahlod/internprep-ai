@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [selectedResumeId, setSelectedResumeId] = useState<string>("")
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadError, setUploadError] = useState("")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchResumes = async () => {
@@ -321,13 +322,61 @@ export default function DashboardPage() {
         </div>
       </aside>
 
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+      )}
+      
+      {/* Mobile Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-white dark:bg-neutral-950 shadow-2xl flex flex-col p-6 transition-transform duration-300 ease-in-out lg:hidden ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-premium p-[1px] flex items-center justify-center shadow-sm">
+              <div className="h-full w-full bg-white dark:bg-neutral-950 rounded-[7px] flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+            </div>
+            <span className="text-xl font-bold font-outfit tracking-tight">InternPrep</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <nav className="flex-1 space-y-2">
+          <Button variant="secondary" className="w-full justify-start shadow-sm bg-white dark:bg-neutral-900 text-foreground border border-black/5 dark:border-white/5" onClick={() => setIsMobileMenuOpen(false)}>
+            <LayoutDashboard className="mr-3 h-4 w-4 text-primary" />
+            Command Center
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume"); setIsMobileMenuOpen(false); }}>
+            <FileText className="mr-3 h-4 w-4" />
+            Resume Review
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume-builder"); setIsMobileMenuOpen(false); }}>
+            <UploadCloud className="mr-3 h-4 w-4" />
+            Resume Builder
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
+            <Briefcase className="mr-3 h-4 w-4" />
+            Interviews
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/history"); setIsMobileMenuOpen(false); }}>
+            <Clock className="mr-3 h-4 w-4" />
+            History
+          </Button>
+        </nav>
+      </aside>
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative h-screen overflow-y-auto">
         
         {/* Mobile Header */}
-        <header className="lg:hidden border-b border-border bg-white/50 dark:bg-neutral-950/50 backdrop-blur-xl sticky top-0 z-50 flex h-16 items-center justify-between px-4">
+        <header className="lg:hidden border-b border-border bg-white/50 dark:bg-neutral-950/50 backdrop-blur-xl sticky top-0 z-30 flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <Button variant="ghost" size="icon" className="-ml-2" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </Button>
+            <Sparkles className="h-5 w-5 text-primary ml-1" />
             <span className="text-xl font-bold tracking-tight">InternPrep</span>
           </div>
           <div className="flex items-center gap-2">
