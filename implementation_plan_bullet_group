@@ -1,0 +1,282 @@
+# Section Composer — Multi-Achievement Bullet Generation
+
+Add a "Section Composer" mode to the Bullet Laboratory that lets users generate optimized resume bullet sets from an entire heading/group of achievements, with AI-driven merging, prioritization, and exclusion reasoning.
+
+## How It Works (User Flow)
+
+```mermaid
+graph TD
+    A["User opens Lab"] --> B{"Select Mode"}
+    B -->|"Single Achievement"| C["Existing flow unchanged"]
+    B -->|"Section Composer"| D["Select Parent Heading<br/>(e.g. Accenture Song)"]
+    D --> E["Select Domain + # of Points"]
+    E --> F{"Achievement Selection"}
+    F -->|"All (default)"| G["AI sees all achievements<br/>under that heading"]
+    F -->|"Custom Select"| H["User checkmarks<br/>specific achievements"]
+    G --> I["Optional: Benchmark text"]
+    H --> I
+    I --> J["Generate"]
+    J --> K["AI Output: N optimized bullets<br/>+ exclusion reasoning<br/>+ merge explanations"]
+    K --> L["Resume-style preview"]
+    L --> M["Save individually or as batch"]
+```
+
+### Key UX Details
+- The Lab tab keeps both modes: a **toggle** at the top switches between "Single Achievement" and "Section Composer"
+- Section Composer groups headings exactly like the Vault does (by `parent_experience`)
+- When a heading is selected, all its achievements appear as checkboxes (all checked by default)
+- User specifies number of points (slider or number input, 2–6 range)
+- The output renders in a **resume-section preview** layout (heading + timeline + bullets)
+
+---
+
+## Proposed Changes
+
+### 1. Backend: New AI Engine Function
+
+#### [NEW] `generate_section_bullets()` in [achievement_engine.py](file:///c:/Interview%20Preparation%20Platform/apps/api/agents/achievement_engine.py)
+
+A new function alongside the existing `generate_bullet_variants()`. Key differences:
+
+- **Input**: A list of achievements (not one), target role, number of points, benchmark text
+- **AI Prompt Strategy**:
+  1. AI receives ALL selected achievements with their descriptions, metrics, and tags
+  2. AI must produce exactly N bullet points by intelligently:
+     - **Merging** related achievements into dense, combined bullets
+     - **Prioritizing** the most impactful achievements for the target domain
+     - **Excluding** low-relevance achievements with clear reasoning
+  3. Each generated bullet must indicate which source achievement(s) it was derived from
+  4. Character length matching still applies (benchmark text or standard ~120-140 chars)
+  5. Generate **2 variant sets** (like we do for single — e.g., "impact-heavy set" vs "leadership-heavy set") so the user has options
+
+- **Output Schema**:
+```json
+{
+  "variant_sets": [
+    {
+      "set_label": "Impact-Optimized Set",
+      "set_description": "Prioritizes quantified outcomes and business results",
+      "bullets": [
+        {
+          "bullet_text": "Spearheaded a 37-page POV...",
+          "source_achievement_ids": ["uuid1", "uuid2"],
+          "merge_explanation": "Combined 'POV development' and 'cost analysis' achievements into one dense bullet",
+          "recruiter_notes": "Strong opening verb. Could further quantify the stakeholder count."
+        }
+      ],
+      "excluded_achievements": [
+        {
+          "achievement_id": "uuid5",
+          "title": "Team Lunch Organization",
+          "reason": "Low relevance for consulting domain — no strategic/quantitative impact"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 2. Backend: New API Endpoint
+
+#### [MODIFY] [resume_builder.py](file:///c:/Interview%20Preparation%20Platform/apps/api/routers/resume_builder.py)
+
+Add a new Pydantic model and endpoint:
+
+```python
+class GenerateSectionRequest(BaseModel):
+    user_id: str
+    achievement_ids: List[str]        # IDs of selected achievements
+    parent_experience: str            # The heading name (for context)
+    target_role: str
+    num_points: int                   # How many bullets to generate (2-6)
+    target_company: Optional[str] = None
+    benchmark_text: Optional[str] = None
+
+@router.post("/generate-section")
+async def generate_section_bullets(request: Request, req: GenerateSectionRequest):
+    # 1. Fetch all achievements by IDs
+    # 2. Fetch existing saved bullets for anti-repetition
+    # 3. Call generate_section_bullets() from achievement_engine
+    # 4. Return the variant sets
+```
+
+> [!IMPORTANT]
+> This endpoint does NOT save anything to the DB. It returns the generated sets for the user to review. The user then saves individual bullets using the existing `/save-bullet` endpoint (with a new optional `generation_group_id` field to track batch origin).
+
+---
+
+### 3. Backend: Save Bullet Enhancement
+
+#### [MODIFY] `SaveBulletRequest` in [resume_builder.py](file:///c:/Interview%20Preparation%20Platform/apps/api/routers/resume_builder.py)
+
+Add an optional `generation_group_id` field so we can track which bullets were generated together as a batch:
+
+```python
+class SaveBulletRequest(BaseModel):
+    user_id: str
+    achievement_id: str
+    target_role: str
+    bullet_text: str
+    variant_type: str
+    generation_group_id: Optional[str] = None  # NEW: links batch-generated bullets
+```
+
+> [!NOTE]
+> This requires adding a `generation_group_id` column (nullable UUID) to the `generated_bullets` table in Supabase. No migration needed — just an `ALTER TABLE` to add the nullable column.
+
+---
+
+### 4. Frontend: Lab Tab UI Overhaul
+
+#### [MODIFY] [page.tsx](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/resume-builder/page.tsx) — Lab section (~lines 830–955)
+
+**New state variables:**
+```typescript
+const [labMode, setLabMode] = useState<"single" | "composer">("single")
+const [composerHeading, setComposerHeading] = useState<string | null>(null)
+const [composerSelectedIds, setComposerSelectedIds] = useState<string[]>([])
+const [composerNumPoints, setComposerNumPoints] = useState(3)
+const [composerResults, setComposerResults] = useState<any>(null)
+const [isComposerGenerating, setIsComposerGenerating] = useState(false)
+const [activeVariantSet, setActiveVariantSet] = useState(0)
+```
+
+**UI Structure within Lab tab:**
+
+```
+┌──────────────────────────────────────────────────────┐
+│  [Single Achievement]  [Section Composer]   ← Toggle │
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌─ Select Heading ──────────────────────────────┐  │
+│  │ ▼ Accenture Song (10 achievements)            │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                      │
+│  ┌─ Achievements ────────────────────────────────┐  │
+│  │ [✓] POV Development           [✓] Cost Model  │  │
+│  │ [✓] Test Matrix               [✓] Multi-agent │  │
+│  │ [✓] Stakeholder Alignment     [ ] Team Lunch  │  │
+│  │                        Select All | Deselect   │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                      │
+│  ┌─ Configuration ───────────────────────────────┐  │
+│  │ Domain: [Consulting ▼]                        │  │
+│  │ # Points: [▬▬▬●▬▬] 4                         │  │
+│  │ Company: [McKinsey________] (optional)        │  │
+│  │ Benchmark: [paste here____] (optional)        │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                      │
+│  [ ✨ Compose Section Bullets ]                      │
+│                                                      │
+├──────────────────────────────────────────────────────┤
+│  RESULTS                                             │
+│                                                      │
+│  [Impact-Optimized] [Leadership-Focused]  ← Variant  │
+│                                                      │
+│  ┌─ Accenture Song | Consulting Intern ──────────┐  │
+│  │ • Spearheaded a 37-page POV...        [Save]  │  │
+│  │   ↳ Merged: POV Development + Cost Model      │  │
+│  │ • Architected a repeatable 48-run...  [Save]  │  │
+│  │ • Engineered a multi-agent...         [Save]  │  │
+│  │ • Catalyzed cross-functional...       [Save]  │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                      │
+│  Excluded:                                           │
+│  ⊘ "Team Lunch Organization" — Low relevance...     │
+│                                                      │
+│  [Copy All] [Save All to Point Bank]                 │
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+**Key UI details:**
+- The toggle between "Single Achievement" and "Section Composer" is a `TabsList` within the Lab card header
+- When a heading is selected from the dropdown, all achievements under it appear as checkboxes (all checked by default)
+- Achievement checkboxes show title + a short truncated description
+- Number of points is a simple number input with +/- buttons (range 2-6)
+- Results show variant set tabs at the top
+- Each bullet in the result shows merge source info in a collapsible detail
+- "Save All" saves each bullet individually via the existing endpoint, with a shared `generation_group_id`
+- "Copy All" copies the entire section in a formatted resume-ready format
+
+---
+
+### 5. Frontend: New Generation Function
+
+#### [MODIFY] [page.tsx](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/resume-builder/page.tsx)
+
+New `generateSectionBullets()` function:
+
+```typescript
+const generateSectionBullets = async () => {
+  if (!user || composerSelectedIds.length === 0) return
+  setIsComposerGenerating(true)
+  try {
+    const heading = composerHeading || ""
+    const res = await fetch(`${apiBase}/builder/generate-section`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user.id,
+        achievement_ids: composerSelectedIds,
+        parent_experience: heading,
+        target_role: targetRole,
+        num_points: composerNumPoints,
+        target_company: targetCompany || undefined,
+        benchmark_text: benchmarkText || undefined
+      })
+    })
+    if (res.ok) {
+      setComposerResults(await res.json())
+      setActiveVariantSet(0)
+    }
+  } catch (e) { console.error(e) }
+  setIsComposerGenerating(false)
+}
+```
+
+---
+
+### 6. Database: Minor Schema Update
+
+#### Supabase `generated_bullets` table
+
+```sql
+ALTER TABLE generated_bullets 
+ADD COLUMN IF NOT EXISTS generation_group_id UUID DEFAULT NULL;
+```
+
+This column is nullable and optional. When bullets are saved from a Section Composer batch, they all share the same `generation_group_id` (a UUID generated client-side). This lets us show a subtle "Generated as part of a group" indicator in the Point Bank.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- `npx tsc --noEmit` — TypeScript compilation check after frontend changes
+
+### Manual Verification
+1. **Single Achievement mode** still works exactly as before (regression check)
+2. **Section Composer flow**:
+   - Select a heading with 5+ achievements
+   - Verify all checkboxes appear, all checked by default
+   - Deselect 1-2 achievements
+   - Set num_points to 3, domain to Consulting
+   - Add a benchmark text
+   - Generate → verify 2 variant sets appear
+   - Verify each bullet respects the character length
+   - Verify merge explanations show which achievements were combined
+   - Verify excluded achievements section shows reasoning
+   - "Copy All" copies formatted text
+   - "Save All" saves to Point Bank with group indication
+3. **Point Bank** shows the saved bullets with proper domain tagging
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Supabase column addition**: I'll need you to run the `ALTER TABLE` SQL command in your Supabase dashboard to add `generation_group_id`. Or I can skip this and save without group tracking for now — let me know your preference.
+
+> [!NOTE]
+> **AI Model choice**: For section composition, I plan to use **Gemini** (not Cerebras) since the prompt is significantly more complex — it needs to reason about merging, exclusion, and multiple output bullets simultaneously. The existing single-bullet generation uses Cerebras which is fine for simpler prompts. Does that work for you?

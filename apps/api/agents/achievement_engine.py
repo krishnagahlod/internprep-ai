@@ -475,6 +475,157 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
                 return []
     return []
 
+def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]], target_role: str, target_company: str = "", num_points: int = 3, benchmark_text: str = "") -> Dict[str, Any]:
+    # Extract tags and combined descriptions for RAG
+    all_tags = []
+    combined_desc = ""
+    for ach in achievements:
+        all_tags.extend(ach.get('competency_tags', []))
+        desc = ach.get('original_description', '')
+        notes = ach.get('user_notes', '')
+        combined_desc += f"- {ach.get('title')}: {desc}\n"
+        if notes:
+            combined_desc += f"  Notes: {notes}\n"
+    
+    # RAG context based on all achievements combined
+    rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, list(set(all_tags)))
+    
+    # Length constraint
+    if benchmark_text:
+        length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
+    else:
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~120-140 chars)."
+
+    action_verb_dictionary = """
+    ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated.
+    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
+    """
+
+    role_lower = target_role.lower()
+    if "consult" in role_lower or "finance" in role_lower:
+        set_1 = {"label": "Impact-Optimized Set", "desc": "Focus heavily on the strategic business results, revenue/cost impact, and high-level outcomes."}
+        set_2 = {"label": "Leadership-Focused Set", "desc": "Focus on stakeholder management, leading teams, cross-functional alignment, and ownership."}
+        variant_enum = '"strategic_impact" | "leadership"'
+    elif "product" in role_lower:
+        set_1 = {"label": "Growth & Metrics Set", "desc": "Focus on MAU, retention, engagement, adoption rate, and core product KPIs."}
+        set_2 = {"label": "Cross-Functional Set", "desc": "Focus on leading engineering/design teams, stakeholder alignment, and product vision."}
+        variant_enum = '"growth_metrics" | "cross_functional"'
+    elif "software" in role_lower or "it" in role_lower:
+        set_1 = {"label": "Architecture & Scale Set", "desc": "Focus heavily on system architecture, handling high TPS/scale, and infrastructure."}
+        set_2 = {"label": "Optimization Set", "desc": "Focus on latency reduction, memory/cost savings, algorithm efficiency, and performance."}
+        variant_enum = '"architecture_scale" | "optimization"'
+    else:
+        set_1 = {"label": "Impact-Heavy Set", "desc": "Focus heavily on the quantified results and business/end-user value."}
+        set_2 = {"label": "Technical/Execution Set", "desc": "Focus on the specific tools, methods, frameworks, and technical execution."}
+        variant_enum = '"impact_heavy" | "technical_heavy"'
+
+    company_target = f"Specifically, the user is targeting a role at '{target_company}'." if target_company else ""
+
+    achievements_json = json.dumps([{
+        "id": a.get("id"),
+        "title": a.get("title"),
+        "description": a.get("original_description"),
+        "metrics": a.get("quantified_metrics", {})
+    } for a in achievements], indent=2)
+
+    system_prompt = f"""
+    You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role. {company_target}
+    The user wants exactly {num_points} elite resume bullet points generated from a group of raw achievements.
+    
+    {rag_context}
+    
+    Raw Achievements Group:
+    {achievements_json}
+    
+    {length_constraint}
+    
+    {action_verb_dictionary}
+    
+    CRITICAL TASK INSTRUCTIONS:
+    1. The user requested EXACTLY {num_points} bullets. You must output EXACTLY {num_points} bullets per variant set.
+    2. Intelligent Merging: If multiple raw achievements are related (e.g. built the pipeline AND optimized it), combine them into a single dense bullet. 
+    3. Exclusion: If there are more raw achievements than the target {num_points} bullets, exclude the least relevant/weakest achievements (e.g., ones lacking metrics or relevance to {target_role}). Provide reasoning for exclusion.
+    4. You must generate TWO distinct variant sets:
+       - Set 1: {set_1['label']} - {set_1['desc']}
+       - Set 2: {set_2['label']} - {set_2['desc']}
+
+    Return strictly a JSON object matching this exact schema:
+    {{
+        "variant_sets": [
+            {{
+                "set_label": "The set label",
+                "set_description": "The set description",
+                "bullets": [
+                    {{
+                        "variant_type": {variant_enum},
+                        "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
+                        "source_achievement_ids": ["uuid-1", "uuid-2"],
+                        "merge_explanation": "Explain why these were merged or why this was chosen",
+                        "recruiter_notes": "1-2 sentences on why this is strong."
+                    }}
+                ],
+                "excluded_achievements": [
+                    {{
+                        "achievement_id": "uuid-5",
+                        "title": "Title of excluded",
+                        "reason": "Why it was excluded"
+                    }}
+                ]
+            }}
+        ]
+    }}
+    
+    CRITICAL: 
+    - Output EXACTLY {num_points} bullets in each 'bullets' array.
+    - NEVER put a full stop (period) at the end of the bullet point.
+    - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
+    """
+    
+    # Try Gemini first
+    try:
+        response = gemini_client.generate_content(
+            model_name="gemini-3.5-flash",
+            prompt=system_prompt,
+            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Gemini generation failed for section bullets, falling back to Cerebras: {e}")
+        
+    # Fallback to Cerebras
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            response_text = cerebras_client.generate_chat_completion(
+                model="gpt-oss-120b",
+                messages=[{"role": "user", "content": system_prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=2500
+            )
+            
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+            response_text = response_text.strip()
+            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+            
+            data = json.loads(response_text)
+            
+            # Ensure no full stops
+            for v_set in data.get("variant_sets", []):
+                for v in v_set.get("bullets", []):
+                    if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                        v["bullet_text"] = v["bullet_text"][:-1]
+                        
+            return data
+        except Exception as e:
+            print(f"Failed to generate section variants JSON via Cerebras (attempt {attempt+1}): {e}")
+            if attempt == max_retries - 1:
+                return {}
+    return {}
+
 def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Runs a single turn of the metric reconstruction chat."""
     system_prompt = f"""

@@ -62,6 +62,16 @@ class SaveBulletRequest(BaseModel):
     target_role: str
     bullet_text: str
     variant_type: str
+    generation_group_id: Optional[str] = None
+
+class GenerateSectionRequest(BaseModel):
+    user_id: str
+    achievement_ids: List[str]
+    parent_experience: str
+    target_role: str
+    num_points: int
+    target_company: Optional[str] = None
+    benchmark_text: Optional[str] = None
 
 class EditBulletRequest(BaseModel):
     bullet_text: str
@@ -333,6 +343,33 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
         print(f"Error in generate_bullets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/generate-section")
+@limiter.limit("10/minute")
+async def generate_section_bullets_api(request: Request, req: GenerateSectionRequest):
+    from agents.resume_analyzer import supabase
+    try:
+        if not req.achievement_ids:
+            raise HTTPException(status_code=400, detail="No achievements provided")
+            
+        ach_res = supabase.table('achievements').select("*").in_('id', req.achievement_ids).execute()
+        if not ach_res.data:
+            raise HTTPException(status_code=404, detail="Achievements not found")
+            
+        from agents.achievement_engine import generate_section_bullets
+        variants_data = generate_section_bullets(
+            supabase, 
+            ach_res.data, 
+            req.target_role, 
+            target_company=req.target_company or "",
+            num_points=req.num_points,
+            benchmark_text=req.benchmark_text or ""
+        )
+        
+        return variants_data
+    except Exception as e:
+        print(f"Error in generate_section_bullets: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/point-bank")
 def get_point_bank(user_id: str):
     from agents.resume_analyzer import supabase
@@ -347,14 +384,18 @@ def get_point_bank(user_id: str):
 def save_bullet(req: SaveBulletRequest):
     from agents.resume_analyzer import supabase
     try:
-        res = supabase.table('generated_bullets').insert({
+        insert_data = {
             "achievement_id": req.achievement_id,
             "user_id": req.user_id,
             "target_role": req.target_role,
             "bullet_text": req.bullet_text,
             "variant_type": req.variant_type,
             "is_saved": True
-        }).execute()
+        }
+        if req.generation_group_id:
+            insert_data["generation_group_id"] = req.generation_group_id
+            
+        res = supabase.table('generated_bullets').insert(insert_data).execute()
         return res.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

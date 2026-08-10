@@ -1,0 +1,293 @@
+# Placement Resume Builder — Implementation Plan
+
+## Goal
+
+Add a **Resume Builder** feature to InternPrep AI that helps students convert their raw experiences into high-impact, role-specific resume bullets for placement preparation. This is fundamentally different from the existing **Resume Review** (which critiques a finished resume). The Builder works from raw achievements upward: store once → generate many role-specific variants → benchmark against successful seniors.
+
+> [!IMPORTANT]
+> This is a new top-level page `/resume-builder` that lives alongside the existing `/resume` (Resume Review) page. The two features are complementary — Build first, Review after.
+
+---
+
+## What We Are Building (MVP Scope)
+
+### In Scope
+1. **Achievement Vault** — A user-owned, persistent store of raw achievements extracted from uploaded resumes/documents or manually entered.
+2. **AI Extraction Pipeline** — Upload a previous resume PDF or paste raw text → AI extracts individual achievements → User verifies (keep/edit/reject).
+3. **Bullet Laboratory** — Select an achievement + target role → AI generates 3-5 role-specific bullet variants, benchmarked against placement-tier golden examples.
+4. **Metric Reconstruction** — An interactive chat mode where the AI asks targeted questions to help the user remember forgotten metrics and quantify impact.
+5. **Resume Strategy Panel** — Given a target role + the user's vault, surface: which achievements to prioritize, what the profile lacks (gap analysis), and role-specific writing guidance.
+6. **Placement Resume Ingestion Pipeline** — A script to ingest senior placement resumes into the golden examples database, tagged by `tier=placement`, `domain`, and `competency_tags`.
+7. **Point Bank** — A saved collection of the user's best generated bullets, organized by role. Users copy these into their own template.
+
+### Explicitly Out of Scope (for MVP)
+- PDF resume generation / export
+- Drag-and-drop resume editor
+- JD-paste auto-generation
+- Cover letters / SOPs
+- Company-specific intelligence pages
+- Advanced graph visualizations
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    A["Upload Resume PDF / Paste Text"] --> B["AI Extraction Engine"]
+    B --> C["Achievement Vault (Supabase)"]
+    C --> D["Select Achievement + Target Role"]
+    D --> E["Bullet Laboratory"]
+    E --> F["Golden Examples RAG (placement-tier)"]
+    F --> E
+    E --> G["Generated Bullet Variants"]
+    G --> H["Point Bank (saved bullets)"]
+    C --> I["Resume Strategy Engine"]
+    I --> J["Gap Analysis + Recommendations"]
+    C --> K["Metric Reconstruction Chat"]
+    K --> C
+```
+
+---
+
+## Database Schema (Supabase Migrations)
+
+### Extend existing `golden_resume_bullets` table
+
+| Column | Type | Description |
+|---|---|---|
+| `tier` | `text` | `'internship'` or `'placement'`. Default `'internship'` for all existing rows. |
+| `company` | `text` (nullable) | Company name where available (e.g., "McKinsey", "Google"). |
+| `competency_tags` | `text[]` | Array of competency tags (e.g., `['strategic_problem_solving', 'leadership']`). |
+
+### New table: `achievements`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `uuid` (PK) | |
+| `user_id` | `uuid` (FK → auth.users) | |
+| `title` | `text` | Short title (e.g., "Automated Data Pipeline at Accenture") |
+| `parent_experience` | `text` | Organization/project name |
+| `timeline` | `text` | e.g., "May 2025 – Jul 2025" |
+| `original_description` | `text` | Raw text as extracted or entered |
+| `user_notes` | `text` (nullable) | Additional context the user added |
+| `quantified_metrics` | `jsonb` | `{ "users_affected": 500, "time_saved_hours": 120 }` |
+| `competency_tags` | `text[]` | Auto-classified + user-editable |
+| `extraction_confidence` | `float` | 0.0–1.0 |
+| `source_type` | `text` | `'resume_upload'`, `'manual'`, `'text_paste'` |
+| `status` | `text` | `'pending'`, `'accepted'`, `'rejected'` |
+| `created_at` | `timestamptz` | |
+| `updated_at` | `timestamptz` | |
+
+### New table: `generated_bullets`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `uuid` (PK) | |
+| `achievement_id` | `uuid` (FK → achievements) | |
+| `user_id` | `uuid` (FK → auth.users) | |
+| `target_role` | `text` | The role this bullet was generated for |
+| `bullet_text` | `text` | The generated bullet |
+| `variant_type` | `text` | `'impact_heavy'`, `'leadership_heavy'`, `'technical_heavy'`, `'concise'` |
+| `scores` | `jsonb` | `{ "impact": 85, "quantification": 90, "role_fit": 78, ... }` |
+| `golden_references` | `jsonb` | Array of golden bullet IDs used as few-shot context |
+| `is_saved` | `boolean` | Whether user saved this to their Point Bank |
+| `created_at` | `timestamptz` | |
+
+### New table: `user_role_preferences`
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | `uuid` (PK) | |
+| `user_id` | `uuid` (FK → auth.users) | |
+| `role_priorities` | `text[]` | Ordered list e.g., `['consulting', 'product', 'finance']` |
+| `created_at` | `timestamptz` | |
+| `updated_at` | `timestamptz` | |
+
+### New RPC function: `match_golden_bullets_placement`
+
+Same structure as existing `match_golden_bullets`, but with an additional `filter_tier` parameter to prefer `placement`-tier matches (falling back to `internship`-tier if insufficient results).
+
+---
+
+## Backend Changes (FastAPI)
+
+### New Router: `routers/resume_builder.py`
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/builder/extract` | POST | Upload PDF or text → AI extracts achievements → returns list for verification |
+| `/builder/achievements` | GET | List all achievements for the authenticated user |
+| `/builder/achievements` | POST | Manually add a new achievement |
+| `/builder/achievements/{id}` | PATCH | Edit an existing achievement |
+| `/builder/achievements/{id}` | DELETE | Delete an achievement |
+| `/builder/generate` | POST | Given `achievement_id` + `target_role` → generate 3-5 bullet variants using placement-tier RAG |
+| `/builder/save-bullet` | POST | Save a generated bullet to the Point Bank |
+| `/builder/point-bank` | GET | Get all saved bullets for the user, grouped by role |
+| `/builder/point-bank/{id}` | DELETE | Remove a bullet from the Point Bank |
+| `/builder/strategy` | POST | Given `target_role` + user's vault → return gap analysis + recommendations |
+| `/builder/reconstruct` | POST | Metric reconstruction chat turn (achievement_id + conversation history → AI asks targeted metric questions) |
+
+### New Agent: `agents/achievement_engine.py`
+
+Core logic for:
+1. **`extract_achievements(text, source_type)`** — Gemini extracts individual achievements from resume text or raw notes. Returns structured JSON with title, description, competency tags, metrics, confidence.
+2. **`generate_bullet_variants(achievement, target_role, golden_context)`** — Given a structured achievement + RAG context from placement-tier golden examples, generate 3-5 role-specific bullet variants with scoring.
+3. **`generate_strategy(achievements, target_role)`** — Analyze the full vault against successful placement profiles, identify strengths/gaps, recommend which achievements to prioritize.
+4. **`reconstruct_metrics(achievement, chat_history)`** — Interactive metric reconstruction: AI asks targeted questions based on the achievement context to help the user quantify their impact.
+
+### New Script: `scripts/ingest_placement_resumes.py`
+
+A script modeled on the existing `process_casebooks.py` but designed for senior placement resumes:
+- Input: PDF files in `data/resumes/placement/` organized by domain subfolder
+- Pipeline: Parse PDF → Extract bullets → Classify by competency tags → Embed → Upsert into `golden_resume_bullets` with `tier='placement'`
+- Supports metadata: domain, company (from filename convention), tier
+
+---
+
+## Frontend Changes (Next.js)
+
+### New Page: `/resume-builder/page.tsx`
+
+A single page with **three tabs**:
+
+#### Tab 1: Achievement Vault
+- **Upload Section**: Upload a previous resume PDF or paste raw text → Click "Extract Achievements"
+- **Achievement List**: Cards showing each extracted achievement with:
+  - Title, parent experience, timeline
+  - Competency tags (editable pills)
+  - Status badge (pending/accepted)
+  - Actions: Accept ✓ / Edit ✏ / Reject ✗ / Reconstruct Metrics 💬
+  - "Generate Bullets →" button per achievement
+- **Manual Add**: Button to manually add a new achievement via a form
+- **Filters**: By experience, competency tag, status
+
+#### Tab 2: Bullet Laboratory
+- **Achievement Selector**: Dropdown or card selector to pick an achievement
+- **Role Selector**: Dropdown of available target roles
+- **Generate Button**: Triggers bullet generation
+- **Results Panel**: Shows 3-5 generated variants, each with:
+  - The bullet text
+  - Variant type label (Impact-heavy, Leadership-heavy, Technical, Concise)
+  - Scores (Impact, Quantification, Role Fit)
+  - "Save to Point Bank" button
+  - "Regenerate" button
+- **Benchmark Inspiration**: Shows the golden examples that influenced the generation (anonymized)
+
+#### Tab 3: Strategy & Point Bank
+- **Role Strategy Panel** (top):
+  - Select a target role → Shows gap analysis radar, strengths, weaknesses, recommended achievements
+  - Role-specific writing guidance
+- **Point Bank** (bottom):
+  - All saved bullets grouped by target role
+  - Copy individual bullets or copy all for a role
+  - Delete bullets from the bank
+
+### Navigation Update
+- Add "Resume Builder" to the sidebar/navbar alongside existing "Resume Review"
+- Update the landing page to feature the new capability
+
+---
+
+## Competency Taxonomy
+
+A fixed but extensible set of tags applied to both user achievements and golden examples:
+
+| Tag | Description |
+|---|---|
+| `strategic_problem_solving` | Structuring ambiguous problems, frameworks, recommendations |
+| `product_technical_execution` | Building things, shipping features, technical depth |
+| `sustainability_impact` | ESG, sustainability consulting, social impact |
+| `financial_quantitative_rigor` | Modeling, analysis, numbers-driven work |
+| `leadership_stakeholder_mgmt` | Managing people, driving initiatives, cross-functional work |
+| `entrepreneurial_ownership` | Founding, building 0-to-1, independent execution |
+
+These tags are auto-classified by the AI during extraction and editable by the user.
+
+---
+
+## Proposed Changes Summary
+
+### Backend
+
+#### [NEW] [resume_builder.py](file:///c:/Interview%20Preparation%20Platform/apps/api/routers/resume_builder.py)
+New FastAPI router with all `/builder/*` endpoints.
+
+#### [NEW] [achievement_engine.py](file:///c:/Interview%20Preparation%20Platform/apps/api/agents/achievement_engine.py)
+Core AI logic for extraction, bullet generation, strategy, and metric reconstruction.
+
+#### [NEW] [ingest_placement_resumes.py](file:///c:/Interview%20Preparation%20Platform/apps/api/scripts/ingest_placement_resumes.py)
+Script to parse and embed senior placement resumes into the golden examples DB.
+
+#### [MODIFY] [main.py](file:///c:/Interview%20Preparation%20Platform/apps/api/main.py)
+Register the new `resume_builder` router.
+
+#### [NEW] [placement_best_practices.json](file:///c:/Interview%20Preparation%20Platform/data/resumes/placement_best_practices.json)
+Placement-specific best practice rules (extended from existing internship rules).
+
+#### [NEW] [placement_section_rules.json](file:///c:/Interview%20Preparation%20Platform/data/resumes/placement_section_rules.json)
+Placement-specific section rules with adjusted conventions for placement resumes.
+
+---
+
+### Frontend
+
+#### [NEW] [page.tsx](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/resume-builder/page.tsx)
+Main Resume Builder page with three tabs (Vault / Lab / Strategy+Point Bank).
+
+#### [MODIFY] [page.tsx](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/page.tsx)
+Update landing page to feature the new Resume Builder alongside existing features.
+
+#### [MODIFY] [page.tsx](file:///c:/Interview%20Preparation%20Platform/apps/web/src/app/dashboard/page.tsx)
+Add Resume Builder quick-access card to the dashboard.
+
+---
+
+### Database
+
+#### Supabase Migration
+- ALTER `golden_resume_bullets`: add `tier`, `company`, `competency_tags` columns
+- CREATE `achievements` table
+- CREATE `generated_bullets` table
+- CREATE `user_role_preferences` table
+- CREATE `match_golden_bullets_placement` RPC function
+- Add Row Level Security policies for new tables
+
+---
+
+## Build Sequence
+
+| Phase | What Gets Built | Depends On |
+|---|---|---|
+| **Phase 1: Schema & Ingestion** | DB migration + `ingest_placement_resumes.py` script + golden table extensions | You providing placement resume PDFs |
+| **Phase 2: Achievement Vault** | `extract_achievements` AI pipeline + `/builder/extract` + `/builder/achievements` CRUD endpoints + Vault UI tab | Phase 1 |
+| **Phase 3: Bullet Laboratory** | `generate_bullet_variants` + placement-tier RAG + `/builder/generate` + Lab UI tab | Phase 1 + Phase 2 |
+| **Phase 4: Metric Reconstruction** | `/builder/reconstruct` interactive chat + UI modal | Phase 2 |
+| **Phase 5: Strategy & Point Bank** | `generate_strategy` + gap analysis + Point Bank CRUD + Strategy UI tab | Phase 2 + Phase 3 |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Test achievement extraction on 3-5 sample resumes → verify all bullets captured
+- Test bullet generation for same achievement across 3 different roles → verify role-specific framing
+- Test RAG retrieval with `tier=placement` filter → verify placement-tier examples returned preferentially
+
+### Manual Verification
+- End-to-end flow: Upload a real resume → Extract → Verify → Generate bullets → Save to Point Bank
+- Compare generated placement bullets against actual successful placement resume bullets
+- Verify metric reconstruction chat produces meaningful follow-up questions
+
+---
+
+## Open Questions For You
+
+> [!IMPORTANT]
+> **Roles list:** You mentioned you'll provide the exact list of target roles. I need this before Phase 1 so I can encode them into the taxonomy. Please share whenever ready.
+
+> [!IMPORTANT]
+> **Placement resume organization:** When you provide the placement resumes, how will they be organized? I'd suggest creating subfolders by domain inside `data/resumes/placement/` (e.g., `consulting/`, `product/`, `finance/`). The filename should ideally include the company name if available (e.g., `McKinsey_Senior1.pdf`).
+
+> [!NOTE]
+> **Placement-specific rules:** The existing `best_practices_rules.json` and `section_rules.json` are heavily internship-focused. I'll create placement-specific versions, but I may need your input on whether any conventions differ significantly for placement resumes vs internship resumes (e.g., do placement resumes typically have more experience entries? Different section ordering?).

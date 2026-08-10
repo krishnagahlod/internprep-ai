@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2 } from "lucide-react"
+import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers } from "lucide-react"
 
 // Types
 type Achievement = {
@@ -49,11 +49,13 @@ const SECTION_ORDER: Record<string, number> = {
 interface GeneratedBullet {
   id: string;
   achievement_id: string;
+  source_achievement_ids?: string[];
   target_role: string;
   bullet_text: string;
   variant_type: string;
   recruiter_notes?: string;
   is_saved?: boolean;
+  generation_group_id?: string;
 }
 
 // Helper to highlight numbers and percentages in text
@@ -96,6 +98,15 @@ export default function ResumeBuilderPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
   
+  // Section Composer State
+  const [labMode, setLabMode] = useState<"single" | "composer">("single")
+  const [composerHeading, setComposerHeading] = useState<string | null>(null)
+  const [composerSelectedIds, setComposerSelectedIds] = useState<string[]>([])
+  const [composerNumPoints, setComposerNumPoints] = useState(3)
+  const [composerResults, setComposerResults] = useState<any>(null)
+  const [isComposerGenerating, setIsComposerGenerating] = useState(false)
+  const [activeVariantSet, setActiveVariantSet] = useState(0)
+
   // Point Bank State
   const [pointBank, setPointBank] = useState<GeneratedBullet[]>([])
   const [activePointBankRole, setActivePointBankRole] = useState<string>("all")
@@ -284,21 +295,60 @@ export default function ResumeBuilderPage() {
     }
     setIsGenerating(false)
   }
-  
-  const saveBullet = async (bullet: GeneratedBullet) => {
-    if (!user) return
+
+  const generateSectionBullets = async () => {
+    if (!user || composerSelectedIds.length === 0) return
+    setIsComposerGenerating(true)
     try {
-      const res = await fetch(`${apiBase}/builder/save-bullet`, {
+      const heading = composerHeading || ""
+      const res = await fetch(`${apiBase}/builder/generate-section`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          achievement_id: bullet.achievement_id,
+          achievement_ids: composerSelectedIds,
+          parent_experience: heading,
           target_role: targetRole,
-          bullet_text: bullet.bullet_text,
-          variant_type: bullet.variant_type,
-          recruiter_notes: bullet.recruiter_notes
+          num_points: composerNumPoints,
+          target_company: targetCompany || undefined,
+          benchmark_text: benchmarkText || undefined
         })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (!data || !data.variant_sets) {
+          alert("AI generation failed or returned no results. Please try again.")
+        } else {
+          setComposerResults(data)
+          setActiveVariantSet(0)
+        }
+      } else {
+        alert("Failed to connect to AI generation server. Please try again.")
+      }
+    } catch (e) { 
+      console.error(e) 
+    }
+    setIsComposerGenerating(false)
+  }
+  
+  const saveBullet = async (bullet: GeneratedBullet, generationGroupId?: string) => {
+    if (!user) return
+    try {
+      const bodyPayload: any = {
+        user_id: user.id,
+        achievement_id: bullet.achievement_id || bullet.source_achievement_ids?.[0] || composerSelectedIds[0] || "",
+        target_role: targetRole,
+        bullet_text: bullet.bullet_text,
+        variant_type: bullet.variant_type,
+        recruiter_notes: bullet.recruiter_notes
+      }
+      if (generationGroupId) {
+        bodyPayload.generation_group_id = generationGroupId
+      }
+      const res = await fetch(`${apiBase}/builder/save-bullet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyPayload)
       })
       if (res.ok) {
         // Mark locally as saved
@@ -837,55 +887,138 @@ export default function ResumeBuilderPage() {
               <CardDescription className="text-base">Mix and match your raw achievements into perfectly crafted, role-specific bullet points tailored to golden benchmarks.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-8 pt-8">
+              <div className="flex justify-center mb-2">
+                <div className="bg-muted/50 p-1 rounded-xl flex items-center gap-1 shadow-inner border border-border/50">
+                  <Button variant={labMode === "single" ? "default" : "ghost"} size="sm" onClick={() => setLabMode("single")} className="px-6 rounded-lg font-semibold">Single Achievement</Button>
+                  <Button variant={labMode === "composer" ? "default" : "ghost"} size="sm" onClick={() => setLabMode("composer")} className="px-6 rounded-lg font-semibold">Section Composer</Button>
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-8">
-                <div className="space-y-3">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="achievement-select">
-                    Select Achievement Source
-                  </label>
-                  <div className="relative">
-                    <select 
-                      id="achievement-select"
-                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
-                      value={selectedAchievement || ""}
-                      onChange={(e) => setSelectedAchievement(e.target.value)}
-                      aria-label="Select an achievement"
-                    >
-                      <option value="" disabled>-- Select an achievement from your vault --</option>
-                      {(() => {
-                        const sectionOrder = ["Scholastic Achievements", "Professional Experience", "Positions of Responsibility", "Projects", "Extracurriculars"];
-                        const grouped = achievements.reduce((acc, ach) => {
-                          const section = ach.section_type || "Experience";
-                          if (!acc[section]) acc[section] = {};
-                          const parent = ach.parent_experience || "Other";
-                          if (!acc[section][parent]) acc[section][parent] = [];
-                          acc[section][parent].push(ach);
-                          return acc;
-                        }, {} as Record<string, Record<string, Achievement[]>>);
-                        
-                        const sorted = Object.keys(grouped).sort((a, b) => {
-                          const idxA = sectionOrder.indexOf(a);
-                          const idxB = sectionOrder.indexOf(b);
-                          if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-                          if (idxA === -1) return 1;
-                          if (idxB === -1) return -1;
-                          return idxA - idxB;
-                        });
-                        
-                        return sorted.map(section => (
-                          Object.entries(grouped[section]).map(([parent, achs]) => (
-                            <optgroup key={`${section}-${parent}`} label={`${section} • ${parent}`}>
-                              {achs.map(ach => (
-                                <option key={ach.id} value={ach.id}>{ach.title}</option>
-                              ))}
-                            </optgroup>
-                          ))
-                        ));
-                      })()}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                      <ChevronRight className="h-5 w-5 rotate-90" />
+                <div className="space-y-3 col-span-1 md:col-span-2">
+                  {labMode === "single" ? (
+                    <>
+                      <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="achievement-select">
+                        Select Achievement Source
+                      </label>
+                      <div className="relative">
+                        <select 
+                          id="achievement-select"
+                          className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
+                          value={selectedAchievement || ""}
+                          onChange={(e) => setSelectedAchievement(e.target.value)}
+                          aria-label="Select an achievement"
+                        >
+                          <option value="" disabled>-- Select an achievement from your vault --</option>
+                          {(() => {
+                            const sectionOrder = ["Scholastic Achievements", "Professional Experience", "Positions of Responsibility", "Projects", "Extracurriculars"];
+                            const grouped = achievements.reduce((acc, ach) => {
+                              const section = ach.section_type || "Experience";
+                              if (!acc[section]) acc[section] = {};
+                              const parent = ach.parent_experience || "Other";
+                              if (!acc[section][parent]) acc[section][parent] = [];
+                              acc[section][parent].push(ach);
+                              return acc;
+                            }, {} as Record<string, Record<string, Achievement[]>>);
+                            
+                            const sorted = Object.keys(grouped).sort((a, b) => {
+                              const idxA = sectionOrder.indexOf(a);
+                              const idxB = sectionOrder.indexOf(b);
+                              if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+                              if (idxA === -1) return 1;
+                              if (idxB === -1) return -1;
+                              return idxA - idxB;
+                            });
+                            
+                            return sorted.map(section => (
+                              Object.entries(grouped[section]).map(([parent, achs]) => (
+                                <optgroup key={`${section}-${parent}`} label={`${section} • ${parent}`}>
+                                  {achs.map(ach => (
+                                    <option key={ach.id} value={ach.id}>{ach.title}</option>
+                                  ))}
+                                </optgroup>
+                              ))
+                            ));
+                          })()}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                          <ChevronRight className="h-5 w-5 rotate-90" />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="heading-select">
+                          Select Section Heading
+                        </label>
+                        <div className="relative">
+                          <select 
+                            id="heading-select"
+                            className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer"
+                            value={composerHeading || ""}
+                            onChange={(e) => {
+                              const heading = e.target.value;
+                              setComposerHeading(heading);
+                              const achs = achievements.filter(a => a.parent_experience === heading).map(a => a.id);
+                              setComposerSelectedIds(achs);
+                            }}
+                          >
+                            <option value="" disabled>-- Select a heading from your vault --</option>
+                            {Array.from(new Set(achievements.filter(a => a.parent_experience).map(a => a.parent_experience))).map(heading => (
+                              <option key={heading} value={heading}>{heading}</option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                            <ChevronRight className="h-5 w-5 rotate-90" />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {composerHeading && (
+                        <div className="space-y-3 p-4 bg-muted/5 border border-border/50 rounded-xl">
+                          <div className="flex justify-between items-center mb-2">
+                            <label className="text-sm font-bold text-foreground">Select Achievements to Include</label>
+                            <Button 
+                              variant="ghost" size="sm" className="h-7 text-xs"
+                              onClick={() => {
+                                const allIds = achievements.filter(a => a.parent_experience === composerHeading).map(a => a.id);
+                                if (composerSelectedIds.length === allIds.length) {
+                                  setComposerSelectedIds([]);
+                                } else {
+                                  setComposerSelectedIds(allIds);
+                                }
+                              }}
+                            >
+                              {composerSelectedIds.length === achievements.filter(a => a.parent_experience === composerHeading).length ? "Deselect All" : "Select All"}
+                            </Button>
+                          </div>
+                          <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                            {achievements.filter(a => a.parent_experience === composerHeading).map(ach => (
+                              <label key={ach.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/40 hover:bg-muted/20 cursor-pointer transition-colors bg-background shadow-sm">
+                                <input 
+                                  type="checkbox" 
+                                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                  checked={composerSelectedIds.includes(ach.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setComposerSelectedIds([...composerSelectedIds, ach.id]);
+                                    } else {
+                                      setComposerSelectedIds(composerSelectedIds.filter(id => id !== ach.id));
+                                    }
+                                  }}
+                                />
+                                <div>
+                                  <div className="font-semibold text-[13px] leading-tight">{ach.title}</div>
+                                  <div className="text-[12px] text-muted-foreground line-clamp-1 mt-0.5">{ach.original_description}</div>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </div>
                 
                 <div className="space-y-3">
@@ -925,37 +1058,67 @@ export default function ResumeBuilderPage() {
                   />
                 </div>
                 
-                <div className="space-y-3">
-                  <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="benchmark-text">
-                    Benchmark Bullet (Optional)
-                  </label>
-                  <Textarea
-                    id="benchmark-text"
-                    placeholder="Paste a point from your LaTeX template. AI will strictly match its character length."
-                    className="min-h-[80px] w-full rounded-xl border border-input/60 bg-muted/5 px-4 py-3 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none placeholder:text-muted-foreground/60"
-                    value={benchmarkText}
-                    onChange={(e) => setBenchmarkText(e.target.value)}
-                  />
+                <div className="space-y-3 col-span-1 md:col-span-2">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="benchmark-text">
+                        Benchmark Bullet (Optional)
+                      </label>
+                      <Textarea
+                        id="benchmark-text"
+                        placeholder="Paste a point from your LaTeX template. AI will strictly match its character length."
+                        className="min-h-[80px] w-full rounded-xl border border-input/60 bg-muted/5 px-4 py-3 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none placeholder:text-muted-foreground/60"
+                        value={benchmarkText}
+                        onChange={(e) => setBenchmarkText(e.target.value)}
+                      />
+                    </div>
+                    {labMode === "composer" && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="num-points">
+                          Number of Bullets to Generate
+                        </label>
+                        <div className="flex items-center h-[80px] gap-4 bg-muted/5 px-4 rounded-xl border border-input/60 shadow-sm">
+                          <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setComposerNumPoints(Math.max(1, composerNumPoints - 1))}>-</Button>
+                          <div className="text-2xl font-bold w-12 text-center text-primary">{composerNumPoints}</div>
+                          <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setComposerNumPoints(Math.min(8, composerNumPoints + 1))}>+</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
               <div className="pt-2">
-                <Button 
-                  className="w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl transition-all" 
-                  onClick={generateVariants} 
-                  disabled={!selectedAchievement || isGenerating}
-                >
-                  {isGenerating ? (
-                    <><Loader2 className="h-5 w-5 animate-spin mr-3" /> Synthesizing variants using AI...</>
-                  ) : (
-                    <><Sparkles className="h-5 w-5 mr-3" /> Generate Benchmarked Variants</>
-                  )}
-                </Button>
+                {labMode === "single" ? (
+                  <Button 
+                    className="w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl transition-all" 
+                    onClick={generateVariants} 
+                    disabled={!selectedAchievement || isGenerating}
+                  >
+                    {isGenerating ? (
+                      <><Loader2 className="h-5 w-5 animate-spin mr-3" /> Synthesizing variants using AI...</>
+                    ) : (
+                      <><Sparkles className="h-5 w-5 mr-3" /> Generate Benchmarked Variants</>
+                    )}
+                  </Button>
+                ) : (
+                  <Button 
+                    className="w-full h-14 text-lg font-medium shadow-lg hover:shadow-xl transition-all" 
+                    onClick={generateSectionBullets} 
+                    disabled={composerSelectedIds.length === 0 || isComposerGenerating}
+                  >
+                    {isComposerGenerating ? (
+                      <><Loader2 className="h-5 w-5 animate-spin mr-3" /> Composing section using AI...</>
+                    ) : (
+                      <><Sparkles className="h-5 w-5 mr-3" /> Compose Resume Section</>
+                    )}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {generatedBullets.length > 0 && (
+          {labMode === "single" && generatedBullets.length > 0 && (
             <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
               <div className="flex items-center gap-3">
                 <div className="h-px bg-border flex-1"></div>
@@ -1040,6 +1203,96 @@ export default function ResumeBuilderPage() {
                   </Card>
                 ))}
               </div>
+            </div>
+          )}
+          
+          {labMode === "composer" && composerResults && composerResults.variant_sets && (
+            <div className="space-y-8 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="flex items-center gap-3">
+                <div className="h-px bg-border flex-1"></div>
+                <h3 className="text-xl font-bold px-2">Generated Section Variants</h3>
+                <div className="h-px bg-border flex-1"></div>
+              </div>
+              
+              <div className="flex justify-center gap-4">
+                {composerResults.variant_sets.map((vSet: any, idx: number) => (
+                  <Button 
+                    key={idx} 
+                    variant={activeVariantSet === idx ? "default" : "outline"} 
+                    className="flex flex-col h-auto py-3 px-6"
+                    onClick={() => setActiveVariantSet(idx)}
+                  >
+                    <span className="font-bold">{vSet.set_label}</span>
+                    <span className="text-xs opacity-80 font-normal max-w-xs whitespace-normal">{vSet.set_description}</span>
+                  </Button>
+                ))}
+              </div>
+
+              {composerResults.variant_sets[activeVariantSet] && (
+                <div className="space-y-6">
+                  {/* The bullets list */}
+                  <div className="bg-card border border-border shadow-md rounded-xl overflow-hidden">
+                    <div className="p-4 bg-muted/30 border-b border-border flex justify-between items-center">
+                      <h4 className="font-bold text-foreground">Drafted Points</h4>
+                      <Button 
+                        size="sm"
+                        onClick={async () => {
+                          const groupId = crypto.randomUUID();
+                          const bullets = composerResults.variant_sets[activeVariantSet].bullets;
+                          for (const bullet of bullets) {
+                             await saveBullet(bullet, groupId);
+                          }
+                        }}
+                      >
+                        <Save className="h-4 w-4 mr-2" /> Save Set to Point Bank
+                      </Button>
+                    </div>
+                    <div className="divide-y divide-border/50">
+                      {composerResults.variant_sets[activeVariantSet].bullets.map((bullet: any, idx: number) => (
+                        <div key={idx} className="p-5 flex flex-col gap-3 hover:bg-muted/10 transition-colors">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className="flex-1 text-[16px] md:text-[17px] font-medium leading-relaxed text-foreground">
+                              <span className="text-muted-foreground font-bold mr-2">•</span>
+                              {highlightMetrics(bullet.bullet_text)}
+                            </div>
+                            <Button 
+                              variant="ghost" size="sm"
+                              className="text-muted-foreground hover:text-foreground shrink-0"
+                              onClick={async () => {
+                                const groupId = crypto.randomUUID();
+                                await saveBullet(bullet, groupId);
+                              }}
+                            >
+                              <Save className="h-4 w-4 mr-2" /> Save Single
+                            </Button>
+                          </div>
+                          <div className="pl-6 text-[13px] text-muted-foreground flex items-center gap-2">
+                            <Sparkles className="h-3 w-3 text-primary" />
+                            <span className="italic">{bullet.merge_explanation}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Excluded achievements */}
+                  {composerResults.variant_sets[activeVariantSet].excluded_achievements && composerResults.variant_sets[activeVariantSet].excluded_achievements.length > 0 && (
+                    <div className="bg-muted/20 border border-border/50 rounded-xl p-5">
+                      <h4 className="font-bold text-sm text-foreground mb-3 flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-primary" /> Achievements Excluded from this Draft
+                      </h4>
+                      <div className="space-y-3">
+                        {composerResults.variant_sets[activeVariantSet].excluded_achievements.map((excl: any, idx: number) => (
+                          <div key={idx} className="text-[13px]">
+                            <span className="font-semibold">{excl.title}: </span>
+                            <span className="text-muted-foreground">{excl.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
@@ -1153,7 +1406,14 @@ export default function ResumeBuilderPage() {
                                             ) : (
                                               <div className="p-4 pr-16 flex gap-4 items-start">
                                                 <div className="mt-2 h-1.5 w-1.5 rounded-full bg-primary/60 shrink-0"></div>
-                                                <div className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</div>
+                                                <div className="flex flex-col gap-1 w-full">
+                                                  <div className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</div>
+                                                  {bullet.generation_group_id && (
+                                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 font-medium bg-muted/30 px-2 py-0.5 rounded-sm w-fit mt-1">
+                                                      <Layers className="h-3 w-3" /> Group Generated
+                                                    </div>
+                                                  )}
+                                                </div>
                                                 
                                                 {/* Action Buttons Overlay */}
                                                 <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-2">
