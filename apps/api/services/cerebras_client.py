@@ -80,7 +80,7 @@ class CerebrasClient:
                         continue
                         
                     response.raise_for_status()
-                    return response.json()["choices"][0]["message"]["content"]
+                    return response.json()["choices"][0]["message"].get("content", "")
                     
             except httpx.HTTPStatusError as e:
                 error_msg = str(e).lower()

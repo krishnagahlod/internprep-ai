@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers } from "lucide-react"
+import { UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info } from "lucide-react"
 
 // Types
 type Achievement = {
@@ -129,6 +129,12 @@ export default function ResumeBuilderPage() {
   const [isChatLoading, setIsChatLoading] = useState(false)
   const [pendingMetricsUpdate, setPendingMetricsUpdate] = useState<any>(null)
   const [pendingContextSummary, setPendingContextSummary] = useState("")
+  
+  // Refinement Chat State
+  const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer", id: string, text: string, role: string, composerSetIdx?: number } | null>(null)
+  const [refineInstruction, setRefineInstruction] = useState("")
+  const [isRefining, setIsRefining] = useState(false)
+  const [refinedResult, setRefinedResult] = useState<{ text: string, explanation: string } | null>(null)
   
   // API Base
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000"
@@ -420,18 +426,15 @@ export default function ResumeBuilderPage() {
   const generateStrategy = async () => {
     if (!user) return
     setIsStrategyLoading(true)
-    
-    // Determine the role to run strategy for (using the currently selected point bank domain)
-    const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
-    const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
-
     try {
+      // Determine the role to run strategy for (using the currently selected point bank domain)
+      const targetRole = activePointBankRole === "all" ? Array.from(new Set(pointBank.map(b => b.target_role)))[0] || "finance" : activePointBankRole;
       const res = await fetch(`${apiBase}/resume-builder/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          target_role: displayRole,
+          target_role: targetRole,
           target_company: strategyTargetCompany || undefined,
           job_description: strategyJobDescription || undefined
         })
@@ -441,8 +444,9 @@ export default function ResumeBuilderPage() {
       }
     } catch (e) {
       console.error(e)
+    } finally {
+      setIsStrategyLoading(false)
     }
-    setIsStrategyLoading(false)
   }
 
   const handleQuickSave = async (domain: string) => {
@@ -467,6 +471,61 @@ export default function ResumeBuilderPage() {
     } catch (e) {
       console.error("Failed to quick save:", e)
     }
+  }
+
+  const handleRefineSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!refineTarget || !refineInstruction.trim()) return
+    setIsRefining(true)
+    setRefinedResult(null)
+    try {
+      const res = await fetch(`${apiBase}/builder/refine-bullet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bullet_text: refineTarget.text,
+          instruction: refineInstruction,
+          target_role: refineTarget.role
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setRefinedResult({ text: data.refined_bullet, explanation: data.explanation })
+      }
+    } catch (e) {
+      console.error("Refinement failed:", e)
+    } finally {
+      setIsRefining(false)
+    }
+  }
+
+  const acceptRefinement = async () => {
+    if (!refineTarget || !refinedResult) return
+    const newText = refinedResult.text
+
+    if (refineTarget.source === "bank") {
+      try {
+        const res = await fetch(`${apiBase}/builder/point-bank/${refineTarget.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bullet_text: newText })
+        })
+        if (res.ok) {
+          setPointBank(prev => prev.map(b => b.id === refineTarget.id ? { ...b, bullet_text: newText } : b))
+        }
+      } catch(e) {}
+    } else if (refineTarget.source === "lab_single") {
+      setGeneratedBullets(prev => prev.map(b => b.id === refineTarget.id ? { ...b, bullet_text: newText } : b))
+    } else if (refineTarget.source === "lab_composer" && refineTarget.composerSetIdx !== undefined) {
+      const newResults = { ...composerResults }
+      const set = newResults.variant_sets[refineTarget.composerSetIdx]
+      set.bullets = set.bullets.map((b: any) => b.id === refineTarget.id ? { ...b, bullet_text: newText } : b)
+      setComposerResults(newResults)
+    }
+    
+    setRefineTarget(null)
+    setRefinedResult(null)
+    setRefineInstruction("")
   }
 
   // Effect to load point bank
@@ -1188,16 +1247,28 @@ export default function ResumeBuilderPage() {
                           )}
                         </div>
 
-                        <Button 
-                          size="default" 
-                          variant={bullet.is_saved ? "secondary" : "default"}
-                          className={`font-medium min-w-[120px] shadow-sm transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
-                          onClick={() => saveBullet(bullet)}
-                          disabled={bullet.is_saved}
-                        >
-                          {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                          {bullet.is_saved ? "Saved" : "Save"}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline"
+                            className="font-medium shadow-sm border-primary/20 hover:bg-primary/5 text-primary"
+                            onClick={() => {
+                              setRefineTarget({ source: "lab_single", id: bullet.id, text: bullet.bullet_text, role: targetRole });
+                              setRefineInstruction("");
+                            }}
+                          >
+                            <Sparkles className="h-4 w-4 mr-2" /> Refine
+                          </Button>
+                          <Button 
+                            size="default" 
+                            variant={bullet.is_saved ? "secondary" : "default"}
+                            className={`font-medium min-w-[120px] shadow-sm transition-all ${bullet.is_saved ? 'bg-green-100 text-green-800 hover:bg-green-200 border-green-200' : ''}`}
+                            onClick={() => saveBullet(bullet)}
+                            disabled={bullet.is_saved}
+                          >
+                            {bullet.is_saved ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                            {bullet.is_saved ? "Saved" : "Save"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -1255,16 +1326,28 @@ export default function ResumeBuilderPage() {
                               <span className="text-muted-foreground font-bold mr-2">•</span>
                               {highlightMetrics(bullet.bullet_text)}
                             </div>
-                            <Button 
-                              variant="ghost" size="sm"
-                              className="text-muted-foreground hover:text-foreground shrink-0"
-                              onClick={async () => {
-                                const groupId = crypto.randomUUID();
-                                await saveBullet(bullet, groupId);
-                              }}
-                            >
-                              <Save className="h-4 w-4 mr-2" /> Save Single
-                            </Button>
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <Button 
+                                variant="ghost" size="sm"
+                                className="text-primary hover:text-primary hover:bg-primary/10 shrink-0 font-medium justify-start"
+                                onClick={() => {
+                                  setRefineTarget({ source: "lab_composer", id: bullet.id, text: bullet.bullet_text, role: composerResults.target_role || "finance", composerSetIdx: activeVariantSet });
+                                  setRefineInstruction("");
+                                }}
+                              >
+                                <Sparkles className="h-4 w-4 mr-2" /> AI Refine
+                              </Button>
+                              <Button 
+                                variant="ghost" size="sm"
+                                className="text-muted-foreground hover:text-foreground shrink-0 justify-start"
+                                onClick={async () => {
+                                  const groupId = crypto.randomUUID();
+                                  await saveBullet(bullet, groupId);
+                                }}
+                              >
+                                <Save className="h-4 w-4 mr-2" /> Save Single
+                              </Button>
+                            </div>
                           </div>
                           <div className="pl-6 text-[13px] text-muted-foreground flex items-center gap-2">
                             <Sparkles className="h-3 w-3 text-primary" />
@@ -1417,10 +1500,16 @@ export default function ResumeBuilderPage() {
                                                 
                                                 {/* Action Buttons Overlay */}
                                                 <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-2">
-                                                  <Button variant="ghost" size="icon" onClick={() => {setEditingPointBankBullet(bullet.id); setEditPointBankText(bullet.bullet_text);}} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full shadow-sm">
+                                                  <Button variant="ghost" size="icon" onClick={() => {
+                                                    setRefineTarget({ source: "bank", id: bullet.id, text: bullet.bullet_text, role: bullet.target_role });
+                                                    setRefineInstruction("");
+                                                  }} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-primary rounded-full shadow-sm" title="Refine with AI">
+                                                    <Sparkles className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button variant="ghost" size="icon" onClick={() => {setEditingPointBankBullet(bullet.id); setEditPointBankText(bullet.bullet_text);}} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full shadow-sm" title="Manual Edit">
                                                     <Edit3 className="h-4 w-4" />
                                                   </Button>
-                                                  <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="h-8 w-8 hover:bg-red-50 hover:text-red-600 text-muted-foreground rounded-full shadow-sm">
+                                                  <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full shadow-sm">
                                                     <Trash2 className="h-4 w-4" />
                                                   </Button>
                                                 </div>
@@ -1695,6 +1784,60 @@ export default function ResumeBuilderPage() {
               </Button>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refine Bullet Dialog */}
+      <Dialog open={!!refineTarget} onOpenChange={(open) => !open && setRefineTarget(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary text-xl">
+              <Sparkles className="h-5 w-5" /> Refine Point with AI
+            </DialogTitle>
+            <DialogDescription>
+              Provide instructions to edit this point (e.g., "Make it shorter", "Focus more on leadership", "Remove the metric").
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-muted/20 border rounded-lg text-sm leading-relaxed text-foreground/90 font-medium">
+              {refineTarget?.text}
+            </div>
+            {refinedResult ? (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg text-sm leading-relaxed text-foreground font-medium relative">
+                  <div className="absolute top-0 right-0 p-1 px-2 bg-primary/20 text-primary text-[10px] uppercase font-bold rounded-bl-lg rounded-tr-lg">New</div>
+                  {refinedResult.text}
+                </div>
+                <div className="text-xs text-muted-foreground flex items-start gap-2 bg-muted/30 p-2 rounded">
+                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                  <p>{refinedResult.explanation}</p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleRefineSubmit} className="space-y-3">
+                <Textarea 
+                  placeholder="Your instructions..." 
+                  value={refineInstruction}
+                  onChange={(e) => setRefineInstruction(e.target.value)}
+                  className="min-h-[80px]"
+                  disabled={isRefining}
+                />
+                <Button type="submit" className="w-full" disabled={isRefining || !refineInstruction.trim()}>
+                  {isRefining ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Refining...</> : <><Sparkles className="h-4 w-4 mr-2" /> Refine</>}
+                </Button>
+              </form>
+            )}
+          </div>
+          {refinedResult && (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setRefinedResult(null)}>
+                Try Again
+              </Button>
+              <Button type="button" onClick={acceptRefinement}>
+                Accept & Save
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

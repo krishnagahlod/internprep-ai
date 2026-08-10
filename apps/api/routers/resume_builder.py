@@ -10,8 +10,10 @@ from agents.achievement_engine import (
     extract_achievements_from_text,
     extract_achievements_from_other_pdf,
     generate_bullet_variants,
+    generate_section_bullets,
     run_metric_reconstruction_turn,
-    generate_resume_strategy
+    generate_resume_strategy,
+    refine_bullet_with_ai
 )
 
 router = APIRouter(prefix="/builder", tags=["resume_builder"])
@@ -30,16 +32,6 @@ class ManualAchievementRequest(BaseModel):
     user_notes: Optional[str] = None
     quantified_metrics: Optional[Dict[str, Any]] = None
     competency_tags: Optional[List[str]] = None
-
-class EditAchievementRequest(BaseModel):
-    title: Optional[str] = None
-    parent_experience: Optional[str] = None
-    timeline: Optional[str] = None
-    original_description: Optional[str] = None
-    user_notes: Optional[str] = None
-    quantified_metrics: Optional[Dict[str, Any]] = None
-    competency_tags: Optional[List[str]] = None
-    status: Optional[str] = None
 
 class EditAchievementRequest(BaseModel):
     title: str
@@ -79,6 +71,11 @@ class EditBulletRequest(BaseModel):
 class MetricChatRequest(BaseModel):
     achievement_id: str
     messages: List[Dict[str, str]]
+
+class RefineBulletRequest(BaseModel):
+    bullet_text: str
+    instruction: str
+    target_role: str
 
 class StrategyRequest(BaseModel):
     user_id: str
@@ -432,6 +429,15 @@ def metric_chat(req: MetricChatRequest):
         return result
     except Exception as e:
         print(f"Error in metric_chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/refine-bullet")
+def refine_bullet(req: RefineBulletRequest):
+    try:
+        result = refine_bullet_with_ai(req.bullet_text, req.instruction, req.target_role)
+        return result
+    except Exception as e:
+        print(f"Error in refine_bullet: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/strategy")

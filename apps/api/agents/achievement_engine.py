@@ -588,7 +588,13 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             prompt=system_prompt,
             generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
         )
-        return json.loads(response.text)
+        import re
+        text = response.text.strip()
+        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(1).strip()
+        text = re.sub(r',\s*([}\]])', r'\1', text)
+        return json.loads(text)
     except Exception as e:
         print(f"Gemini generation failed for section bullets, falling back to Cerebras: {e}")
         
@@ -597,9 +603,8 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     for attempt in range(max_retries):
         try:
             response_text = cerebras_client.generate_chat_completion(
-                model="gpt-oss-120b",
+                model="llama-3.3-70b",
                 messages=[{"role": "user", "content": system_prompt}],
-                response_format={"type": "json_object"},
                 temperature=0.3,
                 max_tokens=2500
             )
@@ -611,7 +616,15 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             response_text = response_text.strip()
             response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
             
-            data = json.loads(response_text)
+            try:
+                data = json.loads(response_text)
+            except json.JSONDecodeError:
+                # One last attempt to extract JSON if it was unparseable
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    data = json.loads(json_match.group(0))
+                else:
+                    raise Exception("Could not parse Cerebras output as JSON")
             
             # Ensure no full stops
             for v_set in data.get("variant_sets", []):
@@ -680,10 +693,77 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
                 response_text = response_text[:-3]
                 
         data = json.loads(response_text.strip())
+        if "response" in data and str(data["response"]).lower().startswith("response:"):
+            data["response"] = data["response"][9:].strip()
+            
         return data
     except Exception as e:
         print(f"Failed to parse metric chat JSON: {e}")
+        
+        # Fallback cleanup just in case
+        if response_text.lower().startswith("response:"):
+            response_text = response_text[9:].strip()
+            
         return {"response": response_text, "extracted_metrics_update": {}, "new_context_summary": ""}
+
+def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: str) -> Dict[str, Any]:
+    """Refines a single bullet point based on user instruction."""
+    system_prompt = f"""
+    You are an elite IIT Bombay placement resume writer. 
+    The user wants to edit/refine a resume bullet point for a '{target_role}' role.
+    
+    Original Bullet: "{bullet_text}"
+    User's Editing Instruction: "{user_instruction}"
+    
+    CRITICAL INSTRUCTIONS:
+    1. Apply the user's instruction precisely to refine the bullet.
+    2. Ensure the bullet still follows IIT Bombay placement rules: starts with a strong action verb, highlights scale/impact, uses active voice.
+    3. DO NOT hallucinate metrics that were not originally there or provided by the user.
+    4. Provide a very short 1-sentence explanation of what you changed.
+    
+    You must return a valid JSON object matching this schema exactly:
+    {{
+        "refined_bullet": "The newly edited bullet point WITHOUT ANY FULL STOP AT THE END",
+        "explanation": "A short 1-sentence explanation of the change"
+    }}
+    
+    NEVER put a full stop (period) at the end of the refined_bullet string.
+    """
+    
+    try:
+        response = gemini_client.generate_content(
+            model_name="gemini-3.5-flash",
+            contents=system_prompt,
+            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Gemini generation failed for bullet refinement, falling back to Cerebras: {e}")
+        
+    try:
+        response_text = cerebras_client.generate_chat_completion(
+            model="gpt-oss-120b",
+            messages=[{"role": "user", "content": system_prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.4,
+            max_tokens=1000
+        )
+        
+        # Clean up JSON
+        response_text = response_text.strip()
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+        elif response_text.startswith("```"):
+            response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+                
+        return json.loads(response_text.strip())
+    except Exception as e:
+        print(f"Failed to refine bullet via Cerebras: {e}")
+        return {"refined_bullet": bullet_text, "explanation": "Failed to refine bullet due to server error."}
 
 def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str, target_company: str = None, job_description: str = None) -> Dict[str, Any]:
     """Analyzes the user's current vault and bank to provide a placement strategy."""
@@ -723,7 +803,7 @@ def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: 
     
     response = gemini_client.generate_content(
         model_name="gemini-3.5-flash",
-        prompt=system_prompt,
+        contents=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
     )
     
