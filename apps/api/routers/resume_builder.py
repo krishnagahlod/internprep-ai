@@ -498,5 +498,7 @@ async def get_strategy(request: Request, req: StrategyRequest):
         )
         return strategy
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Error in get_strategy: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -850,7 +850,7 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     
     response = gemini_client.generate_content(
         model_name="gemini-1.5-flash",
-        contents=system_prompt,
+        prompt=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
     )
     

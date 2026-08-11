@@ -1648,7 +1648,7 @@ function ResumeBuilderPageContent() {
         </TabsContent>
         
         <Dialog open={isStrategyModalOpen} onOpenChange={setIsStrategyModalOpen}>
-          <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
           <div className="container py-4 space-y-8">
             
       <div className="flex items-center justify-between">
