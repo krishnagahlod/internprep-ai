@@ -169,6 +169,40 @@ function ResumeBuilderPageContent() {
     }
   }, [chatMessages, isChatLoading])
 
+  // Handle URL params for Strategy page redirection to AI Refine
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) setActiveTab(tabParam);
+
+    const refineParam = searchParams.get("refine");
+    const instructionParam = searchParams.get("instruction");
+    const sectionParam = searchParams.get("section");
+
+    if (refineParam && pointBank.length > 0) {
+      // Find the bullet in the point bank
+      const bullet = pointBank.find(b => b.id === refineParam);
+      if (bullet) {
+        setRefineTarget({ 
+          source: "bank", 
+          id: bullet.id, 
+          text: bullet.bullet_text, 
+          role: bullet.target_role 
+        });
+        if (instructionParam) {
+          setRefineInstruction(decodeURIComponent(instructionParam));
+        }
+        setRefineHistory([]);
+        
+        // Remove the params from URL so it doesn't keep triggering on re-renders
+        const url = new URL(window.location.href);
+        url.searchParams.delete("refine");
+        url.searchParams.delete("instruction");
+        if (sectionParam) url.searchParams.delete("section");
+        router.replace(url.toString(), undefined);
+      }
+    }
+  }, [searchParams, pointBank, router]);
+
   if (!mounted || !user) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
@@ -257,40 +291,6 @@ function ResumeBuilderPageContent() {
     setIsExtractingText(false)
   }
 
-  // Handle URL params for Strategy page redirection to AI Refine
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam) setActiveTab(tabParam);
-
-    const refineParam = searchParams.get("refine");
-    const instructionParam = searchParams.get("instruction");
-    const sectionParam = searchParams.get("section");
-
-    if (refineParam && pointBank.length > 0) {
-      // Find the bullet in the point bank
-      const bullet = pointBank.find(b => b.id === refineParam);
-      if (bullet) {
-        setRefineTarget({ 
-          source: "bank", 
-          id: bullet.id, 
-          text: bullet.bullet_text, 
-          role: bullet.target_role 
-        });
-        if (instructionParam) {
-          setRefineInstruction(decodeURIComponent(instructionParam));
-        }
-        setRefineHistory([]);
-        
-        // Remove the params from URL so it doesn't keep triggering on re-renders
-        const url = new URL(window.location.href);
-        url.searchParams.delete("refine");
-        url.searchParams.delete("instruction");
-        if (sectionParam) url.searchParams.delete("section");
-        router.replace(url.toString(), undefined);
-      }
-    }
-  }, [searchParams, pointBank, router]);
-  
   const generateVariants = async () => {
     if (!user || !selectedAchievement) return
     setIsGenerating(true)
