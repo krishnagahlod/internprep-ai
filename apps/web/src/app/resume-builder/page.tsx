@@ -496,7 +496,6 @@ export default function ResumeBuilderPage() {
     e.preventDefault()
     if (!refineTarget || !refineInstruction.trim()) return
     setIsRefining(true)
-    setRefinedResult(null)
     try {
       const res = await fetch(`${apiBase}/builder/refine-bullet`, {
         method: "POST",
@@ -545,7 +544,7 @@ export default function ResumeBuilderPage() {
     }
     
     setRefineTarget(null)
-    setRefinedResult(null)
+    setRefineHistory([])
     setRefineInstruction("")
   }
 
