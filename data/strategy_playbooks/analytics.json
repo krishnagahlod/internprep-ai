@@ -1,0 +1,121 @@
+{
+  "domain": "analytics",
+  "display_name": "Data Science & Analytics",
+  "resume_format": "1-page or 2-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "Focus on data pipelines, predictive modeling, and business insights. Must explicitly state the tech stack used (Python, SQL, Tableau) and the business impact of the model.",
+      "emphasis": [
+        "data_driven_insights",
+        "model_accuracy",
+        "tech_stack"
+      ],
+      "common_mistakes": [
+        "Listing tools without context",
+        "Not mentioning the business ROI of an analysis"
+      ]
+    },
+    "projects": {
+      "priority": "critical",
+      "guidance": "The core of an Analytics resume. Detail the dataset size, algorithms used (e.g., XGBoost, NLP), and the performance metrics (Accuracy, F1-score, RMSE).",
+      "emphasis": [
+        "algorithmic_complexity",
+        "large_datasets",
+        "performance_metrics"
+      ],
+      "common_mistakes": [
+        "Using generic datasets like Titanic without unique methodology"
+      ]
+    },
+    "por": {
+      "priority": "low",
+      "guidance": "Only relevant if you led an analytics team, club, or organized a data hackathon.",
+      "emphasis": [
+        "technical_leadership"
+      ],
+      "common_mistakes": [
+        "Wasting space on non-technical PORs"
+      ]
+    },
+    "scholastic": {
+      "priority": "high",
+      "guidance": "Highlight statistics, ML, and math coursework. Mention relevant Kaggle ranks or data hackathon wins.",
+      "emphasis": [
+        "kaggle_ranks",
+        "ml_coursework"
+      ],
+      "common_mistakes": [
+        "Listing basic introductory courses"
+      ]
+    },
+    "extracurricular": {
+      "priority": "low",
+      "guidance": "Keep minimal. Replace with more projects if possible.",
+      "emphasis": [],
+      "common_mistakes": [
+        "Listing sports/cultural events over technical achievements"
+      ]
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.05,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": [
+        "Led a team of",
+        "Managed stakeholder expectations",
+        "Coordinated with cross-functional teams"
+      ]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.2,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": [
+        "Identified root cause",
+        "Developed a framework",
+        "Synthesized findings",
+        "Formulated strategy"
+      ]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.4,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": [
+        "$X revenue",
+        "X% improvement",
+        "ROI of X",
+        "Analyzed dataset"
+      ]
+    },
+    "product_technical_execution": {
+      "weight": 0.3,
+      "description": "Technical skills used as a means to business ends, or core technical delivery.",
+      "signal_phrases": [
+        "Built a dashboard",
+        "Automated a pipeline",
+        "Deployed model",
+        "Engineered architecture"
+      ]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.05,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": [
+        "Founded",
+        "Launched",
+        "Bootstrapped",
+        "Initiated"
+      ]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test \u2014 state the result, not just the action.",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed.",
+    "Include at least one quantified metric per experience/POR point.",
+    "Use the Action + Context + Impact structure consistently.",
+    "Keep each bullet to exactly 1 line on a standard template.",
+    "Do not use full stops at the end of bullet points.",
+    "Avoid explaining too much in a single point; focus on the outcome."
+  ]
+}

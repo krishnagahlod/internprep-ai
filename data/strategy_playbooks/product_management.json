@@ -1,0 +1,122 @@
+{
+  "domain": "product_management",
+  "display_name": "Product Management",
+  "resume_format": "1-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "Highlight product launches, feature development, A/B testing, and user growth. Focus on 'Why' a feature was built and its metric impact (DAU/MAU, conversion).",
+      "emphasis": [
+        "user_impact",
+        "feature_launch",
+        "cross_functional"
+      ],
+      "common_mistakes": [
+        "Focusing only on the engineering/code rather than the product outcome"
+      ]
+    },
+    "projects": {
+      "priority": "very_high",
+      "guidance": "Showcase end-to-end product builds (design to deployment). Include user research, wireframing, and go-to-market strategies.",
+      "emphasis": [
+        "end_to_end_execution",
+        "user_centric_design"
+      ],
+      "common_mistakes": [
+        "Listing hackathon projects without explaining the user problem solved"
+      ]
+    },
+    "por": {
+      "priority": "high",
+      "guidance": "Highlight roles where you managed a team of developers/designers (e.g., Tech Coordinator) or launched a new initiative for the campus.",
+      "emphasis": [
+        "team_management",
+        "initiative_launch"
+      ],
+      "common_mistakes": [
+        "Focusing on logistics rather than product/initiative delivery"
+      ]
+    },
+    "scholastic": {
+      "priority": "low",
+      "guidance": "Keep it brief. PM roles value execution and intuition over pure academic pedigree.",
+      "emphasis": [
+        "relevant_coursework"
+      ],
+      "common_mistakes": [
+        "Taking up too much space with minor academic awards"
+      ]
+    },
+    "extracurricular": {
+      "priority": "medium",
+      "guidance": "Showcase entrepreneurial ventures, hackathon wins, or design/creative pursuits.",
+      "emphasis": [
+        "entrepreneurial_spirit",
+        "hackathons"
+      ],
+      "common_mistakes": [
+        "Generic hobbies"
+      ]
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.25,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": [
+        "Led a team of",
+        "Managed stakeholder expectations",
+        "Coordinated with cross-functional teams"
+      ]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.25,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": [
+        "Identified root cause",
+        "Developed a framework",
+        "Synthesized findings",
+        "Formulated strategy"
+      ]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.15,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": [
+        "$X revenue",
+        "X% improvement",
+        "ROI of X",
+        "Analyzed dataset"
+      ]
+    },
+    "product_technical_execution": {
+      "weight": 0.2,
+      "description": "Technical skills used as a means to business ends, or core technical delivery.",
+      "signal_phrases": [
+        "Built a dashboard",
+        "Automated a pipeline",
+        "Deployed model",
+        "Engineered architecture"
+      ]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.15,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": [
+        "Founded",
+        "Launched",
+        "Bootstrapped",
+        "Initiated"
+      ]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test \u2014 state the result, not just the action.",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed.",
+    "Include at least one quantified metric per experience/POR point.",
+    "Use the Action + Context + Impact structure consistently.",
+    "Keep each bullet to exactly 1 line on a standard template.",
+    "Do not use full stops at the end of bullet points.",
+    "Avoid explaining too much in a single point; focus on the outcome."
+  ]
+}

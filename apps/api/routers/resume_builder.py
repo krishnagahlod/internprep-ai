@@ -80,6 +80,7 @@ class RefineBulletRequest(BaseModel):
 class StrategyRequest(BaseModel):
     user_id: str
     target_role: str
+    data_source: str = "point_bank" # "point_bank", "vault", or "both"
     target_company: Optional[str] = None
     job_description: Optional[str] = None
 
@@ -445,16 +446,53 @@ def refine_bullet(req: RefineBulletRequest):
 async def get_strategy(request: Request, req: StrategyRequest):
     from agents.resume_analyzer import supabase
     try:
-        # Fetch user's achievements
-        ach_res = supabase.table('achievements').select("*").eq('user_id', req.user_id).execute()
+        achievements = []
+        bullets = []
         
-        # Fetch user's saved bullets for this role
-        bullets_res = supabase.table('generated_bullets').select("*").eq('user_id', req.user_id).eq('is_saved', True).eq('target_role', req.target_role).execute()
+        if req.data_source in ["vault", "both"]:
+            ach_res = supabase.table('achievements').select("*").eq('user_id', req.user_id).execute()
+            achievements = ach_res.data or []
+            
+        if req.data_source in ["point_bank", "both"]:
+            bullets_res = supabase.table('generated_bullets').select("*").eq('user_id', req.user_id).eq('is_saved', True).eq('target_role', req.target_role).execute()
+            bullets = bullets_res.data or []
+            
+        # RAG Step: Find similar golden bullets for the user's saved points
+        # To avoid blocking/rate limits on embedding, we could do this async or skip if too many points, 
+        # but for strategy report we will just embed the user's points and match.
+        from services.gemini_client import gemini_client
+        
+        rag_context = []
+        if bullets:
+            # only embed top 5 to save time
+            texts_to_embed = [b['bullet_text'] for b in bullets[:5]]
+            try:
+                embeddings = gemini_client.embed_batch(texts_to_embed)
+                for i, emb in enumerate(embeddings):
+                    # Query pgvector
+                    match_res = supabase.rpc(
+                        'match_golden_bullets',
+                        {
+                            'query_embedding': emb,
+                            'match_count': 2,
+                            'filter_target_role': req.target_role
+                        }
+                    ).execute()
+                    
+                    if match_res.data:
+                        rag_context.append({
+                            "user_bullet": texts_to_embed[i],
+                            "similar_golden_bullets": [m['bullet_text'] for m in match_res.data]
+                        })
+            except Exception as e:
+                print(f"Failed to fetch RAG context for strategy: {e}")
         
         strategy = generate_resume_strategy(
-            ach_res.data or [], 
-            bullets_res.data or [], 
+            req.data_source,
+            achievements, 
+            bullets, 
             req.target_role, 
+            rag_context,
             req.target_company, 
             req.job_description
         )

@@ -1,0 +1,122 @@
+{
+  "domain": "finance",
+  "display_name": "Finance (IB/PE/VC/Quant)",
+  "resume_format": "1-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "Focus on deal flow, financial modeling, valuation, market research, or quantitative analysis. Quantify capital raised, portfolio sizes, or trading volume.",
+      "emphasis": [
+        "financial_impact",
+        "modeling_valuation",
+        "market_research"
+      ],
+      "common_mistakes": [
+        "Vague market research without actionable insights"
+      ]
+    },
+    "projects": {
+      "priority": "high",
+      "guidance": "Highlight independent financial modeling, stock pitch projects, algorithmic trading, or macro-economic research.",
+      "emphasis": [
+        "analytical_rigor",
+        "financial_metrics"
+      ],
+      "common_mistakes": [
+        "Lacking complexity in financial models"
+      ]
+    },
+    "por": {
+      "priority": "medium",
+      "guidance": "Highlight roles involving budget management (e.g., Treasurer) or leadership in Finance Clubs/Investment Groups.",
+      "emphasis": [
+        "budget_management",
+        "financial_leadership"
+      ],
+      "common_mistakes": [
+        "Over-indexing on event management instead of financial responsibility"
+      ]
+    },
+    "scholastic": {
+      "priority": "very_high",
+      "guidance": "Extremely important. Highlight top percentiles (JEE, Olympiads), CFA/FRM levels passed, or high CPI/GPA.",
+      "emphasis": [
+        "certifications",
+        "extreme_academic_rigor"
+      ],
+      "common_mistakes": [
+        "Burying CFA/FRM certifications at the bottom"
+      ]
+    },
+    "extracurricular": {
+      "priority": "low",
+      "guidance": "Include only highly competitive achievements (e.g., national level chess, poker, or major sports).",
+      "emphasis": [
+        "competitive_excellence"
+      ],
+      "common_mistakes": [
+        "Including generic participation certificates"
+      ]
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.15,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": [
+        "Led a team of",
+        "Managed stakeholder expectations",
+        "Coordinated with cross-functional teams"
+      ]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.25,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": [
+        "Identified root cause",
+        "Developed a framework",
+        "Synthesized findings",
+        "Formulated strategy"
+      ]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.45,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": [
+        "$X revenue",
+        "X% improvement",
+        "ROI of X",
+        "Analyzed dataset"
+      ]
+    },
+    "product_technical_execution": {
+      "weight": 0.1,
+      "description": "Technical skills used as a means to business ends, or core technical delivery.",
+      "signal_phrases": [
+        "Built a dashboard",
+        "Automated a pipeline",
+        "Deployed model",
+        "Engineered architecture"
+      ]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.05,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": [
+        "Founded",
+        "Launched",
+        "Bootstrapped",
+        "Initiated"
+      ]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test \u2014 state the result, not just the action.",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed.",
+    "Include at least one quantified metric per experience/POR point.",
+    "Use the Action + Context + Impact structure consistently.",
+    "Keep each bullet to exactly 1 line on a standard template.",
+    "Do not use full stops at the end of bullet points.",
+    "Avoid explaining too much in a single point; focus on the outcome."
+  ]
+}

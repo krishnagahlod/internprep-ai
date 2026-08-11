@@ -1,0 +1,118 @@
+{
+  "domain": "software",
+  "display_name": "Software Engineering (IT)",
+  "resume_format": "1-page or 2-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "Focus on architecture, scale, and performance improvements. Use strict formatting: 'Action + Methodology/Tech + Result (Latency reduced by X ms, handled Y TPS)'.",
+      "emphasis": [
+        "system_design",
+        "performance_optimization",
+        "tech_stack"
+      ],
+      "common_mistakes": [
+        "Writing 'Worked on backend' instead of 'Architected REST APIs using Node.js'"
+      ]
+    },
+    "projects": {
+      "priority": "critical",
+      "guidance": "Highlight complex, deployed systems. Open-source contributions (GSoC) and major BTPs are highly valued. Include GitHub links if possible.",
+      "emphasis": [
+        "open_source",
+        "deployed_systems",
+        "complex_architecture"
+      ],
+      "common_mistakes": [
+        "Listing simple CRUD apps with no users or scale"
+      ]
+    },
+    "por": {
+      "priority": "low",
+      "guidance": "Focus on Tech Team leads (e.g., Web & Coding Club Manager, Techfest Coordinator).",
+      "emphasis": [
+        "tech_team_management"
+      ],
+      "common_mistakes": [
+        "Including non-technical event management"
+      ]
+    },
+    "scholastic": {
+      "priority": "medium",
+      "guidance": "Highlight Competitive Programming ranks (Codeforces, ICPC), Hackathon wins, and core CS coursework.",
+      "emphasis": [
+        "competitive_programming",
+        "hackathon_wins"
+      ],
+      "common_mistakes": [
+        "Not mentioning LeetCode/Codeforces handles if they are strong"
+      ]
+    },
+    "extracurricular": {
+      "priority": "low",
+      "guidance": "Keep minimal. Use space for more technical projects.",
+      "emphasis": [],
+      "common_mistakes": []
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.05,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": [
+        "Led a team of",
+        "Managed stakeholder expectations",
+        "Coordinated with cross-functional teams"
+      ]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.15,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": [
+        "Identified root cause",
+        "Developed a framework",
+        "Synthesized findings",
+        "Formulated strategy"
+      ]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.1,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": [
+        "$X revenue",
+        "X% improvement",
+        "ROI of X",
+        "Analyzed dataset"
+      ]
+    },
+    "product_technical_execution": {
+      "weight": 0.65,
+      "description": "Technical skills used as a means to business ends, or core technical delivery.",
+      "signal_phrases": [
+        "Built a dashboard",
+        "Automated a pipeline",
+        "Deployed model",
+        "Engineered architecture"
+      ]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.05,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": [
+        "Founded",
+        "Launched",
+        "Bootstrapped",
+        "Initiated"
+      ]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test \u2014 state the result, not just the action.",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed.",
+    "Include at least one quantified metric per experience/POR point.",
+    "Use the Action + Context + Impact structure consistently.",
+    "Keep each bullet to exactly 1 line on a standard template.",
+    "Do not use full stops at the end of bullet points.",
+    "Avoid explaining too much in a single point; focus on the outcome."
+  ]
+}

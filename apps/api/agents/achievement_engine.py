@@ -767,9 +767,16 @@ def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: 
         print(f"Failed to refine bullet via Cerebras: {e}")
         return {"refined_bullet": bullet_text, "explanation": "Failed to refine bullet due to server error."}
 
-def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str, target_company: str = None, job_description: str = None) -> Dict[str, Any]:
-    """Analyzes the user's current vault and bank to provide a placement strategy."""
+def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str, rag_context: List[Dict[str, Any]], target_company: str = None, job_description: str = None) -> Dict[str, Any]:
+    """Analyzes the user's current vault and bank to provide a detailed placement strategy using domain playbooks and RAG."""
     
+    # Load playbook
+    playbook_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "strategy_playbooks", f"{target_role}.json")
+    playbook_data = {}
+    if os.path.exists(playbook_path):
+        with open(playbook_path, "r", encoding="utf-8") as f:
+            playbook_data = json.load(f)
+            
     target_context = f"Target Role: {target_role}"
     if target_company:
         target_context += f"\n    - Target Company: {target_company}"
@@ -778,39 +785,79 @@ def generate_resume_strategy(achievements: List[Dict[str, Any]], saved_bullets: 
 
     system_prompt = f"""
     You are a placement strategy engine for an IIT Bombay student.
-    Analyze the user's achievements and saved bullets to identify gaps, suggest a resume structure, and provide actionable advice.
+    Analyze the user's achievements and saved bullets against the domain playbook and provide a highly detailed resume strategy report.
     
-    Input Data:
-    - {target_context}
+    Data Source Analyzed: {data_source}
     - Number of Achievements: {len(achievements)}
     - Number of Saved Bullets: {len(saved_bullets)}
     
-    Achievements Data (Summarized):
+    Target Context:
+    {target_context}
+    
+    Domain Playbook Context:
+    {json.dumps(playbook_data, indent=2)}
+    
+    User Achievements (Vault):
     {json.dumps([{ 'id': a.get('id'), 'title': a.get('title'), 'section': a.get('section_type'), 'parent': a.get('parent_experience'), 'tags': a.get('competency_tags', []) } for a in achievements])}
     
-    Saved Bullets:
-    {json.dumps([b.get('bullet_text') for b in saved_bullets])}
+    User Saved Bullets (Point Bank):
+    {json.dumps([{{'id': b.get('id'), 'bullet_text': b.get('bullet_text'), 'section': b.get('section_type')}} for b in saved_bullets])}
     
-    Return a JSON object with:
+    RAG Context (Comparison to successful senior bullets):
+    {json.dumps(rag_context, indent=2)}
+    
+    INSTRUCTIONS:
+    Output MUST be a JSON object strictly matching this schema:
     {{
-        "overall_readiness_score": 0-100,
-        "strengths": ["list of 2-3 strong points"],
-        "critical_gaps": ["list of 2-3 missing skills/experiences for this role"],
-        "action_plan": ["list of 3 actionable steps to improve the resume or which metrics to hunt down"],
-        "vault_recommendations": [
-            {{"achievement_id": "id from achievements list above", "reason": "Why they should generate a bullet for this specific vault item to fill a critical gap"}}
-        ]
+      "domain": "the target role",
+      "overall_readiness_score": 0-100,
+      "overall_guidance": "High-level guidance on what to prioritize",
+      "section_analysis": [
+        {{
+          "section": "experience|projects|por|scholastic|extracurricular",
+          "priority_level": "critical|high|medium|low",
+          "domain_guidance": "What the playbook says about this section",
+          "user_points": [
+            {{
+              "point_id": "uuid of the bullet or achievement",
+              "bullet_text": "The text being evaluated",
+              "verdict": "keep|needs_rework|cut",
+              "reasoning": "Why this verdict",
+              "refine_instruction": "Instruction to pass to the AI Refine tool to fix it (if needs_rework), else null"
+            }}
+          ]
+        }}
+      ],
+      "competency_coverage": [
+        {{
+          "theme": "name of competency theme from playbook",
+          "domain_weight": 0.0-1.0,
+          "user_coverage": 0.0-1.0,
+          "gap_assessment": "Assessment of user coverage vs domain ideal",
+          "suggested_action": "Actionable advice"
+        }}
+      ],
+      "phrasing_alerts": [
+        {{
+          "point_id": "uuid",
+          "issue": "weak_verb|missing_metric|structure",
+          "detail": "What is wrong",
+          "refine_instruction": "Instruction to fix"
+        }}
+      ]
     }}
     """
     
     response = gemini_client.generate_content(
-        model_name="gemini-3.5-flash",
+        model_name="gemini-1.5-flash",
         contents=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
     )
     
     try:
-        return json.loads(response.text)
+        data = json_repair.loads(response.text)
+        return data
     except Exception as e:
         print(f"Failed to parse strategy JSON: {e}")
         return {}
+

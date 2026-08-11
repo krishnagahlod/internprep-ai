@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
@@ -75,10 +75,11 @@ const highlightMetrics = (text: string) => {
   );
 };
 
-export default function ResumeBuilderPage() {
+function ResumeBuilderPageContent() {
   const [activeTab, setActiveTab] = useState("vault")
   const { user } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   // Vault State
   const [achievements, setAchievements] = useState<Achievement[]>([])
@@ -255,6 +256,40 @@ export default function ResumeBuilderPage() {
     }
     setIsExtractingText(false)
   }
+
+  // Handle URL params for Strategy page redirection to AI Refine
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) setActiveTab(tabParam);
+
+    const refineParam = searchParams.get("refine");
+    const instructionParam = searchParams.get("instruction");
+    const sectionParam = searchParams.get("section");
+
+    if (refineParam && pointBank.length > 0) {
+      // Find the bullet in the point bank
+      const bullet = pointBank.find(b => b.id === refineParam);
+      if (bullet) {
+        setRefineTarget({ 
+          source: "bank", 
+          id: bullet.id, 
+          text: bullet.bullet_text, 
+          role: bullet.target_role 
+        });
+        if (instructionParam) {
+          setRefineInstruction(decodeURIComponent(instructionParam));
+        }
+        setRefineHistory([]);
+        
+        // Remove the params from URL so it doesn't keep triggering on re-renders
+        const url = new URL(window.location.href);
+        url.searchParams.delete("refine");
+        url.searchParams.delete("instruction");
+        if (sectionParam) url.searchParams.delete("section");
+        router.replace(url.toString(), undefined);
+      }
+    }
+  }, [searchParams, pointBank, router]);
   
   const generateVariants = async () => {
     if (!user || !selectedAchievement) return
@@ -1410,6 +1445,25 @@ export default function ResumeBuilderPage() {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Strategy CTA */}
+                  <div className="mt-6 p-4 rounded-xl border border-primary/20 bg-primary/5 flex items-center justify-between shadow-sm">
+                    <div>
+                      <h4 className="font-bold text-[15px] flex items-center gap-2 text-primary">
+                        <Target className="h-4 w-4" /> Validate Your Strategy
+                      </h4>
+                      <p className="text-[13px] text-muted-foreground mt-1">
+                        Done generating points? Check how they align with successful senior {getRoleLabel(composerResults.target_role || "consulting")} resumes.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => router.push(`/resume-builder/strategy?role=${composerResults.target_role || "consulting"}`)}
+                      size="sm"
+                      className="shrink-0 shadow-sm"
+                    >
+                      Run Strategy Engine
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1458,8 +1512,8 @@ export default function ResumeBuilderPage() {
                         </div>
                         <Button 
                           onClick={() => {
-                            setIsStrategyModalOpen(true);
-                            setStrategyData(null);
+                            const rawRole = pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting";
+                            router.push(`/resume-builder/strategy?role=${rawRole}`);
                           }}
                           className="font-semibold shadow-sm"
                         >
@@ -1569,134 +1623,6 @@ export default function ResumeBuilderPage() {
               </Card>
         </TabsContent>
         
-        {/* Strategy Engine Modal */}
-        <Dialog open={isStrategyModalOpen} onOpenChange={setIsStrategyModalOpen}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl text-primary">
-                <Target className="h-6 w-6" /> Strategy Engine
-              </DialogTitle>
-              <DialogDescription>
-                Analyze your vault and point bank against top-tier placement standards for {
-                  (() => {
-                    const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
-                    return activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
-                  })()
-                }.
-              </DialogDescription>
-            </DialogHeader>
-            
-            {!strategyData ? (
-              <div className="space-y-5 py-4">
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground" htmlFor="strategy-company">Target Company (Optional)</label>
-                  <Input 
-                    id="strategy-company"
-                    placeholder="e.g. McKinsey, Google, Goldman Sachs"
-                    value={strategyTargetCompany}
-                    onChange={(e) => setStrategyTargetCompany(e.target.value)}
-                    className="h-12 border-input/60 bg-muted/5 shadow-sm"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground" htmlFor="strategy-jd">Job Description snippet (Optional)</label>
-                  <Textarea 
-                    id="strategy-jd"
-                    placeholder="Paste key responsibilities or requirements here..."
-                    value={strategyJobDescription}
-                    onChange={(e) => setStrategyJobDescription(e.target.value)}
-                    className="min-h-[100px] border-input/60 bg-muted/5 shadow-sm resize-none"
-                  />
-                </div>
-                
-                <Button className="w-full h-12 shadow-sm font-medium mt-4" onClick={generateStrategy} disabled={isStrategyLoading}>
-                  {isStrategyLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2"/> : <Sparkles className="h-5 w-5 mr-2"/>}
-                  {isStrategyLoading ? "Analyzing..." : "Generate Strategy Report"}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6 py-4 animate-in slide-in-from-bottom-4 fade-in duration-500">
-                <div className="flex flex-col items-center justify-center p-6 bg-background rounded-xl border shadow-sm">
-                  <span className="text-sm font-medium text-muted-foreground mb-2">Overall Readiness</span>
-                  <div className="flex items-end gap-1">
-                    <span className={`text-4xl font-extrabold ${strategyData.overall_readiness_score > 70 ? "text-green-600" : strategyData.overall_readiness_score > 40 ? "text-amber-500" : "text-destructive"}`}>
-                      {strategyData.overall_readiness_score}
-                    </span>
-                    <span className="text-muted-foreground font-medium mb-1">/100</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-md">
-                    <CheckCircle2 className="h-4 w-4" /> Key Strengths
-                  </h4>
-                  <ul className="text-sm space-y-2 pl-2">
-                    {strategyData.strengths?.map((s: string, i: number) => (
-                      <li key={i} className="flex gap-2"><span className="text-green-500 font-bold">•</span><span className="text-foreground/80 leading-snug">{s}</span></li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div className="space-y-2">
-                  <h4 className="text-sm font-bold flex items-center gap-2 text-destructive bg-destructive/10 px-3 py-1.5 rounded-md">
-                    <AlertTitle className="m-0 text-sm h-4 w-4" /> Critical Gaps
-                  </h4>
-                  <ul className="text-sm space-y-2 pl-2">
-                    {strategyData.critical_gaps?.map((g: string, i: number) => (
-                      <li key={i} className="flex gap-2"><span className="text-destructive font-bold">•</span><span className="text-foreground/80 leading-snug">{g}</span></li>
-                    ))}
-                  </ul>
-                </div>
-
-                {strategyData.action_plan && strategyData.action_plan.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-bold flex items-center gap-2 text-primary bg-primary/10 px-3 py-1.5 rounded-md">
-                      <Target className="h-4 w-4" /> Recommended Action Plan
-                    </h4>
-                    <ul className="text-sm space-y-2 pl-2">
-                      {strategyData.action_plan.map((action: string, i: number) => (
-                        <li key={i} className="flex gap-2"><span className="text-primary font-bold">•</span><span className="text-foreground/80 leading-snug">{action}</span></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {strategyData.vault_recommendations && strategyData.vault_recommendations.length > 0 && (
-                  <div className="space-y-3 mt-6 border-t pt-5">
-                    <h4 className="text-sm font-bold flex items-center gap-2 text-foreground">
-                      <Sparkles className="h-4 w-4 text-amber-500" /> Vault Extraction Recommendations
-                    </h4>
-                    <p className="text-xs text-muted-foreground mb-2">We found these existing achievements in your vault that perfectly match your critical gaps. Generate bullets for them in the Laboratory!</p>
-                    <div className="space-y-3">
-                      {strategyData.vault_recommendations.map((rec: any, i: number) => {
-                        const ach = achievements.find(a => a.id === rec.achievement_id);
-                        if (!ach) return null;
-                        return (
-                          <div key={i} className="bg-muted/30 border rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="font-semibold text-sm">{ach.title}</span>
-                              <Badge variant="outline" className="text-[10px]">{ach.parent_experience}</Badge>
-                            </div>
-                            <p className="text-[13px] text-primary/80 font-medium mt-2"><span className="text-muted-foreground font-normal">Why:</span> {rec.reason}</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                <Button 
-                  className="w-full mt-4" 
-                  variant="outline" 
-                  onClick={() => setStrategyData(null)}
-                >
-                  Generate New Strategy
-                </Button>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
       </Tabs>
 
       {/* Edit Achievement Dialog */}
@@ -1887,5 +1813,13 @@ export default function ResumeBuilderPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function ResumeBuilderPage() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center p-8"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>}>
+      <ResumeBuilderPageContent />
+    </Suspense>
   )
 }

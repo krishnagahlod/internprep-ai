@@ -1,0 +1,128 @@
+{
+  "domain": "consulting",
+  "display_name": "Management Consulting",
+  "resume_format": "1-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "2-3 internship entries, 3-5 sub-points each. Every point must demonstrate business impact with quantified metrics. Lead with ownership verbs (Spearheaded, Drove, Led).",
+      "emphasis": [
+        "quantified_impact",
+        "ownership",
+        "cross_functional_collaboration"
+      ],
+      "common_mistakes": [
+        "Too many technical details without business impact",
+        "Using passive voice"
+      ]
+    },
+    "projects": {
+      "priority": "high",
+      "guidance": "2-3 projects max. Prioritize projects showing analytical/problem-solving skills over pure coding projects. Always include methodology + result.",
+      "emphasis": [
+        "analytical_methodology",
+        "structured_problem_solving",
+        "data_driven_decisions"
+      ],
+      "common_mistakes": [
+        "Listing tech stack without impact",
+        "Including coursework projects with no unique contribution"
+      ]
+    },
+    "por": {
+      "priority": "very_high",
+      "guidance": "2-4 PORs. This section is disproportionately important for consulting. Focus on scale (team size, budget, event footfall) and unique initiatives.",
+      "emphasis": [
+        "leadership_at_scale",
+        "stakeholder_management",
+        "initiative_ownership"
+      ],
+      "common_mistakes": [
+        "Listing responsibilities instead of initiatives",
+        "Not quantifying team/budget scale"
+      ]
+    },
+    "scholastic": {
+      "priority": "medium",
+      "guidance": "3-5 punchy phrases. Include JEE rank, olympiad selections, and academic awards.",
+      "emphasis": [
+        "competitive_rankings",
+        "academic_excellence"
+      ],
+      "common_mistakes": [
+        "Full sentences instead of concise phrases"
+      ]
+    },
+    "extracurricular": {
+      "priority": "medium",
+      "guidance": "Show breadth and depth. Sports achievements (Inter-IIT, national level) are valued. Cultural/social impact initiatives add well-roundedness.",
+      "emphasis": [
+        "competitive_achievements",
+        "breadth_of_interests"
+      ],
+      "common_mistakes": [
+        "Listing hobbies without achievements"
+      ]
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.35,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": [
+        "Led a team of",
+        "Managed stakeholder expectations",
+        "Coordinated with cross-functional teams"
+      ]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.3,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": [
+        "Identified root cause",
+        "Developed a framework",
+        "Synthesized findings",
+        "Formulated strategy"
+      ]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.2,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": [
+        "$X revenue",
+        "X% improvement",
+        "ROI of X",
+        "Analyzed dataset"
+      ]
+    },
+    "product_technical_execution": {
+      "weight": 0.05,
+      "description": "Technical skills used as a means to business ends, or core technical delivery.",
+      "signal_phrases": [
+        "Built a dashboard",
+        "Automated a pipeline",
+        "Deployed model",
+        "Engineered architecture"
+      ]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.1,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": [
+        "Founded",
+        "Launched",
+        "Bootstrapped",
+        "Initiated"
+      ]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test \u2014 state the result, not just the action.",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed.",
+    "Include at least one quantified metric per experience/POR point.",
+    "Use the Action + Context + Impact structure consistently.",
+    "Keep each bullet to exactly 1 line on a standard template.",
+    "Do not use full stops at the end of bullet points.",
+    "Avoid explaining too much in a single point; focus on the outcome."
+  ]
+}
