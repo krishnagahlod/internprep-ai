@@ -35,7 +35,7 @@ const ROLE_LABELS: Record<string, string> = {
   "analytics": "Data & Analytics",
   "it-software": "Software Engineering"
 };
-const getRoleLabel = (r: string) => ROLE_LABELS[r.toLowerCase()] || r;
+const getRoleLabel = (r: string) => { if (!r) return "Unknown"; return ROLE_LABELS[r.toLowerCase()] || r; };
 
 const SECTION_ORDER: Record<string, number> = {
   "Scholastic Achievements": 1,

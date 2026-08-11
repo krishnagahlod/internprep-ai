@@ -1,0 +1,262 @@
+# Resume Strategy Engine — Implementation Plan
+
+## Goal
+
+Replace the current broken/generic "Strategy Report" modal with a fully redesigned, standalone **Resume Strategy Engine** page at `/resume-builder/strategy`. This feature will analyze the user's saved points (and optionally raw vault achievements) against a curated, domain-specific knowledge base derived from 88+ successful senior placement resumes. It will produce an actionable "resume playbook" telling users **what to keep, what to cut, and how to rephrase** — tailored to their target domain (Consulting, Finance, PM, Analytics, Software).
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **This is a significant new feature** that introduces a new page, a new backend endpoint, a pre-generated knowledge base, and deep integration with existing Point Bank and AI Refine workflows. Please review the overall approach before I begin implementation.
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    A[User clicks 'Strategy Engine'] --> B["/resume-builder/strategy page"]
+    B --> C{User selects domain & data source}
+    C --> D[Fetches user's Point Bank / Vault data]
+    C --> E[Loads static Domain Playbook JSON]
+    D --> F[Backend: /builder/strategy-report]
+    E --> F
+    F --> G[Live RAG: Query golden_resume_bullets]
+    F --> H[LLM Analysis: Gemini]
+    G --> H
+    H --> I[Returns structured strategy report]
+    I --> J[Frontend renders report]
+    J --> K["User clicks 'Refine' on a point → opens AI Refine with pre-filled instruction"]
+```
+
+---
+
+## Proposed Changes
+
+### Component 1: Domain Knowledge Base (Static JSON)
+
+I will pre-generate a knowledge base by analyzing all 88+ senior placement resumes with Gemini, distilling domain-specific patterns into static JSON files. These files become the "playbook" that the LLM uses as grounding context.
+
+#### [NEW] `data/strategy_playbooks/consulting.json`
+#### [NEW] `data/strategy_playbooks/finance.json`
+#### [NEW] `data/strategy_playbooks/product_management.json`
+#### [NEW] `data/strategy_playbooks/analytics.json`
+#### [NEW] `data/strategy_playbooks/software.json`
+
+Each playbook will contain:
+
+```json
+{
+  "domain": "consulting",
+  "display_name": "Management Consulting",
+  "resume_format": "1-page",
+  "section_allocation": {
+    "experience": {
+      "priority": "critical",
+      "guidance": "2-3 internship entries, 3-5 sub-points each. Every point must demonstrate business impact with quantified metrics. Lead with ownership verbs (Spearheaded, Drove, Led).",
+      "emphasis": ["quantified_impact", "ownership", "cross_functional_collaboration"],
+      "common_mistakes": ["Too many technical details without business impact", "Using passive voice"]
+    },
+    "projects": {
+      "priority": "high",
+      "guidance": "2-3 projects max. Prioritize projects showing analytical/problem-solving skills over pure coding projects. Always include methodology + result.",
+      "emphasis": ["analytical_methodology", "structured_problem_solving", "data_driven_decisions"],
+      "common_mistakes": ["Listing tech stack without impact", "Including coursework projects with no unique contribution"]
+    },
+    "por": {
+      "priority": "very_high",
+      "guidance": "2-4 PORs. This section is disproportionately important for consulting. Focus on scale (team size, budget, event footfall) and unique initiatives.",
+      "emphasis": ["leadership_at_scale", "stakeholder_management", "initiative_ownership"],
+      "common_mistakes": ["Listing responsibilities instead of initiatives", "Not quantifying team/budget scale"]
+    },
+    "scholastic": {
+      "priority": "medium",
+      "guidance": "3-5 punchy phrases. Include JEE rank, olympiad selections, and academic awards.",
+      "emphasis": ["competitive_rankings", "academic_excellence"],
+      "common_mistakes": ["Full sentences instead of concise phrases"]
+    },
+    "extracurricular": {
+      "priority": "medium",
+      "guidance": "Show breadth and depth. Sports achievements (Inter-IIT, national level) are valued. Cultural/social impact initiatives add well-roundedness.",
+      "emphasis": ["competitive_achievements", "breadth_of_interests"],
+      "common_mistakes": ["Listing hobbies without achievements"]
+    }
+  },
+  "competency_themes": {
+    "leadership_stakeholder_mgmt": {
+      "weight": 0.30,
+      "description": "Demonstrated ability to lead teams, manage stakeholders, and drive organizational change.",
+      "signal_phrases": ["Led a team of", "Managed stakeholder expectations", "Coordinated with cross-functional teams"]
+    },
+    "strategic_problem_solving": {
+      "weight": 0.25,
+      "description": "Evidence of structured, analytical thinking applied to real-world problems.",
+      "signal_phrases": ["Identified root cause", "Developed a framework", "Synthesized findings"]
+    },
+    "financial_quantitative_rigor": {
+      "weight": 0.25,
+      "description": "Presence of hard metrics, financial figures, and data-driven outcomes.",
+      "signal_phrases": ["$X revenue", "X% improvement", "ROI of X"]
+    },
+    "product_technical_execution": {
+      "weight": 0.10,
+      "description": "Technical skills used as a means to business ends, not as the primary highlight.",
+      "signal_phrases": ["Built a dashboard", "Automated a pipeline"]
+    },
+    "entrepreneurial_ownership": {
+      "weight": 0.10,
+      "description": "Self-started initiatives, side projects, or entrepreneurial ventures.",
+      "signal_phrases": ["Founded", "Launched", "Bootstrapped"]
+    }
+  },
+  "phrasing_rules": [
+    "Every bullet must pass the 'So What?' test — state the result, not just the action",
+    "Lead with non-repetitive power verbs: Spearheaded, Orchestrated, Synthesized, Catalyzed",
+    "Include at least one quantified metric per experience/POR point",
+    "Use the Action + Context + Impact structure consistently",
+    "Keep each bullet to exactly 1 line on a standard template"
+  ]
+}
+```
+
+#### [NEW] `apps/api/scripts/generate_playbooks.py`
+
+A one-time script that:
+1. Reads all PDFs in `data/Placement Resumes/{domain}/`
+2. Uses Gemini to extract structural patterns (section allocation, point counts, competency distribution, phrasing patterns)
+3. Aggregates findings across all resumes in each domain
+4. Outputs curated JSON playbook files
+
+---
+
+### Component 2: Backend API
+
+#### [MODIFY] [achievement_engine.py](file:///c:/Interview Preparation Platform/apps/api/agents/achievement_engine.py)
+
+Replace the existing `generate_resume_strategy()` function with a much richer implementation:
+
+- **Input:** User's saved points (and optionally vault achievements), target domain, and the static playbook JSON
+- **RAG Step:** Query `golden_resume_bullets` table to find the 10 most similar senior bullets for each of the user's points — used to assess quality gap
+- **LLM Analysis:** Feed the playbook + user points + RAG comparisons to Gemini with a structured output schema
+- **Output:** A comprehensive strategy report JSON
+
+**New output schema:**
+```json
+{
+  "domain": "consulting",
+  "section_analysis": [
+    {
+      "section": "experience",
+      "priority_level": "critical",
+      "domain_guidance": "For consulting, experience points must demonstrate...",
+      "user_points": [
+        {
+          "point_id": "uuid",
+          "bullet_text": "Spearheaded a cost optimization...",
+          "verdict": "keep" | "cut" | "needs_rework",
+          "reasoning": "Strong quantified impact, excellent verb choice",
+          "refine_instruction": null | "Add team size context and specify the business vertical"
+        }
+      ]
+    }
+  ],
+  "competency_coverage": [
+    {
+      "theme": "leadership_stakeholder_mgmt",
+      "domain_weight": 0.30,
+      "user_coverage": 0.15,
+      "gap_assessment": "Your resume under-indexes on leadership. Consider adding POR points or reframing experience bullets to highlight team management.",
+      "suggested_action": "Refine your Deloitte internship point to mention the 5-person team you led"
+    }
+  ],
+  "overall_guidance": "Your consulting resume is strong on technical execution but under-indexes on leadership. Prioritize POR and reframe experience bullets.",
+  "phrasing_alerts": [
+    {
+      "point_id": "uuid",
+      "issue": "weak_verb",
+      "detail": "'Worked on' should be replaced with 'Drove' or 'Spearheaded'",
+      "refine_instruction": "Replace the opening verb 'Worked on' with a stronger action verb like 'Drove' or 'Spearheaded'"
+    }
+  ]
+}
+```
+
+#### [MODIFY] [resume_builder.py](file:///c:/Interview Preparation Platform/apps/api/routers/resume_builder.py)
+
+Update the `/strategy` endpoint:
+- Accept new fields: `data_source` (point_bank | vault | both), `domain`
+- Load the corresponding playbook JSON
+- Run RAG queries against `golden_resume_bullets`
+- Call the updated `generate_resume_strategy()` with all context
+- Return the rich report JSON
+
+---
+
+### Component 3: Frontend — New Strategy Page
+
+#### [NEW] `apps/web/src/app/resume-builder/strategy/page.tsx`
+
+A dedicated full-page strategy experience with these sections:
+
+1. **Setup Panel** (top)
+   - Domain selector (Consulting, Finance, PM, Analytics, Software)
+   - Data source toggle: "Analyze my Point Bank" / "Analyze my Vault" / "Analyze Both"
+   - Optional: Target company, JD snippet
+   - "Generate Strategy Report" button
+
+2. **Section-Wise Analysis** (main content)
+   - Expandable cards per resume section (Experience, Projects, POR, Scholastic, Extra)
+   - Each card shows:
+     - Domain guidance (from playbook): what this section should look like
+     - The user's actual points in this section
+     - Per-point verdict badge: ✅ Keep / ⚠️ Needs Rework / ❌ Cut
+     - For "Needs Rework" points: a "Refine with AI" button that opens the AI Refine dialog **with the `refine_instruction` pre-filled** from the strategy report
+
+3. **Competency Radar** (sidebar or section)
+   - Visual comparison of the user's competency coverage vs. domain ideal weights
+   - Gap indicators with suggested actions
+
+4. **Phrasing Alerts** (bottom)
+   - Flagged points with weak verbs, missing metrics, or structural issues
+   - Each alert has a one-click "Fix with AI" button → opens Refine with pre-filled instruction
+
+5. **Flow Integration**
+   - After generating points in Section Composer → show a CTA: "Run Strategy Analysis on your new points"
+   - After running strategy → each "Refine" action returns user to the Point Bank with the refine dialog open
+
+#### [MODIFY] [page.tsx](file:///c:/Interview Preparation Platform/apps/web/src/app/resume-builder/page.tsx)
+
+- Remove the old strategy modal (lines ~1572-1698) and the associated state variables
+- Add a navigation link/button to `/resume-builder/strategy` in the Point Bank tab
+- After Section Composer generates points, show a CTA card suggesting strategy analysis
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **Resume format differences:** You mentioned Consult/Finance/PM are 1-page while Analytics/Software are 2-page. Should the strategy explicitly tell users "Your resume should be 1 page" for consulting, or just focus on content quality? I'll include format guidance in the playbook but won't enforce strict point budgets.
+
+> [!NOTE]
+> **Playbook generation:** I'll pre-generate the 5 playbook JSONs by analyzing your senior resumes with Gemini. I'll share them with you for review/curation before shipping. You know the domain nuances better than any AI — your corrections will make this knowledge base truly elite. Are you okay reviewing/editing the generated playbooks?
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- `npm run build` — verify the new page compiles without TypeScript errors
+- Test the backend endpoint with a curl/httpie request using sample data
+
+### Manual Verification
+1. Generate playbooks and review them for domain accuracy
+2. Save 5-10 points across different domains in the Point Bank
+3. Run the Strategy Engine and verify:
+   - Section-wise breakdown renders correctly
+   - Keep/Cut/Rework verdicts are reasonable
+   - "Refine with AI" buttons open the refine dialog with pre-filled instructions
+   - Competency coverage analysis is domain-appropriate
+4. Test the flow: Section Composer → Strategy CTA → Strategy Page → Refine → back to Point Bank
+5. Test on mobile viewport
