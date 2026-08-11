@@ -46,7 +46,7 @@ function StrategyPageContent() {
     if (!user) return
     setIsLoading(true)
     try {
-      const res = await fetch(`${apiBase}/resume-builder/strategy`, {
+      const res = await fetch(`${apiBase}/builder/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
