@@ -801,7 +801,7 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     {json.dumps([{ 'id': a.get('id'), 'title': a.get('title'), 'section': a.get('section_type'), 'parent': a.get('parent_experience'), 'tags': a.get('competency_tags', []) } for a in achievements])}
     
     User Saved Bullets (Point Bank):
-    {json.dumps([{{'id': b.get('id'), 'bullet_text': b.get('bullet_text'), 'section': b.get('section_type')}} for b in saved_bullets])}
+    {json.dumps([{'id': b.get('id'), 'bullet_text': b.get('bullet_text'), 'section': b.get('section_type')} for b in saved_bullets])}
     
     RAG Context (Comparison to successful senior bullets):
     {json.dumps(rag_context, indent=2)}
