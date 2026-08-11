@@ -310,6 +310,7 @@ function ResumeBuilderPageContent() {
       if (instruction) setRefineInstruction(instruction);
       if (section) setComposerHeading(section);
       setRefineHistory([]);
+      setIsStrategyModalOpen(false);
       setActiveTab("bank");
     }
   }
@@ -504,14 +505,13 @@ function ResumeBuilderPageContent() {
     if (!user) return
     setIsStrategyLoading(true)
     try {
-      // Determine the role to run strategy for (using the currently selected point bank domain)
-      const targetRole = activePointBankRole === "all" ? Array.from(new Set(pointBank.map(b => b.target_role)))[0] || "finance" : activePointBankRole;
-      const res = await fetch(`${apiBase}/resume-builder/strategy`, {
+      const res = await fetch(`${apiBase}/builder/strategy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: user.id,
-          target_role: targetRole,
+          target_role: strategyTargetRole,
+          data_source: strategyDataSource,
           target_company: strategyTargetCompany || undefined,
           job_description: strategyJobDescription || undefined
         })
@@ -1480,7 +1480,7 @@ function ResumeBuilderPageContent() {
                       </p>
                     </div>
                     <Button 
-                      onClick={() => router.push(`/resume-builder/strategy?role=${composerResults.target_role || "consulting"}`)}
+                      onClick={() => setIsStrategyModalOpen(true)}
                       size="sm"
                       className="shrink-0 shadow-sm"
                     >
@@ -1536,7 +1536,8 @@ function ResumeBuilderPageContent() {
                         <Button 
                           onClick={() => {
                             const rawRole = pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting";
-                            router.push(`/resume-builder/strategy?role=${rawRole}`);
+                            setStrategyTargetRole(rawRole);
+                            setIsStrategyModalOpen(true);
                           }}
                           className="font-semibold shadow-sm"
                         >
@@ -1646,9 +1647,9 @@ function ResumeBuilderPageContent() {
               </Card>
         </TabsContent>
         
-      
-        <TabsContent value="strategy" className="mt-6 space-y-6 animate-in fade-in duration-500">
-          <div className="container max-w-6xl py-8 space-y-8">
+        <Dialog open={isStrategyModalOpen} onOpenChange={setIsStrategyModalOpen}>
+          <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+          <div className="container py-4 space-y-8">
             
       <div className="flex items-center justify-between">
         <div className="space-y-1">
@@ -1896,7 +1897,8 @@ function ResumeBuilderPageContent() {
       )}
     
           </div>
-        </TabsContent>
+          </DialogContent>
+        </Dialog>
 
       </Tabs>
 
