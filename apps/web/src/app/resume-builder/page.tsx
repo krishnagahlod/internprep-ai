@@ -134,7 +134,7 @@ export default function ResumeBuilderPage() {
   const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer", id: string, text: string, role: string, composerSetIdx?: number } | null>(null)
   const [refineInstruction, setRefineInstruction] = useState("")
   const [isRefining, setIsRefining] = useState(false)
-  const [refinedResult, setRefinedResult] = useState<{ text: string, explanation: string } | null>(null)
+  const [refineHistory, setRefineHistory] = useState<{ instruction: string, result: string, explanation: string }[]>([])
   
   // API Base
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000"
@@ -291,6 +291,9 @@ export default function ResumeBuilderPage() {
         if (!data || data.length === 0) {
           alert("AI generation failed or returned no results. Please try again.")
         } else {
+          data.forEach((b: any, bIdx: number) => {
+            if (!b.id) b.id = `single-bullet-${bIdx}-${crypto.randomUUID()}`;
+          });
           setGeneratedBullets(data)
         }
       } else {
@@ -325,6 +328,11 @@ export default function ResumeBuilderPage() {
         if (!data || !data.variant_sets) {
           alert("AI generation failed or returned no results. Please try again.")
         } else {
+          data.variant_sets.forEach((set: any, sIdx: number) => {
+            set.bullets.forEach((b: any, bIdx: number) => {
+              if (!b.id) b.id = `composer-bullet-${sIdx}-${bIdx}-${crypto.randomUUID()}`;
+            });
+          });
           setComposerResults(data)
           setActiveVariantSet(0)
         }
@@ -494,14 +502,16 @@ export default function ResumeBuilderPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bullet_text: refineTarget.text,
-          instruction: refineInstruction,
-          target_role: refineTarget.role
+          user_id: user.id,
+          target_role: refineTarget.role,
+          original_bullet: refineHistory.length > 0 ? refineHistory[refineHistory.length - 1].result : refineTarget.text,
+          instructions: refineInstruction
         })
       })
       if (res.ok) {
         const data = await res.json()
-        setRefinedResult({ text: data.refined_bullet, explanation: data.explanation })
+        setRefineHistory(prev => [...prev, { instruction: refineInstruction, result: data.refined_bullet, explanation: data.explanation }])
+        setRefineInstruction("")
       }
     } catch (e) {
       console.error("Refinement failed:", e)
@@ -511,8 +521,8 @@ export default function ResumeBuilderPage() {
   }
 
   const acceptRefinement = async () => {
-    if (!refineTarget || !refinedResult) return
-    const newText = refinedResult.text
+    if (!refineTarget || refineHistory.length === 0) return
+    const newText = refineHistory[refineHistory.length - 1].result
 
     if (refineTarget.source === "bank") {
       try {
@@ -1265,6 +1275,7 @@ export default function ResumeBuilderPage() {
                             onClick={() => {
                               setRefineTarget({ source: "lab_single", id: bullet.id, text: bullet.bullet_text, role: targetRole });
                               setRefineInstruction("");
+                              setRefineHistory([]);
                             }}
                           >
                             <Sparkles className="h-4 w-4 mr-2" /> Refine
@@ -1355,6 +1366,7 @@ export default function ResumeBuilderPage() {
                                 onClick={() => {
                                   setRefineTarget({ source: "lab_composer", id: bullet.id, text: bullet.bullet_text, role: composerResults.target_role || "finance", composerSetIdx: activeVariantSet });
                                   setRefineInstruction("");
+                                  setRefineHistory([]);
                                 }}
                               >
                                 <Sparkles className="h-4 w-4 mr-2" /> AI Refine
@@ -1524,10 +1536,11 @@ export default function ResumeBuilderPage() {
                                                 </div>
                                                 
                                                 {/* Action Buttons Overlay */}
-                                                <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-3 md:pr-4">
+                                                <div className="absolute right-0 top-0 bottom-0 flex flex-row items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-3 md:pr-4">
                                                   <Button variant="ghost" size="icon" onClick={() => {
                                                     setRefineTarget({ source: "bank", id: bullet.id, text: bullet.bullet_text, role: bullet.target_role });
                                                     setRefineInstruction("");
+                                                    setRefineHistory([]);
                                                   }} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-primary rounded-full shadow-sm" title="Refine with AI">
                                                     <Sparkles className="h-4 w-4" />
                                                   </Button>
@@ -1814,7 +1827,7 @@ export default function ResumeBuilderPage() {
 
       {/* Refine Bullet Dialog */}
       <Dialog open={!!refineTarget} onOpenChange={(open) => !open && setRefineTarget(null)}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-primary text-xl">
               <Sparkles className="h-5 w-5" /> Refine Point with AI
@@ -1823,43 +1836,52 @@ export default function ResumeBuilderPage() {
               Provide instructions to edit this point (e.g., "Make it shorter", "Focus more on leadership", "Remove the metric").
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
             <div className="p-4 bg-muted/20 border rounded-lg text-sm leading-relaxed text-foreground/90 font-medium">
               {refineTarget?.text}
             </div>
-            {refinedResult ? (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            
+            {refineHistory.map((item, idx) => (
+              <div key={idx} className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 mb-6">
+                <div className="flex justify-end mb-2">
+                  <div className="bg-muted p-3 rounded-xl rounded-tr-none text-sm text-foreground max-w-[80%] whitespace-pre-wrap">
+                    {item.instruction}
+                  </div>
+                </div>
                 <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg text-sm leading-relaxed text-foreground font-medium relative">
                   <div className="absolute top-0 right-0 p-1 px-2 bg-primary/20 text-primary text-[10px] uppercase font-bold rounded-bl-lg rounded-tr-lg">New</div>
-                  {refinedResult.text}
+                  {item.result}
                 </div>
                 <div className="text-xs text-muted-foreground flex items-start gap-2 bg-muted/30 p-2 rounded">
                   <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                  <p>{refinedResult.explanation}</p>
+                  <p>{item.explanation}</p>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleRefineSubmit} className="space-y-3">
-                <Textarea 
-                  placeholder="Your instructions..." 
-                  value={refineInstruction}
-                  onChange={(e) => setRefineInstruction(e.target.value)}
-                  className="min-h-[80px]"
-                  disabled={isRefining}
-                />
-                <Button type="submit" className="w-full" disabled={isRefining || !refineInstruction.trim()}>
-                  {isRefining ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Refining...</> : <><Sparkles className="h-4 w-4 mr-2" /> Refine</>}
-                </Button>
-              </form>
-            )}
+            ))}
           </div>
-          {refinedResult && (
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="outline" onClick={() => setRefinedResult(null)}>
-                Try Again
+          
+          <div className="pt-2 border-t mt-auto">
+            <form onSubmit={handleRefineSubmit} className="space-y-3">
+              <Textarea 
+                placeholder="Your instructions (e.g., Make it shorter)..." 
+                value={refineInstruction}
+                onChange={(e) => setRefineInstruction(e.target.value)}
+                className="min-h-[80px]"
+                disabled={isRefining}
+              />
+              <Button type="submit" className="w-full" disabled={isRefining || !refineInstruction.trim()}>
+                {isRefining ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Refining...</> : <><Sparkles className="h-4 w-4 mr-2" /> Send to AI Coach</>}
+              </Button>
+            </form>
+          </div>
+          
+          {refineHistory.length > 0 && (
+            <DialogFooter className="gap-2 sm:gap-0 mt-2">
+              <Button type="button" variant="outline" onClick={() => { setRefineHistory([]); setRefineInstruction(""); }}>
+                Reset Chat
               </Button>
               <Button type="button" onClick={acceptRefinement}>
-                Accept & Save
+                Accept & Save Latest
               </Button>
             </DialogFooter>
           )}
