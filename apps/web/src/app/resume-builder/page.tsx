@@ -559,10 +559,9 @@ function ResumeBuilderPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: user.id,
           target_role: refineTarget.role,
-          original_bullet: refineHistory.length > 0 ? refineHistory[refineHistory.length - 1].result : refineTarget.text,
-          instructions: refineInstruction
+          bullet_text: refineHistory.length > 0 ? refineHistory[refineHistory.length - 1].result : refineTarget.text,
+          instruction: refineInstruction
         })
       })
       if (res.ok) {
