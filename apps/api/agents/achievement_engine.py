@@ -409,6 +409,9 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     
     CRITICAL: 
     - Follow standard Day 1 resume rules (Start with strong elite action verb, quantify, single line).
+    - Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
+    - Massive Effect Inversion: If the achievement contains a massive business impact (e.g., millions in revenue, massive scale, critical system rescue), you MUST invert the formula to front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
+    - Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability. Preserve the exact unrounded metrics provided by the user.
     - Do NOT hallucinate metrics; use the provided metrics or abstract them safely (e.g. 'significant improvement').
     - NEVER put a full stop (period) at the end of the bullet point.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
@@ -551,6 +554,9 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     
     CRITICAL: 
     - Output EXACTLY {num_points} bullets in each 'bullets' array.
+    - Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
+    - Massive Effect Inversion: If the achievement contains a massive business impact (e.g., millions in revenue, massive scale, critical system rescue), you MUST invert the formula to front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
+    - Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability. Preserve the exact unrounded metrics provided by the user.
     - NEVER put a full stop (period) at the end of the bullet point.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
     """
@@ -685,8 +691,11 @@ def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: 
     CRITICAL INSTRUCTIONS:
     1. Apply the user's instruction precisely to refine the bullet.
     2. Ensure the bullet still follows IIT Bombay placement rules: starts with a strong action verb, highlights scale/impact, uses active voice.
-    3. DO NOT hallucinate metrics that were not originally there or provided by the user.
-    4. Provide a very short 1-sentence explanation of what you changed.
+    3. Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
+    4. Massive Effect Inversion: If the achievement contains a massive business impact, you MUST invert the formula to front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
+    5. Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability. Preserve the exact unrounded metrics provided by the user.
+    6. DO NOT hallucinate metrics that were not originally there or provided by the user.
+    7. Provide a very short 1-sentence explanation of what you changed.
     
     You must return a valid JSON object matching this schema exactly:
     {{
