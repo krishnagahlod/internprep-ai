@@ -74,24 +74,15 @@ def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[st
     )
     
     try:
-        data = json.loads(response.text)
+        data = json_repair.loads(response.text)
         if isinstance(data, dict):
             for k, v in data.items():
                 if isinstance(v, list): return v
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse PDF extraction JSON: {e}. Attempting repair...")
-        try:
-            repaired_data = json_repair.loads(response.text.strip())
-            if isinstance(repaired_data, dict):
-                for k, v in repaired_data.items():
-                    if isinstance(v, list): return v
-                return [repaired_data]
-            return repaired_data if isinstance(repaired_data, list) else []
-        except Exception as repair_e:
-            print(f"Failed to repair JSON: {repair_e}")
-            return []
+        print(f"Failed to parse PDF extraction JSON: {e}")
+        return []
 
 def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     import fitz # PyMuPDF
@@ -193,24 +184,15 @@ def extract_achievements_from_other_pdf(pdf_bytes: bytes, existing_vault: List[D
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
                 
-        data = json.loads(response_text.strip())
+        data = json_repair.loads(response_text.strip())
         if isinstance(data, dict):
             for k, v in data.items():
                 if isinstance(v, list): return v
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse other PDF extraction JSON: {e}. Attempting repair...")
-        try:
-            repaired_data = json_repair.loads(response_text.strip())
-            if isinstance(repaired_data, dict):
-                for k, v in repaired_data.items():
-                    if isinstance(v, list): return v
-                return [repaired_data]
-            return repaired_data if isinstance(repaired_data, list) else []
-        except Exception as repair_e:
-            print(f"Failed to repair JSON: {repair_e}")
-            return []
+        print(f"Failed to parse other PDF extraction JSON: {e}")
+        return []
 
 def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     vault_context = ""
@@ -276,24 +258,15 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
     )
     
     try:
-        data = json.loads(response.text)
+        data = json_repair.loads(response.text)
         if isinstance(data, dict):
             for k, v in data.items():
                 if isinstance(v, list): return v
             return [data]
         return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"Failed to parse text extraction JSON: {e}. Attempting repair...")
-        try:
-            repaired_data = json_repair.loads(response.text.strip())
-            if isinstance(repaired_data, dict):
-                for k, v in repaired_data.items():
-                    if isinstance(v, list): return v
-                return [repaired_data]
-            return repaired_data if isinstance(repaired_data, list) else []
-        except Exception as repair_e:
-            print(f"Failed to repair JSON: {repair_e}")
-            return []
+        print(f"Failed to parse text extraction JSON: {e}")
+        return []
 
 def get_placement_rag_context(supabase_client, target_role: str, description: str, tags: List[str]) -> str:
     """Fetches relevant placement-tier golden bullets to use as few-shot examples."""
@@ -446,7 +419,6 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             response_text = cerebras_client.generate_chat_completion(
                 model="gpt-oss-120b",
                 messages=[{"role": "user", "content": system_prompt}],
-                response_format={"type": "json_object"},
                 temperature=0.4,
                 max_tokens=2048
             )
@@ -461,7 +433,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             # Remove trailing commas which break standard json.loads
             response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
             
-            data = json.loads(response_text)
+            data = json_repair.loads(response_text)
             variants = data.get("variants", [])
             
             # Ensure no full stops made it through
@@ -596,7 +568,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         if json_match:
             text = json_match.group(1).strip()
         text = re.sub(r',\s*([}\]])', r'\1', text)
-        return json.loads(text)
+        return json_repair.loads(text)
     except Exception as e:
         print(f"Gemini generation failed for section bullets, falling back to Cerebras: {e}")
         
@@ -605,7 +577,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     for attempt in range(max_retries):
         try:
             response_text = cerebras_client.generate_chat_completion(
-                model="llama-3.3-70b",
+                model="gpt-oss-120b",
                 messages=[{"role": "user", "content": system_prompt}],
                 temperature=0.3,
                 max_tokens=2500
@@ -616,19 +588,12 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             if json_match:
                 response_text = json_match.group(1)
             response_text = response_text.strip()
-            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
-            
-            try:
-                data = json.loads(response_text)
-            except json.JSONDecodeError:
-                # One last attempt to extract JSON if it was unparseable
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    data = json.loads(json_match.group(0))
-                else:
-                    raise Exception("Could not parse Cerebras output as JSON")
             
             # Ensure no full stops
+            # (Fixing regex/logic for compliance with instruction)
+            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+            data = json_repair.loads(response_text)
+            
             for v_set in data.get("variant_sets", []):
                 for v in v_set.get("bullets", []):
                     if v.get("bullet_text") and v["bullet_text"].endswith("."):
