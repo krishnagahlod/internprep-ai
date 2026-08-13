@@ -97,7 +97,7 @@ async def extract_from_pdf(
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
     try:
-        from agents.resume_analyzer import supabase
+        from dependencies import get_supabase; supabase = get_supabase()
         
         # Fetch existing vault context
         existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).execute()
@@ -166,7 +166,7 @@ async def extract_from_pdf(
 @limiter.limit("5/minute")
 async def extract_from_text(request: Request, body: ExtractTextRequest):
     try:
-        from agents.resume_analyzer import supabase
+        from dependencies import get_supabase; supabase = get_supabase()
         
         # Fetch existing vault context
         existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).execute()
@@ -227,7 +227,7 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
 # CRUD endpoints
 @router.get("/achievements")
 def get_achievements(user_id: str):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         res = supabase.table('achievements').select("*").eq('user_id', user_id).order('created_at', desc=True).execute()
         return res.data
@@ -236,7 +236,7 @@ def get_achievements(user_id: str):
 
 @router.put("/achievements/{achievement_id}")
 def update_achievement(achievement_id: str, body: EditAchievementRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         res = supabase.table('achievements').update({
             "title": body.title,
@@ -254,7 +254,7 @@ def update_achievement(achievement_id: str, body: EditAchievementRequest):
 
 @router.post("/achievements")
 def add_achievement(req: ManualAchievementRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         res = supabase.table('achievements').insert({
             "user_id": req.user_id,
@@ -274,7 +274,7 @@ def add_achievement(req: ManualAchievementRequest):
 
 @router.patch("/achievements/{ach_id}")
 def edit_achievement(ach_id: str, req: EditAchievementRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         update_data = {k: v for k, v in req.dict(exclude_unset=True).items() if v is not None}
         if not update_data:
@@ -286,7 +286,7 @@ def edit_achievement(ach_id: str, req: EditAchievementRequest):
 
 @router.delete("/achievements/{ach_id}")
 def delete_achievement(ach_id: str):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         # Also delete generated bullets linked to this
         supabase.table('generated_bullets').delete().eq('achievement_id', ach_id).execute()
@@ -299,7 +299,7 @@ def delete_achievement(ach_id: str):
 @router.post("/generate")
 @limiter.limit("10/minute")
 async def generate_bullets(request: Request, req: GenerateBulletsRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         # Fetch achievement
         ach_res = supabase.table('achievements').select("*").eq('id', req.achievement_id).execute()
@@ -344,7 +344,7 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
 @router.post("/generate-section")
 @limiter.limit("10/minute")
 async def generate_section_bullets_api(request: Request, req: GenerateSectionRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         if not req.achievement_ids:
             raise HTTPException(status_code=400, detail="No achievements provided")
@@ -370,7 +370,7 @@ async def generate_section_bullets_api(request: Request, req: GenerateSectionReq
 
 @router.get("/point-bank")
 def get_point_bank(user_id: str):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         # Only return saved bullets
         res = supabase.table('generated_bullets').select("*, achievements(title, parent_experience)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True).execute()
@@ -380,7 +380,7 @@ def get_point_bank(user_id: str):
 
 @router.post("/save-bullet")
 def save_bullet(req: SaveBulletRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         insert_data = {
             "achievement_id": req.achievement_id,
@@ -400,7 +400,7 @@ def save_bullet(req: SaveBulletRequest):
 
 @router.delete("/point-bank/{bullet_id}")
 def delete_saved_bullet(bullet_id: str):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         supabase.table('generated_bullets').delete().eq('id', bullet_id).execute()
         return {"status": "deleted"}
@@ -409,7 +409,7 @@ def delete_saved_bullet(bullet_id: str):
 
 @router.put("/point-bank/{bullet_id}")
 def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         res = supabase.table('generated_bullets').update({
             "bullet_text": req.bullet_text
@@ -420,7 +420,7 @@ def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
 
 @router.post("/metric-chat")
 def metric_chat(req: MetricChatRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         ach_res = supabase.table('achievements').select("*").eq('id', req.achievement_id).execute()
         if not ach_res.data:
@@ -444,7 +444,7 @@ def refine_bullet(req: RefineBulletRequest):
 @router.post("/strategy")
 @limiter.limit("5/minute")
 async def get_strategy(request: Request, req: StrategyRequest):
-    from agents.resume_analyzer import supabase
+    from dependencies import get_supabase; supabase = get_supabase()
     try:
         achievements = []
         bullets = []
