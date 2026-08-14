@@ -685,7 +685,7 @@ function ResumeBuilderPageContent() {
             Resume Builder
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Specifically focusing on placements. Store your raw achievements once, and let our AI generate perfectly benchmarked bullet variants tailored for top-tier roles.
+            Specifically focusing on placement and internship resumes. Store your raw achievements once, and let our AI generate perfectly benchmarked bullet variants tailored for top-tier roles.
           </p>
         </div>
       </div>
