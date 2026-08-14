@@ -226,3 +226,44 @@ async def resume_workshop(request: Request, body: WorkshopRequest):
         raise HTTPException(status_code=504, detail="Workshop engine timed out. Please try your response again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Workshop error: {str(e)}")
+
+class AnalyzeSectionRequest(BaseModel):
+    text: str
+    target_role: str = "consult"
+    resume_phase: str = "placement"
+    section_type: str = "experience"
+    user_id: Optional[str] = None
+
+@router.post("/analyze-section")
+@limiter.limit("10/hour")
+async def analyze_resume_section(request: Request, body: AnalyzeSectionRequest):
+    try:
+        from agents.resume_analyzer import analyze_resume_section_text
+        
+        if not body.text or not body.text.strip():
+            raise HTTPException(status_code=400, detail="Text cannot be empty")
+            
+        analysis_json_str = await asyncio.wait_for(
+            asyncio.to_thread(
+                analyze_resume_section_text, 
+                body.text, 
+                body.target_role, 
+                body.resume_phase, 
+                body.section_type
+            ),
+            timeout=180.0
+        )
+        
+        analysis_dict = json.loads(analysis_json_str)
+        
+        return {
+            "raw_text": body.text,
+            "analysis": analysis_dict,
+            "is_section_only": True
+        }
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=503, detail="Analysis timed out. Please try again.")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse the AI engine's response into structural data.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing section: {str(e)}")

@@ -437,6 +437,25 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
             
             data = json_repair.loads(response_text)
+            
+            if isinstance(data, str):
+                import json
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    # Attempt a final regex extraction if pure string
+                    import re
+                    match = re.search(r'(\{.*\})', data, re.DOTALL)
+                    if match:
+                        try:
+                            data = json.loads(match.group(1))
+                        except Exception:
+                            data = {}
+                    else:
+                        data = {}
+            if not isinstance(data, dict):
+                data = {}
+                
             variants = data.get("variants", [])
             
             # Ensure no full stops made it through

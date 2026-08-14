@@ -94,6 +94,12 @@ export default function ResumePage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<"section" | "severity">("section")
   
+  // Section Analysis State
+  const [analysisMode, setAnalysisMode] = useState<"full" | "section">("full")
+  const [sectionText, setSectionText] = useState("")
+  const [sectionType, setSectionType] = useState("experience")
+  const [isSectionOnly, setIsSectionOnly] = useState(false)
+
   // Workshop State
   const [activeWorkshopBullet, setActiveWorkshopBullet] = useState<any | null>(null)
   const [workshopMessages, setWorkshopMessages] = useState<{role: string, content: string}[]>([])
@@ -188,6 +194,73 @@ export default function ResumePage() {
       clearInterval(progressInterval)
       setResumeText(data.raw_text)
       setAnalysisResult(data.analysis)
+      setIsSectionOnly(data.is_section_only || false)
+      setProgress(100)
+      if (isGuest) {
+        incrementGuestResume()
+      }
+    } catch (err: any) {
+      clearInterval(progressInterval)
+      setError(err.message || "An unexpected error occurred.")
+      setProgress(0)
+    } finally {
+      clearInterval(progressInterval)
+      setIsUploading(false)
+    }
+  }
+
+  const handleAnalyzeText = async () => {
+    if (!sectionText.trim()) {
+      setError("Please paste some text to analyze.")
+      return
+    }
+
+    if (isGuest && guestResumeCount >= 2) {
+      setError("You've reached your free guest limit (2 resumes). Please sign up to continue using InternPrep AI.")
+      return
+    }
+
+    setIsUploading(true)
+    setError(null)
+    setProgress(5)
+
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 95) {
+          clearInterval(progressInterval);
+          return 95;
+        }
+        const increment = prev < 40 ? 5 : prev < 75 ? 2 : 0.5;
+        return prev + increment;
+      })
+    }, 2000)
+
+    try {
+      const payload = {
+        text: sectionText,
+        target_role: targetRole,
+        resume_phase: resumePhase,
+        section_type: sectionType,
+        user_id: user?.id || null
+      }
+      
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const response = await fetch(`${API_URL}/resume/analyze-section`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to analyze section")
+      }
+
+      const data = await response.json()
+      clearInterval(progressInterval)
+      setResumeText(data.raw_text)
+      setAnalysisResult(data.analysis)
+      setIsSectionOnly(data.is_section_only || false)
       setProgress(100)
       if (isGuest) {
         incrementGuestResume()
@@ -398,7 +471,25 @@ export default function ResumePage() {
                 </div>
               </div>
 
-              <div className="relative group mb-8">
+              <div className="mb-6 flex p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'full' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setAnalysisMode('full')}
+                  disabled={isUploading}
+                >
+                  Full Resume (PDF)
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'section' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setAnalysisMode('section')}
+                  disabled={isUploading}
+                >
+                  Section/Bullet (Text)
+                </button>
+              </div>
+
+              {analysisMode === 'full' ? (
+                <div className="relative group mb-8">
                 <div className={`absolute inset-0 bg-primary/20 rounded-2xl blur-xl transition-opacity duration-500 ${isUploading ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-50'}`} />
                 <div className="relative border-2 border-dashed border-black/20 dark:border-white/20 rounded-2xl p-12 text-center flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5">
                   <UploadCloud className={`h-12 w-12 mb-4 transition-colors ${file ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -421,6 +512,41 @@ export default function ResumePage() {
                   )}
                 </div>
               </div>
+              ) : (
+                <div className="mb-8 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Section Type</label>
+                    <div className="relative">
+                      <select 
+                        className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
+                        value={sectionType}
+                        onChange={(e) => setSectionType(e.target.value)}
+                        disabled={isUploading}
+                      >
+                        <option value="experience">Experience / Internships</option>
+                        <option value="project">Projects</option>
+                        <option value="por">Positions of Responsibility</option>
+                        <option value="scholastic">Scholastic Achievements</option>
+                        <option value="extracurricular">Extracurriculars</option>
+                        <option value="all">Mixed / Unknown</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                        <ChevronDown className="h-5 w-5 opacity-50" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Paste Text</label>
+                    <textarea
+                      className="w-full h-40 p-4 rounded-xl border border-input/60 bg-muted/5 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
+                      placeholder="Paste a single bullet or an entire section from your resume here..."
+                      value={sectionText}
+                      onChange={(e) => setSectionText(e.target.value)}
+                      disabled={isUploading}
+                    />
+                  </div>
+                </div>
+              )}
 
               {error && (
                 <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
@@ -442,8 +568,8 @@ export default function ResumePage() {
 
               <Button 
                 className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all" 
-                onClick={handleUpload} 
-                disabled={!file || isUploading}
+                onClick={analysisMode === 'full' ? handleUpload : handleAnalyzeText} 
+                disabled={(analysisMode === 'full' ? !file : !sectionText.trim()) || isUploading}
               >
                 {isUploading ? "Executing Deep Analysis (~2 mins)" : "Analyze Document"}
               </Button>
@@ -472,67 +598,76 @@ export default function ResumePage() {
               {/* Analysis Content */}
               <div className="flex-1 overflow-y-auto px-2 md:pl-4 custom-scrollbar">
                 <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                  <Activity className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold">{healthScore}%</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Health Score</p>
-                </div>
-                <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                  <Target className="h-6 w-6 mx-auto mb-2 text-green-500 dark:text-green-400" />
-                  <p className="text-2xl font-bold">{metricsCount} <span className="text-sm font-normal text-muted-foreground">/ {totalBullets}</span></p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Quantified</p>
-                </div>
-                <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                  <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500 dark:text-amber-400" />
-                  <p className="text-2xl font-bold text-amber-400">{structuralIssues}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Structural Issues</p>
-                </div>
-                <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                  <ShieldAlert className="h-6 w-6 mx-auto mb-2 text-red-500 dark:text-red-400" />
-                  <p className="text-2xl font-bold text-red-400">{ruleViolations}</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
-                </div>
-              </div>
+              {!isSectionOnly ? (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <Activity className="h-6 w-6 mx-auto mb-2 text-primary" />
+                      <p className="text-2xl font-bold">{healthScore}%</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Health Score</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <Target className="h-6 w-6 mx-auto mb-2 text-green-500 dark:text-green-400" />
+                      <p className="text-2xl font-bold">{metricsCount} <span className="text-sm font-normal text-muted-foreground">/ {totalBullets}</span></p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Quantified</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500 dark:text-amber-400" />
+                      <p className="text-2xl font-bold text-amber-400">{structuralIssues}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Structural Issues</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <ShieldAlert className="h-6 w-6 mx-auto mb-2 text-red-500 dark:text-red-400" />
+                      <p className="text-2xl font-bold text-red-400">{ruleViolations}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
+                    </div>
+                  </div>
 
-              {/* Scoring Dashboard */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 flex flex-col items-center justify-center">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
-                  <RadarChart scores={analysisResult.radar_scores} />
-                  {analysisResult.radar_scores_reasoning && (
-                    <details className="mt-6 w-full p-4 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
-                      <summary className="flex items-center gap-2 outline-none font-semibold text-sm text-primary list-none">
-                        <Brain className="h-4 w-4" />
-                        AI Evaluation Reasoning
-                        <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
-                      </summary>
-                      <ul className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text space-y-2 list-disc pl-4">
-                        {Array.isArray(analysisResult.radar_scores_reasoning) 
-                          ? analysisResult.radar_scores_reasoning.map((reason: string, i: number) => (
-                              <li key={i}>{reason}</li>
-                            ))
-                          : <li>{analysisResult.radar_scores_reasoning}</li>}
-                      </ul>
-                    </details>
-                  )}
-                </div>
-                
-                <div className="flex flex-col gap-4">
-                  <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Architecture</h3>
-                    <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_feedback}</p>
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Day 1 Benchmark</h3>
-                    <p className="text-muted-foreground text-sm italic">{analysisResult.day1_comparison}</p>
+                  {/* Scoring Dashboard */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 flex flex-col items-center justify-center">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
+                      <RadarChart scores={analysisResult.radar_scores} />
+                      {analysisResult.radar_scores_reasoning && (
+                        <details className="mt-6 w-full p-4 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
+                          <summary className="flex items-center gap-2 outline-none font-semibold text-sm text-primary list-none">
+                            <Brain className="h-4 w-4" />
+                            AI Evaluation Reasoning
+                            <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
+                          </summary>
+                          <ul className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text space-y-2 list-disc pl-4">
+                            {Array.isArray(analysisResult.radar_scores_reasoning) 
+                              ? analysisResult.radar_scores_reasoning.map((reason: string, i: number) => (
+                                  <li key={i}>{reason}</li>
+                                ))
+                              : <li>{analysisResult.radar_scores_reasoning}</li>}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col gap-4">
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1">
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Architecture</h3>
+                        <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_feedback}</p>
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Day 1 Benchmark</h3>
+                        <p className="text-muted-foreground text-sm italic">{analysisResult.day1_comparison}</p>
+                      </div>
+                      
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-amber-500">
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500 mb-2">Section Strategy</h3>
+                        <p className="text-muted-foreground text-sm">{analysisResult.section_ordering_advice}</p>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-amber-500">
-                    <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500 mb-2">Section Strategy</h3>
-                    <p className="text-muted-foreground text-sm">{analysisResult.section_ordering_advice}</p>
-                  </div>
+                </>
+              ) : (
+                <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1 mb-8 mt-2">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Section Feedback</h3>
+                  <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_section_feedback}</p>
                 </div>
-              </div>
+              )}
 
               <div>
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">

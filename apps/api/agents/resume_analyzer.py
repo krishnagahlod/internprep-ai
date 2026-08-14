@@ -492,3 +492,164 @@ def run_workshop_turn(
             "is_final_bullet": False,
             "final_bullet": None
         }
+
+def analyze_resume_section_text(resume_text: str, target_role: str = "consult", resume_phase: str = "placement", section_type: str = "experience") -> str:
+    """
+    Analyzes a specific section or single bullet of resume text using Adaptive RAG against Golden Resumes.
+    """
+    print("Extracting bullets from section text...")
+    user_bullets = extract_user_bullets(resume_text)
+    
+    if not user_bullets:
+        print("Fallback: No bullets extracted. Treating text as a single bullet.")
+        user_bullets = [{"bullet_text": resume_text.strip(), "section_type": section_type, "strength": "weak"}]
+    else:
+        if section_type and section_type != "all":
+            for ub in user_bullets:
+                ub["section_type"] = section_type
+
+    print("Fetching adaptive RAG context for section...")
+    
+    bullet_texts = [ub.get('bullet_text', '') for ub in user_bullets]
+    try:
+        embeddings = gemini_client.embed_batch(bullet_texts)
+    except Exception as e:
+        print(f"Batch embedding failed: {e}")
+        embeddings = [None] * len(user_bullets)
+        
+    def fetch_rag_for_bullet(args):
+        import time
+        idx, ub, embedding = args
+        bullet_text = ub.get('bullet_text', '')
+        s_type = ub.get('section_type', section_type)
+        if len(bullet_text) < 15 or not embedding: return ""
+        
+        from agents.resume_analyzer import supabase
+        for attempt in range(3):
+            try:
+                if not supabase: return ""
+                rpc_name = 'match_golden_bullets_placement' if resume_phase == 'placement' else 'match_golden_bullets'
+                rpc_res = supabase.rpc(rpc_name, {
+                    'query_embedding': embedding,
+                    'match_count': 10,
+                    'filter_section_type': s_type,
+                    'filter_target_role': target_role
+                }).execute()
+                
+                matches = rpc_res.data
+                if matches:
+                    local_context = f"\\n--- USER BULLET: {bullet_text} ---\\n"
+                    local_context += f"GOLDEN DAY 1 BENCHMARKS ({len(matches)} matches):\\n"
+                    for m in matches:
+                        local_context += f"- Pattern: {m['structural_skeleton']} | Verb: {m['action_verb']}\\n"
+                        local_context += f"  Text: {m['bullet_text']}\\n"
+                    return local_context
+                break
+            except Exception as e:
+                print(f"Supabase RPC error on attempt {attempt+1} for bullet {idx}: {e}")
+                time.sleep(1.5)
+        return ""
+
+    args_list = [(i, ub, embeddings[i] if i < len(embeddings) else None) for i, ub in enumerate(user_bullets)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        rag_results = list(executor.map(fetch_rag_for_bullet, args_list))
+    
+    rag_context = "".join(rag_results)
+
+    global_rules_text = "\\n".join([f"- {r}" for r in BEST_PRACTICES])
+    
+    active_section_rules = SECTION_RULES
+    if resume_phase == "placement":
+        PLACEMENT_RULES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/resumes/placement_section_rules.json"))
+        if os.path.exists(PLACEMENT_RULES_PATH):
+            try:
+                with open(PLACEMENT_RULES_PATH, 'r') as f:
+                    active_section_rules = json.load(f)
+            except Exception:
+                pass
+                
+    section_rules_text = json.dumps(active_section_rules.get(section_type, {}), indent=2)
+    user_bullets_json = json.dumps(user_bullets, indent=2)
+
+    final_prompt = f"""
+    You are an elite IIT Bombay Day 1 Resume Reviewer.
+    
+    We parsed a section of the user's resume. For their bullets, we ran a vector search against verified Day 1 Senior Resumes.
+    CRITICAL CONSTRAINT: You MUST NOT tell the user to copy specific facts from the Golden Examples. 
+    Use the Golden Examples purely as a STRUCTURAL BENCHMARK.
+    
+    ### GLOBAL STRICT RULES:
+    {global_rules_text}
+    
+    ### SECTION-SPECIFIC RULES & CONVENTIONS ({section_type}):
+    {section_rules_text}
+    
+    ### USER SECTION TEXT:
+    {resume_text}
+    
+    ### USER BULLETS TO EVALUATE:
+    {user_bullets_json}
+    
+    ### ADAPTIVE RAG CONTEXT:
+    {rag_context}
+    
+    ### TASK:
+    Analyze the user's resume section bullet by bullet.
+    Provide severity (critical, major, minor, good), an action verb rating (weak, moderate, strong) with alternatives, and a metrics hint if they lack quantification.
+    Generate a suggested_rewrite that preserves their facts but upgrades the structural skeleton.
+    CRITICAL TENSE RULE: You MUST preserve the original verb tense of the point.
+    
+    CRITICAL: You MUST evaluate EVERY SINGLE bullet present in the "USER BULLETS TO EVALUATE" section (there are {len(user_bullets)} bullets). 
+    
+    Return ONLY valid JSON exactly matching this schema:
+    {{
+        "overall_section_feedback": "string",
+        "bullets": [
+            {{
+                "original_bullet": "string",
+                "section_type": "string",
+                "severity": "critical" | "major" | "minor" | "good",
+                "confidence": number,
+                "critique": "string",
+                "action_verb_rating": "weak" | "moderate" | "strong",
+                "action_verb_alternatives": ["string"],
+                "structural_issues": ["string"],
+                "best_practice_violations": ["string"],
+                "metrics_hint": "string" or null,
+                "golden_comparison": "string",
+                "suggested_rewrite": "string",
+                "predicted_questions": ["string"],
+                "mapped_company_category": "string"
+            }}
+        ]
+    }}
+    """
+    
+    import typing_extensions as typing
+    class BulletFeedback(typing.TypedDict, total=False):
+        original_bullet: str
+        section_type: str
+        severity: str
+        confidence: float
+        critique: str
+        action_verb_rating: str
+        action_verb_alternatives: list[str]
+        structural_issues: list[str]
+        best_practice_violations: list[str]
+        metrics_hint: str
+        golden_comparison: str
+        suggested_rewrite: str
+        predicted_questions: list[str]
+        mapped_company_category: str
+
+    class SectionAnalysisResponse(typing.TypedDict):
+        overall_section_feedback: str
+        bullets: list[BulletFeedback]
+
+    config = genai.GenerationConfig(
+        response_mime_type="application/json", 
+        temperature=0.0
+    )
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.1-flash-lite"), final_prompt, generation_config=config)
+    
+    return clean_json(response.text)

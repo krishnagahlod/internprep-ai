@@ -79,7 +79,7 @@ def extract_bullets_from_resume(pdf_path):
         for attempt in range(5):
             try:
                 response = groq_client.chat.completions.create(
-                    model="openai/gpt-oss-120b",
+                    model="gpt-oss-120b",
                     messages=[{"role": "user", "content": full_prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.1
