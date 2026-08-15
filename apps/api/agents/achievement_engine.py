@@ -268,36 +268,112 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
         print(f"Failed to parse text extraction JSON: {e}")
         return []
 
-def get_placement_rag_context(supabase_client, target_role: str, description: str, tags: List[str]) -> str:
-    """Fetches relevant placement-tier golden bullets to use as few-shot examples."""
+# Helper functions for Playbooks & Section Rules
+def normalize_section_type(raw_section: str) -> str:
+    if not raw_section:
+        return "experience"
+    s = raw_section.lower().strip()
+    if "exp" in s or "work" in s or "intern" in s or "prof" in s:
+        return "experience"
+    if "proj" in s or "b.tech" in s or "btp" in s or "ddp" in s:
+        return "project"
+    if "por" in s or "responsib" in s or "position" in s or "lead" in s:
+        return "por"
+    if "scholas" in s or "acad" in s or "grade" in s or "cpi" in s or "rank" in s:
+        return "scholastic"
+    if "extra" in s or "cultur" in s or "sport" in s or "achieve" in s:
+        return "extracurricular"
+    return "experience"
+
+def get_playbook_filename(target_role: str) -> str:
+    r = target_role.lower() if target_role else "consulting"
+    if "consult" in r:
+        return "consulting.json"
+    if "fin" in r:
+        return "finance.json"
+    if "prod" in r or "pm" in r:
+        return "product_management.json"
+    if "soft" in r or "it" in r or "swe" in r or "dev" in r:
+        return "software.json"
+    if "analyt" in r or "data" in r or "ds" in r:
+        return "analytics.json"
+    return "consulting.json"
+
+def load_domain_playbook(target_role: str) -> Dict[str, Any]:
+    filename = get_playbook_filename(target_role)
+    playbook_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "strategy_playbooks", filename)
+    if os.path.exists(playbook_path):
+        try:
+            with open(playbook_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to load domain playbook {filename}: {e}")
+    return {}
+
+def load_placement_section_rules(raw_section: str = "") -> Dict[str, Any]:
+    rules_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "resumes", "placement_section_rules.json")
+    all_rules = {}
+    if os.path.exists(rules_path):
+        try:
+            with open(rules_path, "r", encoding="utf-8") as f:
+                all_rules = json.load(f)
+        except Exception as e:
+            print(f"Failed to load placement section rules: {e}")
+    
+    if raw_section:
+        norm_key = normalize_section_type(raw_section)
+        return all_rules.get(norm_key, {})
+    return all_rules
+
+def get_placement_rag_context(supabase_client, target_role: str, description: str, tags: List[str], section_type: str = "experience") -> str:
+    """Fetches relevant placement-tier golden bullets to use as few-shot examples with role and section-type awareness."""
     query_embedding = get_query_embedding(description)
     if not query_embedding:
         return ""
         
+    norm_section = normalize_section_type(section_type)
+    
     try:
-        # Match using the new placement RPC function
+        # First attempt: match with both target_role and section_type
         response = supabase_client.rpc('match_golden_bullets_placement', {
             'query_embedding': query_embedding,
-            'match_count': 10,
-            'filter_target_role': target_role,
-            'filter_tier': 'placement'
+            'match_count': 8,
+            'filter_section_type': norm_section,
+            'filter_target_role': target_role
         }).execute()
         
-        matches = response.data
+        matches = response.data if response and response.data else []
+        
+        # If fewer than 3 matches with strict section filter, try role only
+        if len(matches) < 3:
+            fallback_res = supabase_client.rpc('match_golden_bullets_placement', {
+                'query_embedding': query_embedding,
+                'match_count': 6,
+                'filter_section_type': None,
+                'filter_target_role': target_role
+            }).execute()
+            if fallback_res and fallback_res.data:
+                seen_texts = {m.get('bullet_text') for m in matches if m.get('bullet_text')}
+                for m in fallback_res.data:
+                    if m.get('bullet_text') not in seen_texts:
+                        matches.append(m)
+                        seen_texts.add(m.get('bullet_text'))
+        
+        # If still empty, try general golden_bullets
         if not matches:
-            # Fallback to any tier if placement tier is empty for this role
             response = supabase_client.rpc('match_golden_bullets', {
                 'query_embedding': query_embedding,
                 'match_count': 5,
+                'filter_section_type': norm_section,
                 'filter_target_role': target_role
             }).execute()
-            matches = response.data
+            matches = response.data if response and response.data else []
             
         if not matches:
             return ""
             
-        context = "GOLDEN BULLET EXAMPLES (For Inspiration):\n"
-        for i, m in enumerate(matches):
+        context = f"GOLDEN DAY 1 BENCHMARKS [{target_role.upper()} - {norm_section.upper()}] (For Inspiration):\n"
+        for i, m in enumerate(matches[:8]):
             context += f"{i+1}. {m.get('bullet_text')} [Skeleton: {m.get('structural_skeleton')}]\n"
             
         return context
@@ -305,36 +381,68 @@ def get_placement_rag_context(supabase_client, target_role: str, description: st
         print(f"RAG fetch failed: {e}")
         return ""
 
-def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", benchmark_text: str = "", existing_bullets: List[str] = None) -> List[Dict[str, Any]]:
-    # 1. Fetch RAG context
+def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", benchmark_text: str = "", existing_bullets: List[str] = None) -> Dict[str, Any]:
+    # Extract metadata & section type
+    raw_section = achievement.get('section_type', 'experience')
+    norm_section = normalize_section_type(raw_section)
+    
     desc = achievement.get('original_description', '')
     notes = achievement.get('user_notes', '')
     tags = achievement.get('competency_tags', [])
-    
     combined_desc = f"{desc}\n\nAdditional Context/Notes: {notes}" if notes else desc
     
-    rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, tags)
+    # 1. Fetch RAG context with section awareness
+    rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, tags, section_type=norm_section)
     
+    # 2. Load Domain Playbook and Section Rules
+    playbook = load_domain_playbook(target_role)
+    display_domain = playbook.get("display_name", target_role)
+    sec_allocation = playbook.get("section_allocation", {}).get(norm_section, {})
+    sec_priority = sec_allocation.get("priority", "high")
+    sec_guidance = sec_allocation.get("guidance", "Highlight measurable business/technical outcomes, ownership, and scale.")
+    sec_emphasis = sec_allocation.get("emphasis", ["quantified_impact", "ownership"])
+    sec_common_mistakes = sec_allocation.get("common_mistakes", ["Listing duties instead of accomplishments", "Vague impact without metrics"])
+    
+    section_rules_data = load_placement_section_rules(norm_section)
+    sec_rules_list = section_rules_data.get("rules", [])
+    sec_iitb_conventions = section_rules_data.get("iitb_conventions", [])
+    
+    formatted_mistakes = "\n".join([f"    - ⚠️ AVOID: {m}" for m in sec_common_mistakes])
+    formatted_sec_rules = "\n".join([f"    - {r}" for r in sec_rules_list[:4]])
+    formatted_conventions = "\n".join([f"    - {c}" for c in sec_iitb_conventions[:3]])
+    
+    domain_playbook_block = f"""
+    DOMAIN PLAYBOOK & SECTION INTELLIGENCE ({display_domain.upper()} - {norm_section.upper()}):
+    - Section Priority Level: {sec_priority.upper()}
+    - Domain Target Guidance: {sec_guidance}
+    - Key Competency Signals: {", ".join(sec_emphasis)}
+    Common Mistakes to Avoid:
+{formatted_mistakes}
+    Placement & Section Rules:
+{formatted_sec_rules}
+{formatted_conventions}
+    """
+
     # Setup length constraint
     if benchmark_text:
         length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
     else:
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Match the length of the original description closely. Standard 1-line length (approx 13-18 words)."
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Match standard 1-line length (approx 13-18 words, ~110-140 characters). NEVER exceed 1 line."
 
     # Setup context awareness
     context_rules = ""
     if existing_bullets:
         context_rules = f"""
     CONTEXT AWARENESS (ANTI-FRANKENSTEIN RULE):
-    The user already has these bullets saved for this project:
+    The user already has these bullets saved for this experience/project:
     {json.dumps(existing_bullets)}
     You MUST NOT reuse the action verbs or exact sentence structures found in these existing bullets to ensure variety.
         """
         
     action_verb_dictionary = """
     ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated, Streamlined, Modernized, Revamped, Overhauled, Championed, Maximized, Optimized, Transformed, Automated, Directed, Guided, Mentored, Shaped.
-    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
-    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary to ensure no repetition.
+    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale), Assisted with, Responsible for.
+    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary.
     """
 
     # Define variants dynamically based on role
@@ -342,27 +450,35 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     if "consult" in role_lower or "finance" in role_lower:
         variants_instructions = """
     1. 'strategic_impact': Focus heavily on the strategic business results, revenue/cost impact, and high-level outcomes.
-    2. 'financial_roi': Focus specifically on financial metrics, cost savings, valuation, or profitability changes.
-    3. 'leadership': Focus on stakeholder management, leading teams, cross-functional alignment, and ownership.
-    4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
+    2. 'financial_roi': Focus specifically on financial metrics, cost savings, valuation, efficiency gains, or scale.
+    3. 'leadership': Focus on stakeholder management, leading teams, cross-functional alignment, and initiative ownership.
+    4. 'concise': A highly punchy version prioritizing extreme brevity and high density while maintaining the core outcome.
         """
         variant_enum = '"strategic_impact" | "financial_roi" | "leadership" | "concise"'
     elif "product" in role_lower:
         variants_instructions = """
-    1. 'growth_metrics': Focus on MAU, retention, engagement, adoption rate, and core product KPIs.
-    2. 'cross_functional': Focus on leading engineering/design teams, stakeholder alignment, and product vision.
-    3. 'go_to_market': Focus on launch success, market penetration, user feedback, and iteration.
+    1. 'growth_metrics': Focus on MAU, retention, engagement, conversion rate, and core product KPIs.
+    2. 'cross_functional': Focus on leading engineering/design teams, stakeholder alignment, user empathy, and product vision.
+    3. 'go_to_market': Focus on launch success, market penetration, user feedback, and iterative validation.
     4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
         """
         variant_enum = '"growth_metrics" | "cross_functional" | "go_to_market" | "concise"'
     elif "software" in role_lower or "it" in role_lower:
         variants_instructions = """
-    1. 'architecture_scale': Focus heavily on system architecture, handling high TPS/scale, and infrastructure.
-    2. 'optimization': Focus on latency reduction, memory/cost savings, algorithm efficiency, and performance.
-    3. 'feature_impact': Focus on the business impact of the shipped feature, user adoption, and technical execution.
+    1. 'architecture_scale': Focus heavily on system design, microservices, handling high TPS/scale, and infrastructure reliability.
+    2. 'optimization': Focus on latency reduction, throughput, memory/cost savings, algorithm efficiency, and performance.
+    3. 'feature_impact': Focus on the business/user impact of the shipped feature, technical execution, and reliability.
     4. 'concise': A highly punchy version prioritizing extreme brevity while maintaining the core outcome.
         """
         variant_enum = '"architecture_scale" | "optimization" | "feature_impact" | "concise"'
+    elif "analyt" in role_lower or "data" in role_lower:
+        variants_instructions = """
+    1. 'data_rigor': Focus on statistical modeling, dataset scale (e.g. millions of rows), ETL pipelines, and analytical depth.
+    2. 'business_decision': Focus on how the data insights directly changed business strategy, ROI, or operational decisions.
+    3. 'algorithm_engineering': Focus on predictive model performance (F1-score, AUC-ROC, inference latency, accuracy gains).
+    4. 'concise': A highly punchy version prioritizing extreme brevity and density.
+        """
+        variant_enum = '"data_rigor" | "business_decision" | "algorithm_engineering" | "concise"'
     else:
         variants_instructions = """
     1. 'impact_heavy': Focus heavily on the quantified results and business/end-user value.
@@ -374,16 +490,20 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
 
     company_target = f"Specifically, the user is targeting a role at '{target_company}'." if target_company else ""
 
-    # 2. Generate variants using Cerebras
+    # Generate variants using Cerebras
     system_prompt = f"""
-    You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role. {company_target}
-    Take their raw achievement data and generate 4 distinct, high-impact resume bullet variants.
+    You are an elite IIT Bombay placement resume master and former top-tier recruiter for {display_domain}.
+    The user is preparing for Day 1 placements in '{target_role}'. {company_target}
+    Take their raw achievement data and generate 4 distinct, high-impact resume bullet variants tailored strictly to {display_domain} benchmarks.
+    
+    {domain_playbook_block}
     
     {rag_context}
     
     Raw Achievement Data:
     - Title: {achievement.get('title')}
-    - Context: {achievement.get('parent_experience')}
+    - Section: {raw_section} ({norm_section})
+    - Context/Organization: {achievement.get('parent_experience')}
     - Description: {combined_desc}
     - Known Metrics: {json.dumps(achievement.get('quantified_metrics', {}))}
     
@@ -396,7 +516,9 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     Generate 4 variants of the bullet:
     {variants_instructions}
     
-    Return strictly a JSON object with a "variants" key that contains an array of exactly 4 objects matching this schema:
+    Also generate 2-3 proactive 'local_coaching_tips' for the user on how they can elevate this achievement further (e.g., specific proxy metrics to uncover, technical stack details to add, or how to pitch this in an interview).
+    
+    Return strictly a JSON object with this schema:
     {{
         "variants": [
             {{
@@ -404,10 +526,14 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
                 "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
                 "recruiter_notes": "1-2 sentences explaining why this bullet is elite, and actively suggesting exactly which metric could be further quantified to make it even stronger."
             }}
+        ],
+        "local_coaching_tips": [
+            "Actionable coaching tip 1 for this achievement",
+            "Actionable coaching tip 2 for this achievement"
         ]
     }}
     
-    CRITICAL: 
+    CRITICAL QUALITY RULES:
     - Follow standard Day 1 resume rules (Start with strong elite action verb, quantify, single line).
     - Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
     - Massive Effect Inversion: If the achievement contains a massive business impact (e.g., millions in revenue, massive scale, critical system rescue), you MUST invert the formula to front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
@@ -457,23 +583,34 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
                 data = {}
                 
             variants = data.get("variants", [])
+            coaching_tips = data.get("local_coaching_tips", [])
             
             # Ensure no full stops made it through
             for v in variants:
                 if v.get("bullet_text") and v["bullet_text"].endswith("."):
                     v["bullet_text"] = v["bullet_text"][:-1]
+                # Attach coaching tips to variants for backwards compatibility
+                if coaching_tips:
+                    v["coaching_tips"] = coaching_tips
                     
-            return variants
+            return {
+                "variants": variants,
+                "coaching_tips": coaching_tips
+            }
         except Exception as e:
             print(f"Failed to generate variants JSON (attempt {attempt+1}): {e}")
             if attempt == max_retries - 1:
-                return []
-    return []
+                return {"variants": [], "coaching_tips": []}
+    return {"variants": [], "coaching_tips": []}
 
 def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]], target_role: str, target_company: str = "", num_points: int = 3, benchmark_text: str = "") -> Dict[str, Any]:
     # Extract tags and combined descriptions for RAG
     all_tags = []
     combined_desc = ""
+    section_types = [a.get('section_type', 'experience') for a in achievements if a.get('section_type')]
+    dominant_section = max(set(section_types), key=section_types.count) if section_types else "experience"
+    norm_section = normalize_section_type(dominant_section)
+    
     for ach in achievements:
         all_tags.extend(ach.get('competency_tags', []))
         desc = ach.get('original_description', '')
@@ -482,19 +619,48 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         if notes:
             combined_desc += f"  Notes: {notes}\n"
     
-    # RAG context based on all achievements combined
-    rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, list(set(all_tags)))
+    # 1. RAG context based on all achievements combined with section awareness
+    rag_context = get_placement_rag_context(supabase_client, target_role, combined_desc, list(set(all_tags)), section_type=norm_section)
     
+    # 2. Load Domain Playbook & Section Rules
+    playbook = load_domain_playbook(target_role)
+    display_domain = playbook.get("display_name", target_role)
+    sec_allocation = playbook.get("section_allocation", {}).get(norm_section, {})
+    sec_priority = sec_allocation.get("priority", "high")
+    sec_guidance = sec_allocation.get("guidance", "Highlight measurable business/technical outcomes, ownership, and scale.")
+    sec_emphasis = sec_allocation.get("emphasis", ["quantified_impact", "ownership"])
+    sec_common_mistakes = sec_allocation.get("common_mistakes", ["Listing duties instead of accomplishments", "Vague impact without metrics"])
+    
+    section_rules_data = load_placement_section_rules(norm_section)
+    sec_rules_list = section_rules_data.get("rules", [])
+    sec_iitb_conventions = section_rules_data.get("iitb_conventions", [])
+    
+    formatted_mistakes = "\n".join([f"    - ⚠️ AVOID: {m}" for m in sec_common_mistakes])
+    formatted_sec_rules = "\n".join([f"    - {r}" for r in sec_rules_list[:4]])
+    formatted_conventions = "\n".join([f"    - {c}" for c in sec_iitb_conventions[:3]])
+    
+    domain_playbook_block = f"""
+    DOMAIN PLAYBOOK & SECTION COMPOSITION INTELLIGENCE ({display_domain.upper()} - {norm_section.upper()}):
+    - Section Priority Level: {sec_priority.upper()}
+    - Domain Target Guidance: {sec_guidance}
+    - Key Competency Signals: {", ".join(sec_emphasis)}
+    Common Mistakes to Avoid:
+{formatted_mistakes}
+    Placement & Section Rules:
+{formatted_sec_rules}
+{formatted_conventions}
+    """
+
     # Length constraint
     if benchmark_text:
         length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
     else:
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~120-140 chars)."
+        length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~110-140 chars per bullet)."
 
     action_verb_dictionary = """
     ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated, Streamlined, Modernized, Revamped, Overhauled, Championed, Maximized, Optimized, Transformed, Automated, Directed, Guided, Mentored, Shaped.
-    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale).
-    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary to ensure no repetition.
+    BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale), Assisted with, Responsible for.
+    CRITICAL RULE: NEVER start two bullet points with the same action verb in the same variant set. You MUST use a highly diverse vocabulary to ensure no repetition across all bullets in the section.
     """
 
     role_lower = target_role.lower()
@@ -510,6 +676,10 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         set_1 = {"label": "Architecture & Scale Set", "desc": "Focus heavily on system architecture, handling high TPS/scale, and infrastructure."}
         set_2 = {"label": "Optimization Set", "desc": "Focus on latency reduction, memory/cost savings, algorithm efficiency, and performance."}
         variant_enum = '"architecture_scale" | "optimization"'
+    elif "analyt" in role_lower or "data" in role_lower:
+        set_1 = {"label": "Insight & Strategy Set", "desc": "Focus on actionable insights that drove major business decisions and measurable ROI."}
+        set_2 = {"label": "Modeling & Rigor Set", "desc": "Focus on technical ML modeling metrics, data scale, and algorithmic improvements."}
+        variant_enum = '"data_rigor" | "business_decision"'
     else:
         set_1 = {"label": "Impact-Heavy Set", "desc": "Focus heavily on the quantified results and business/end-user value."}
         set_2 = {"label": "Technical/Execution Set", "desc": "Focus on the specific tools, methods, frameworks, and technical execution."}
@@ -520,13 +690,17 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     achievements_json = json.dumps([{
         "id": a.get("id"),
         "title": a.get("title"),
+        "section": a.get("section_type", norm_section),
         "description": a.get("original_description"),
         "metrics": a.get("quantified_metrics", {})
     } for a in achievements], indent=2)
 
     system_prompt = f"""
-    You are an elite IIT Bombay placement resume writer. The user is targeting a '{target_role}' role. {company_target}
-    The user wants exactly {num_points} elite resume bullet points generated from a group of raw achievements.
+    You are an elite IIT Bombay placement resume writer and expert recruiter for {display_domain}.
+    The user is targeting a '{target_role}' role for Day 1 campus placements. {company_target}
+    The user wants exactly {num_points} elite resume bullet points generated from a group of raw achievements in the {norm_section} section.
+    
+    {domain_playbook_block}
     
     {rag_context}
     
@@ -537,13 +711,15 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     
     {action_verb_dictionary}
     
-    CRITICAL TASK INSTRUCTIONS:
-    1. The user requested EXACTLY {num_points} bullets. You must output EXACTLY {num_points} bullets per variant set.
-    2. Intelligent Merging: If multiple raw achievements are related (e.g. built the pipeline AND optimized it), combine them into a single dense bullet. 
-    3. Exclusion: If there are more raw achievements than the target {num_points} bullets, exclude the least relevant/weakest achievements (e.g., ones lacking metrics or relevance to {target_role}). Provide reasoning for exclusion.
-    4. You must generate TWO distinct variant sets:
+    CRITICAL SECTION COMPOSITION INSTRUCTIONS:
+    1. Output EXACTLY {num_points} bullets per variant set.
+    2. Chronological & Impact Ordering: Order the sub-points strategically—lead with the broadest scope or highest business/technical impact as Bullet #1.
+    3. Intelligent Merging: If multiple raw achievements are related (e.g. built the pipeline AND optimized it), combine them into a single dense bullet.
+    4. Exclusion with Reasoning: If there are more raw achievements than the target {num_points} bullets, exclude the least relevant/weakest achievements. Provide crisp reasoning.
+    5. Generate TWO distinct variant sets:
        - Set 1: {set_1['label']} - {set_1['desc']}
        - Set 2: {set_2['label']} - {set_2['desc']}
+    6. Provide 2-3 proactive 'local_coaching_tips' on how this entire section can be presented most effectively in a 1-page resume and in interviews.
 
     Return strictly a JSON object matching this exact schema:
     {{
@@ -568,14 +744,18 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                     }}
                 ]
             }}
+        ],
+        "local_coaching_tips": [
+            "Section-level coaching tip 1 (e.g., ordering or interview narrative advice)",
+            "Section-level coaching tip 2"
         ]
     }}
     
     CRITICAL: 
     - Output EXACTLY {num_points} bullets in each 'bullets' array.
     - Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
-    - Massive Effect Inversion: If the achievement contains a massive business impact (e.g., millions in revenue, massive scale, critical system rescue), you MUST invert the formula to front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
-    - Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability. Preserve the exact unrounded metrics provided by the user.
+    - Massive Effect Inversion: If the achievement contains a massive business impact, front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
+    - Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability.
     - NEVER put a full stop (period) at the end of the bullet point.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
     """
@@ -593,7 +773,13 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         if json_match:
             text = json_match.group(1).strip()
         text = re.sub(r',\s*([}\]])', r'\1', text)
-        return json_repair.loads(text)
+        data = json_repair.loads(text)
+        if isinstance(data, dict) and "variant_sets" in data:
+            for v_set in data.get("variant_sets", []):
+                for v in v_set.get("bullets", []):
+                    if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                        v["bullet_text"] = v["bullet_text"][:-1]
+            return data
     except Exception as e:
         print(f"Gemini generation failed for section bullets, falling back to Cerebras: {e}")
         
@@ -613,23 +799,20 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             if json_match:
                 response_text = json_match.group(1)
             response_text = response_text.strip()
-            
-            # Ensure no full stops
-            # (Fixing regex/logic for compliance with instruction)
             response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
             data = json_repair.loads(response_text)
             
-            for v_set in data.get("variant_sets", []):
-                for v in v_set.get("bullets", []):
-                    if v.get("bullet_text") and v["bullet_text"].endswith("."):
-                        v["bullet_text"] = v["bullet_text"][:-1]
-                        
-            return data
+            if isinstance(data, dict) and "variant_sets" in data:
+                for v_set in data.get("variant_sets", []):
+                    for v in v_set.get("bullets", []):
+                        if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                            v["bullet_text"] = v["bullet_text"][:-1]
+                return data
         except Exception as e:
             print(f"Failed to generate section variants JSON via Cerebras (attempt {attempt+1}): {e}")
             if attempt == max_retries - 1:
-                return {}
-    return {}
+                return {"variant_sets": [], "local_coaching_tips": []}
+    return {"variant_sets": [], "local_coaching_tips": []}
 
 def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Runs a single turn of the metric reconstruction chat."""
@@ -764,25 +947,22 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     """Analyzes the user's current vault and bank to provide a detailed placement strategy using domain playbooks and RAG."""
     
     # Load playbook
-    playbook_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "strategy_playbooks", f"{target_role}.json")
-    playbook_data = {}
-    if os.path.exists(playbook_path):
-        with open(playbook_path, "r", encoding="utf-8") as f:
-            playbook_data = json.load(f)
+    playbook_data = load_domain_playbook(target_role)
+    display_domain = playbook_data.get("display_name", target_role)
             
-    target_context = f"Target Role: {target_role}"
+    target_context = f"Target Role: {target_role} ({display_domain})"
     if target_company:
         target_context += f"\n    - Target Company: {target_company}"
     if job_description:
         target_context += f"\n    - Job Description / Requirements: {job_description}"
 
     system_prompt = f"""
-    You are a placement strategy engine for an IIT Bombay student.
-    Analyze the user's achievements and saved bullets against the domain playbook and provide a highly detailed resume strategy report.
+    You are an elite IIT Bombay placement strategy engine and former hiring committee member for {display_domain}.
+    Analyze the user's achievements and saved bullets against the {display_domain} domain playbook and provide an exhaustive, highly actionable resume strategy report.
     
     Data Source Analyzed: {data_source}
-    - Number of Achievements: {len(achievements)}
-    - Number of Saved Bullets: {len(saved_bullets)}
+    - Number of Achievements in Vault: {len(achievements)}
+    - Number of Saved Bullets in Point Bank: {len(saved_bullets)}
     
     Target Context:
     {target_context}
@@ -791,20 +971,40 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     {json.dumps(playbook_data, indent=2)}
     
     User Achievements (Vault):
-    {json.dumps([{ 'id': a.get('id'), 'title': a.get('title'), 'section': a.get('section_type'), 'parent': a.get('parent_experience'), 'tags': a.get('competency_tags', []) } for a in achievements])}
+    {json.dumps([{ 'id': a.get('id'), 'title': a.get('title'), 'section': a.get('section_type'), 'parent': a.get('parent_experience'), 'tags': a.get('competency_tags', []), 'metrics': a.get('quantified_metrics', {}) } for a in achievements])}
     
     User Saved Bullets (Point Bank):
     {json.dumps([{'id': b.get('id'), 'bullet_text': b.get('bullet_text'), 'section': b.get('section_type')} for b in saved_bullets])}
     
-    RAG Context (Comparison to successful senior bullets):
+    RAG Context (Comparison to successful senior Day 1 resumes):
     {json.dumps(rag_context, indent=2)}
     
     INSTRUCTIONS:
     Output MUST be a JSON object strictly matching this schema:
     {{
-      "domain": "the target role",
+      "domain": "{display_domain}",
       "overall_readiness_score": 0-100,
-      "overall_guidance": "High-level guidance on what to prioritize",
+      "overall_guidance": "High-level strategic guidance on what to prioritize to maximize Day 1 shortlisting chances",
+      "global_coaching_roadmap": [
+        {{
+          "step_number": 1,
+          "title": "Short title of action",
+          "section": "experience|projects|por|scholastic|extracurricular|general",
+          "priority": "critical|high|medium",
+          "description": "Clear explanation of what the user needs to build or fix next",
+          "action_type": "metric_lab|compose_section|generate_bullet|reorder"
+        }}
+      ],
+      "section_density_targets": [
+        {{
+          "section": "experience|projects|por|scholastic|extracurricular",
+          "current_count": 0,
+          "target_min": 3,
+          "target_max": 6,
+          "status": "optimal|needs_more|over_limit",
+          "reasoning": "Why this specific count is ideal for this user's profile and target role"
+        }}
+      ],
       "section_analysis": [
         {{
           "section": "experience|projects|por|scholastic|extracurricular",
@@ -841,16 +1041,37 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     }}
     """
     
-    response = gemini_client.generate_content(
-        model_name="gemini-1.5-flash",
-        prompt=system_prompt,
-        generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
-    )
-    
+    # Try Gemini 3.5 Flash first
     try:
+        response = gemini_client.generate_content(
+            model_name="gemini-3.5-flash",
+            prompt=system_prompt,
+            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
+        )
         data = json_repair.loads(response.text)
-        return data
+        if isinstance(data, dict) and "overall_readiness_score" in data:
+            return data
+    except Exception as e:
+        print(f"Gemini strategy generation failed, falling back to Cerebras: {e}")
+        
+    # Fallback to Cerebras
+    try:
+        response_text = cerebras_client.generate_chat_completion(
+            model="gpt-oss-120b",
+            messages=[{"role": "user", "content": system_prompt}],
+            temperature=0.2,
+            max_tokens=4000
+        )
+        import re
+        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(1)
+        response_text = response_text.strip()
+        response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+        data = json_repair.loads(response_text)
+        return data if isinstance(data, dict) else {}
     except Exception as e:
         print(f"Failed to parse strategy JSON: {e}")
         return {}
+
 

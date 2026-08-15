@@ -15,7 +15,7 @@ import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, Responsi
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { AlertTriangle, AlertCircle, UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info } from "lucide-react"
+import { AlertTriangle, AlertCircle, UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info, Lightbulb, Compass, ListOrdered, ArrowRight, Gauge, CheckSquare } from "lucide-react"
 
 // Types
 type Achievement = {
@@ -102,6 +102,7 @@ function ResumeBuilderPageContent() {
   const [benchmarkText, setBenchmarkText] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
+  const [singleCoachingTips, setSingleCoachingTips] = useState<string[]>([])
   
   // Section Composer State
   const [labMode, setLabMode] = useState<"single" | "composer">("single")
@@ -347,13 +348,16 @@ function ResumeBuilderPageContent() {
       })
       if (res.ok) {
         const data = await res.json()
-        if (!data || data.length === 0) {
+        const bullets = Array.isArray(data) ? data : (data.bullets || []);
+        const tips = data.coaching_tips || (bullets[0]?.coaching_tips) || [];
+        if (!bullets || bullets.length === 0) {
           alert("AI generation failed or returned no results. Please try again.")
         } else {
-          data.forEach((b: any, bIdx: number) => {
+          bullets.forEach((b: any, bIdx: number) => {
             if (!b.id) b.id = `single-bullet-${bIdx}-${crypto.randomUUID()}`;
           });
-          setGeneratedBullets(data)
+          setGeneratedBullets(bullets)
+          setSingleCoachingTips(tips)
         }
       } else {
         alert("Failed to connect to AI generation server. Please try again.")
@@ -1352,6 +1356,25 @@ function ResumeBuilderPageContent() {
                   </Card>
                 ))}
               </div>
+
+              {/* Single Bullet Coaching Tips */}
+              {singleCoachingTips && singleCoachingTips.length > 0 && (
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-background border border-primary/20 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="flex items-center gap-2 text-[15px] font-bold text-primary mb-3">
+                    <Lightbulb className="h-5 w-5" /> Proactive Coach Recommendations for this Point
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {singleCoachingTips.map((tip, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 bg-background/80 p-3 rounded-xl border border-primary/10 text-[13.5px] text-foreground/90">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed">{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
@@ -1462,6 +1485,25 @@ function ResumeBuilderPageContent() {
                           <div key={idx} className="text-[13px]">
                             <span className="font-semibold">{excl.title}: </span>
                             <span className="text-muted-foreground">{excl.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section Local Coaching Tips */}
+                  {composerResults.local_coaching_tips && composerResults.local_coaching_tips.length > 0 && (
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-background border border-primary/20 shadow-sm">
+                      <div className="flex items-center gap-2 text-[15px] font-bold text-primary mb-3">
+                        <Lightbulb className="h-5 w-5" /> Proactive Section Placement Tips
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {composerResults.local_coaching_tips.map((tip: string, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2.5 bg-background/80 p-3 rounded-xl border border-primary/10 text-[13.5px] text-foreground/90">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
+                              {idx + 1}
+                            </span>
+                            <span className="leading-relaxed">{tip}</span>
                           </div>
                         ))}
                       </div>
@@ -1728,7 +1770,7 @@ function ResumeBuilderPageContent() {
         </Card>
       ) : (
         <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-          {/* Header Score Row */}
+          {/* Header Score & Radar Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="col-span-1 border-primary/20 shadow-sm flex flex-col items-center justify-center p-6 bg-gradient-to-br from-primary/5 to-background text-center">
               <span className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Overall Readiness</span>
@@ -1787,6 +1829,61 @@ function ResumeBuilderPageContent() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Global Coaching Roadmap */}
+          {strategyData.global_coaching_roadmap && strategyData.global_coaching_roadmap.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Compass className="h-5 w-5 text-primary" /> Prioritized Next-Step Action Roadmap
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {strategyData.global_coaching_roadmap.map((item: any, i: number) => (
+                  <Card key={i} className="border-border/60 shadow-sm bg-gradient-to-b from-card to-muted/20 hover:border-primary/40 transition-all flex flex-col justify-between">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold text-primary border-primary/30">
+                          Step {item.step_number || i + 1}
+                        </Badge>
+                        <Badge variant={item.priority === 'critical' ? 'destructive' : item.priority === 'high' ? 'secondary' : 'outline'} className="text-[10px] uppercase font-bold">
+                          {item.priority}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-base leading-snug">{item.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <p className="text-[13px] text-muted-foreground leading-relaxed">{item.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI-Inferred Section Density Targets */}
+          {strategyData.section_density_targets && strategyData.section_density_targets.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-primary" /> Target Section Density & Balance
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {strategyData.section_density_targets.map((tgt: any, i: number) => (
+                  <Card key={i} className="border-border/60 shadow-sm p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-sm capitalize">{tgt.section}</span>
+                      <Badge variant={tgt.status === 'optimal' ? 'default' : tgt.status === 'needs_more' ? 'secondary' : 'outline'} className="text-[10px] uppercase font-bold">
+                        {tgt.status === 'needs_more' ? 'Needs More Points' : tgt.status === 'optimal' ? 'Optimal Balance' : 'Consider Trimming'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-extrabold text-primary">{tgt.current_count ?? 0}</span>
+                      <span className="text-xs text-muted-foreground font-medium">/ target {tgt.target_min}-{tgt.target_max} bullets</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{tgt.reasoning}</p>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Phrasing Alerts */}
           {strategyData.phrasing_alerts && strategyData.phrasing_alerts.length > 0 && (

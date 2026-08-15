@@ -309,7 +309,7 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
         achievement = ach_res.data[0]
         
         # Generate
-        variants = generate_bullet_variants(
+        gen_result = generate_bullet_variants(
             supabase, 
             achievement, 
             req.target_role, 
@@ -317,6 +317,13 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
             benchmark_text=req.benchmark_text or "",
             existing_bullets=req.existing_bullets or []
         )
+        
+        if isinstance(gen_result, dict):
+            variants = gen_result.get("variants", [])
+            coaching_tips = gen_result.get("coaching_tips", [])
+        else:
+            variants = gen_result
+            coaching_tips = []
         
         # Save to generated_bullets table
         db_records = []
@@ -332,11 +339,15 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
             
         if db_records:
             res = supabase.table('generated_bullets').insert(db_records).execute()
-            # Reattach recruiter_notes for the frontend
+            # Reattach recruiter_notes and coaching_tips for the frontend
             for i in range(len(res.data)):
                 res.data[i]['recruiter_notes'] = variants[i].get("recruiter_notes", "")
-            return res.data
-        return []
+                res.data[i]['coaching_tips'] = coaching_tips
+            return {
+                "bullets": res.data,
+                "coaching_tips": coaching_tips
+            }
+        return {"bullets": [], "coaching_tips": []}
     except Exception as e:
         print(f"Error in generate_bullets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
