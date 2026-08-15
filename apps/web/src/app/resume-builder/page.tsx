@@ -113,6 +113,7 @@ function ResumeBuilderPageContent() {
   const [composerResults, setComposerResults] = useState<any>(null)
   const [isComposerGenerating, setIsComposerGenerating] = useState(false)
   const [activeVariantSet, setActiveVariantSet] = useState(0)
+  const [customOverviewLines, setCustomOverviewLines] = useState<Record<number, string>>({})
 
   // Point Bank State
   const [pointBank, setPointBank] = useState<GeneratedBullet[]>([])
@@ -401,6 +402,7 @@ function ResumeBuilderPageContent() {
           });
           setComposerResults(data)
           setActiveVariantSet(0)
+          setCustomOverviewLines({})
         }
       } else {
         alert("Failed to connect to AI generation server. Please try again.")
@@ -1460,6 +1462,99 @@ function ResumeBuilderPageContent() {
 
               {composerResults.variant_sets[activeVariantSet] && (
                 <div className="space-y-6">
+                  {/* Section LaTeX Header & Italicized Overview Line Showcase */}
+                  <div className="bg-gradient-to-br from-card via-card to-primary/5 border border-primary/20 shadow-md rounded-2xl p-5 md:p-6 space-y-4">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-border/60">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-bold uppercase text-[10px] tracking-wider">
+                            Section Top Line
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-medium">IITB Placement Standard</span>
+                        </div>
+                        <h4 className="text-base font-extrabold text-foreground mt-1 flex items-center gap-2">
+                          {composerHeading || "Organization / Experience Name"} 
+                          <span className="font-normal text-muted-foreground text-sm font-sans">| {getRoleLabel(composerResults.target_role || targetRole)}</span>
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs font-medium border-border/70 hover:bg-muted/50"
+                          onClick={() => {
+                            const overview = customOverviewLines[activeVariantSet] ?? (composerResults.variant_sets[activeVariantSet]?.overview_line || composerResults.variant_sets[activeVariantSet]?.overview_line_variants?.[0]?.text || "");
+                            navigator.clipboard.writeText(overview);
+                            alert("Overview line copied to clipboard!");
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Overview
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 text-xs font-medium shadow-sm"
+                          onClick={() => {
+                            const currentSet = composerResults.variant_sets[activeVariantSet];
+                            const heading = composerHeading || "Organization / Experience";
+                            const overview = customOverviewLines[activeVariantSet] ?? (currentSet?.overview_line || currentSet?.overview_line_variants?.[0]?.text || "");
+                            const bullets = currentSet.bullets.map((b: any) => `• ${b.bullet_text}`).join('\n');
+                            const fullText = `${heading} | ${getRoleLabel(composerResults.target_role || targetRole)}\n${overview ? `${overview}\n` : ''}${bullets}`;
+                            navigator.clipboard.writeText(fullText);
+                            alert("Full formatted section copied to clipboard!");
+                          }}
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1.5" /> Copy Full Section
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Italicized Overview Box */}
+                    <div className="bg-background/90 p-4 rounded-xl border border-primary/15 shadow-inner space-y-2">
+                      <div className="flex justify-between items-center text-xs text-muted-foreground font-medium">
+                        <span className="flex items-center gap-1.5 text-primary font-semibold">
+                          <Sparkles className="h-3.5 w-3.5" /> Italicized Overview 1-Liner:
+                        </span>
+                        <span className="text-[11px] opacity-70">Renders directly below heading</span>
+                      </div>
+                      <p className="font-serif italic text-[15px] md:text-[16px] text-foreground/95 leading-relaxed pl-3 border-l-2 border-primary/60">
+                        {customOverviewLines[activeVariantSet] ?? (composerResults.variant_sets[activeVariantSet]?.overview_line || composerResults.variant_sets[activeVariantSet]?.overview_line_variants?.[0]?.text || "No overview line generated.")}
+                      </p>
+                    </div>
+
+                    {/* Style / Archetype Switcher Pills */}
+                    {composerResults.variant_sets[activeVariantSet]?.overview_line_variants && composerResults.variant_sets[activeVariantSet]?.overview_line_variants.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <span className="text-xs font-semibold text-muted-foreground">Overview Framing Archetypes:</span>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          {composerResults.variant_sets[activeVariantSet].overview_line_variants.map((v: any, vIdx: number) => {
+                            const isSelected = (customOverviewLines[activeVariantSet] === v.text) || (!customOverviewLines[activeVariantSet] && (v.text === composerResults.variant_sets[activeVariantSet]?.overview_line || vIdx === 0));
+                            return (
+                              <button
+                                key={vIdx}
+                                type="button"
+                                onClick={() => setCustomOverviewLines(prev => ({ ...prev, [activeVariantSet]: v.text }))}
+                                className={`text-left p-2.5 rounded-xl border text-xs transition-all ${
+                                  isSelected 
+                                    ? "bg-primary/15 border-primary text-primary font-semibold shadow-sm" 
+                                    : "bg-background/60 border-border/60 hover:border-primary/40 text-foreground/80 hover:bg-muted/20"
+                                }`}
+                              >
+                                <div className="font-bold flex items-center justify-between mb-1">
+                                  <span>{v.label || v.type.replace('_', ' ').toUpperCase()}</span>
+                                  {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
+                                </div>
+                                <p className="text-[11.5px] line-clamp-2 text-muted-foreground font-normal italic">
+                                  "{v.text}"
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* The bullets list */}
                   <div className="bg-card border border-border shadow-md rounded-xl overflow-hidden">
                     <div className="p-4 bg-muted/30 border-b border-border flex justify-between items-center">

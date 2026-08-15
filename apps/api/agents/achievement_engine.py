@@ -739,6 +739,22 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     
     {action_verb_dictionary}
     
+    CRITICAL SECTION OVERVIEW LINE INSTRUCTIONS (TOP ITALICIZED 1-LINER):
+    In elite IIT Bombay placement resumes, every major experience, project, POR, or entrepreneurship section begins with a single, high-impact italicized overview line immediately below the organization/role heading.
+
+    For each variant set, you MUST generate:
+    1. "overview_line": The primary 1-line overview best aligned with this set's theme.
+    2. "overview_line_variants": Exactly 3 distinct stylistic options:
+       - Type "scope_mission": High-level scope, problem statement, product/system built, and primary technical/business mandate (e.g. "Developed an internal GenAI PoV establishing a framework for reliable, secure conversational AI agents on Google's CXAS", "Contributed to EdMe's AI-based learning app for competitive exams through UI & UX research, design and development").
+       - Type "recognition_prestige": Accolades, partner/CSO commendations, Letter of Recommendation, grant amounts, or client/market valuation (e.g. "Received Letter of Recommendation from the CSO of the $40+ Billion Hinduja Group for exemplary performance", "Incubated at SINE, IIT Bombay | Awarded the Institute of Eminence grant of 0.6M & IDEAS grant of 0.3M", "Healthcare Market Entry | Facilitated the entry of a top 10 Indian conglomerate into the USD 630B+ market").
+       - Type "scale_leadership": Multi-tiered team leadership, selection/nomination ratio, cross-functional footprint, or organizational scale (e.g. "Highest Nominated Student Representative (2/13k+) | Leading a 3-tiered 20+ member student-team", "Worked directly under the India Head of Supply Chain for the Electrification & Distribution Solutions Division").
+
+    SECTION-SPECIFIC OVERVIEW GUIDELINES:
+    - If section is 'experience' / 'internship': Prioritize client scale, market entry, LoR, partner praise, or high-level project mandate.
+    - If section is 'por' / 'leadership' / 'extracurricular': Prioritize election/nomination ratio (e.g. 2/13k+), team hierarchy (e.g. 3-tiered 20+ members), or student reach (10k+ students).
+    - If section is 'project' / 'research': Prioritize professor/lab affiliation, tech stack scope, or research topic (e.g. "Prof. Chintan Amrit | Faculty of Economics & Business Analytics, University of Amsterdam").
+    - If section is 'entrepreneurship': Prioritize incubation (e.g. SINE, IIT Bombay), grants (e.g. 0.6M & 0.3M), and core platform premise.
+
     CRITICAL SECTION COMPOSITION INSTRUCTIONS:
     1. Output EXACTLY {num_points} bullets per variant set.
     2. Chronological & Impact Ordering: Order the sub-points strategically—lead with the broadest scope or highest business/technical impact as Bullet #1.
@@ -755,6 +771,24 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             {{
                 "set_label": "The set label",
                 "set_description": "The set description",
+                "overview_line": "The primary overview line WITHOUT ANY FULL STOP AT THE END",
+                "overview_line_variants": [
+                    {{
+                        "type": "scope_mission",
+                        "label": "Scope & Core Mission",
+                        "text": "1-line overview focusing on core scope and problem statement WITHOUT FULL STOP"
+                    }},
+                    {{
+                        "type": "recognition_prestige",
+                        "label": "Recognition & LoR Context",
+                        "text": "1-line overview focusing on LoR, partner praise, grants, or client/market valuation WITHOUT FULL STOP"
+                    }},
+                    {{
+                        "type": "scale_leadership",
+                        "label": "Scale & Team Architecture",
+                        "text": "1-line overview focusing on election ratio, team size, or high-profile reporting line WITHOUT FULL STOP"
+                    }}
+                ],
                 "bullets": [
                     {{
                         "variant_type": {variant_enum},
@@ -784,34 +818,11 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     - Strict Bullet Formula: Unless the effect is massive, every point MUST strictly follow this exact chronological sequence: [Elite Action Verb] + [What you did] + [How you did it (Tools/Skills)] + [Quantified Effect/Result].
     - Massive Effect Inversion: If the achievement contains a massive business impact, front-load the result: [Elite Action Verb] + [Massive Quantified Effect] + by [What you did] + [How you did it].
     - Anti-Rounding Metric Rule: NEVER round numbers to clean intervals (e.g., avoid 20%, 50x, 5,000). Use exact, highly specific numbers (e.g., 17.4%, 48x, 4,132) to maximize believability.
-    - NEVER put a full stop (period) at the end of the bullet point.
+    - NEVER put a full stop (period) at the end of the overview line or bullet points.
     - OUTPUT STRICTLY VALID JSON. DO NOT INCLUDE TRAILING COMMAS. ESCAPE ALL DOUBLE QUOTES PROPERLY.
     """
     
-    # Try Gemini first
-    try:
-        response = gemini_client.generate_content(
-            model_name="gemini-3.5-flash",
-            prompt=system_prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
-        )
-        import re
-        text = response.text.strip()
-        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
-        if json_match:
-            text = json_match.group(1).strip()
-        text = re.sub(r',\s*([}\]])', r'\1', text)
-        data = json_repair.loads(text)
-        if isinstance(data, dict) and "variant_sets" in data:
-            for v_set in data.get("variant_sets", []):
-                for v in v_set.get("bullets", []):
-                    if v.get("bullet_text") and v["bullet_text"].endswith("."):
-                        v["bullet_text"] = v["bullet_text"][:-1]
-            return data
-    except Exception as e:
-        print(f"Gemini generation failed for section bullets, falling back to Cerebras: {e}")
-        
-    # Fallback to Cerebras
+    # Generate section bullets via Cerebras
     max_retries = 2
     for attempt in range(max_retries):
         try:
@@ -830,8 +841,20 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
             data = json_repair.loads(response_text)
             
+            if isinstance(data, str):
+                import json
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    pass
+
             if isinstance(data, dict) and "variant_sets" in data:
                 for v_set in data.get("variant_sets", []):
+                    if v_set.get("overview_line") and v_set["overview_line"].endswith("."):
+                        v_set["overview_line"] = v_set["overview_line"][:-1]
+                    for ov in v_set.get("overview_line_variants", []):
+                        if ov.get("text") and ov["text"].endswith("."):
+                            ov["text"] = ov["text"][:-1]
                     for v in v_set.get("bullets", []):
                         if v.get("bullet_text") and v["bullet_text"].endswith("."):
                             v["bullet_text"] = v["bullet_text"][:-1]
@@ -839,6 +862,33 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
         except Exception as e:
             print(f"Failed to generate section variants JSON via Cerebras (attempt {attempt+1}): {e}")
             if attempt == max_retries - 1:
+                # Fallback to Gemini if Cerebras encounters unexpected issue
+                try:
+                    response = gemini_client.generate_content(
+                        model_name="gemini-3.5-flash",
+                        prompt=system_prompt,
+                        generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+                    )
+                    import re
+                    text = response.text.strip()
+                    json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+                    if json_match:
+                        text = json_match.group(1).strip()
+                    text = re.sub(r',\s*([}\]])', r'\1', text)
+                    data = json_repair.loads(text)
+                    if isinstance(data, dict) and "variant_sets" in data:
+                        for v_set in data.get("variant_sets", []):
+                            if v_set.get("overview_line") and v_set["overview_line"].endswith("."):
+                                v_set["overview_line"] = v_set["overview_line"][:-1]
+                            for ov in v_set.get("overview_line_variants", []):
+                                if ov.get("text") and ov["text"].endswith("."):
+                                    ov["text"] = ov["text"][:-1]
+                            for v in v_set.get("bullets", []):
+                                if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                                    v["bullet_text"] = v["bullet_text"][:-1]
+                        return data
+                except Exception as fallback_err:
+                    print(f"Gemini fallback also failed: {fallback_err}")
                 return {"variant_sets": [], "local_coaching_tips": []}
     return {"variant_sets": [], "local_coaching_tips": []}
 
