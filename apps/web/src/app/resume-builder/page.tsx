@@ -103,6 +103,7 @@ function ResumeBuilderPageContent() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedBullets, setGeneratedBullets] = useState<GeneratedBullet[]>([])
   const [singleCoachingTips, setSingleCoachingTips] = useState<string[]>([])
+  const [customInstructions, setCustomInstructions] = useState("")
   
   // Section Composer State
   const [labMode, setLabMode] = useState<"single" | "composer">("single")
@@ -343,7 +344,8 @@ function ResumeBuilderPageContent() {
           target_role: targetRole,
           target_company: targetCompany,
           benchmark_text: benchmarkText,
-          existing_bullets: existing_bullets
+          existing_bullets: existing_bullets,
+          custom_instructions: customInstructions || undefined
         })
       })
       if (res.ok) {
@@ -383,7 +385,8 @@ function ResumeBuilderPageContent() {
           target_role: targetRole,
           num_points: composerNumPoints,
           target_company: targetCompany || undefined,
-          benchmark_text: benchmarkText || undefined
+          benchmark_text: benchmarkText || undefined,
+          custom_instructions: customInstructions || undefined
         })
       })
       if (res.ok) {
@@ -1224,6 +1227,61 @@ function ResumeBuilderPageContent() {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* Custom Strategic Instructions & Comments */}
+                <div className="space-y-3 col-span-1 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-foreground flex items-center gap-2" htmlFor="custom-instructions">
+                      <MessageSquare className="h-4 w-4 text-primary" /> Additional Instructions & Strategic Focus (Optional)
+                    </label>
+                    {customInstructions && (
+                      <button 
+                        type="button" 
+                        onClick={() => setCustomInstructions("")}
+                        className="text-xs text-muted-foreground hover:text-foreground font-medium underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <Textarea
+                    id="custom-instructions"
+                    placeholder="e.g. 'Emphasize backend latency & high scale (15k TPS)', 'Highlight C-suite stakeholder alignment', 'Focus on 0-to-1 launch'..."
+                    className="min-h-[80px] w-full rounded-xl border border-input/60 bg-muted/5 px-4 py-3 text-[14.5px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all resize-none placeholder:text-muted-foreground/60"
+                    value={customInstructions}
+                    onChange={(e) => setCustomInstructions(e.target.value)}
+                  />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-xs text-muted-foreground flex items-center font-medium mr-1">Quick Presets:</span>
+                    {[
+                      { label: "💼 Business ROI & Cost", text: "Emphasize quantified financial ROI, cost optimization, and strategic business impact" },
+                      { label: "⚡ Latency & High Scale", text: "Highlight distributed systems scale, latency reduction, throughput, and system reliability" },
+                      { label: "👥 Cross-Functional Leadership", text: "Focus on leading cross-functional teams, stakeholder management, and initiative ownership" },
+                      { label: "🚀 Massive Impact Front-Loaded", text: "Front-load massive business/user metrics using inverted impact structure" },
+                      { label: "🛠️ Highlight Tech Stack", text: "Explicitly showcase key tools, modern frameworks, and architectural design choices" },
+                      { label: "🎯 0-to-1 Launch", text: "Highlight zero-to-one product/initiative execution, rapid iteration, and user adoption" },
+                    ].map((preset, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className={`cursor-pointer text-[11px] px-2.5 py-1 rounded-lg border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all select-none ${
+                          customInstructions.includes(preset.text) ? "bg-primary/15 border-primary text-primary font-semibold" : "bg-background/80 text-foreground/80"
+                        }`}
+                        onClick={() => {
+                          if (customInstructions === preset.text) {
+                            setCustomInstructions("");
+                          } else if (!customInstructions.trim()) {
+                            setCustomInstructions(preset.text);
+                          } else {
+                            setCustomInstructions(`${customInstructions.trim()}; ${preset.text}`);
+                          }
+                        }}
+                      >
+                        {preset.label}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
               </div>

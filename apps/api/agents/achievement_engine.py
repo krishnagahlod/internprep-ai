@@ -381,7 +381,7 @@ def get_placement_rag_context(supabase_client, target_role: str, description: st
         print(f"RAG fetch failed: {e}")
         return ""
 
-def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", benchmark_text: str = "", existing_bullets: List[str] = None) -> Dict[str, Any]:
+def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], target_role: str, target_company: str = "", benchmark_text: str = "", existing_bullets: List[str] = None, custom_instructions: str = "") -> Dict[str, Any]:
     # Extract metadata & section type
     raw_section = achievement.get('section_type', 'experience')
     norm_section = normalize_section_type(raw_section)
@@ -437,6 +437,18 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     The user already has these bullets saved for this experience/project:
     {json.dumps(existing_bullets)}
     You MUST NOT reuse the action verbs or exact sentence structures found in these existing bullets to ensure variety.
+        """
+
+    # Setup custom strategic instructions
+    user_instructions_block = ""
+    if custom_instructions and custom_instructions.strip():
+        user_instructions_block = f"""
+    CRITICAL USER STRATEGIC DIRECTIVE & CUSTOM COMMENTS:
+    "{custom_instructions.strip()}"
+    
+    EXECUTION RULES FOR USER DIRECTIVE:
+    - You MUST actively steer, customize, and prioritize the requested technical angle, business theme, or strategic emphasis across all 4 variants.
+    - STRICT GUARDRAILS: The directive shapes *what to emphasize*, but you MUST NEVER violate Day 1 elite formatting rules (Must start with elite action verb, follow Action Verb + What + How + Effect formula, preserve unrounded metrics, and never add a trailing period).
         """
         
     action_verb_dictionary = """
@@ -510,6 +522,8 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     {length_constraint}
     
     {context_rules}
+    
+    {user_instructions_block}
     
     {action_verb_dictionary}
     
@@ -603,7 +617,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
                 return {"variants": [], "coaching_tips": []}
     return {"variants": [], "coaching_tips": []}
 
-def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]], target_role: str, target_company: str = "", num_points: int = 3, benchmark_text: str = "") -> Dict[str, Any]:
+def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]], target_role: str, target_company: str = "", num_points: int = 3, benchmark_text: str = "", custom_instructions: str = "") -> Dict[str, Any]:
     # Extract tags and combined descriptions for RAG
     all_tags = []
     combined_desc = ""
@@ -657,6 +671,18 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     else:
         length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~110-140 chars per bullet)."
 
+    # Setup custom strategic instructions for section composition
+    user_instructions_block = ""
+    if custom_instructions and custom_instructions.strip():
+        user_instructions_block = f"""
+    CRITICAL USER STRATEGIC DIRECTIVE & CUSTOM COMMENTS FOR SECTION COMPOSITION:
+    "{custom_instructions.strip()}"
+    
+    EXECUTION RULES FOR SECTION DIRECTIVE:
+    - Use this directive to actively determine which achievements to highlight, how to intelligently merge related points, and how to frame the narrative across the {num_points} bullets in the section.
+    - STRICT GUARDRAILS: All generated points must strictly start with elite action verbs, follow the elite bullet formula, preserve unrounded metrics, and have zero trailing periods.
+        """
+
     action_verb_dictionary = """
     ELITE ACTION VERBS: Spearheaded, Architected, Orchestrated, Synthesized, Catalyzed, Engineered, Pioneered, Executed, Designed, Driven, Formulated, Accelerated, Streamlined, Modernized, Revamped, Overhauled, Championed, Maximized, Optimized, Transformed, Automated, Directed, Guided, Mentored, Shaped.
     BANNED WEAK VERBS: Helped, Worked on, Used, Made, Did, Built (unless followed by high scale), Assisted with, Responsible for.
@@ -708,6 +734,8 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     {achievements_json}
     
     {length_constraint}
+    
+    {user_instructions_block}
     
     {action_verb_dictionary}
     

@@ -47,6 +47,7 @@ class GenerateBulletsRequest(BaseModel):
     target_company: Optional[str] = None
     benchmark_text: Optional[str] = None
     existing_bullets: Optional[List[str]] = None
+    custom_instructions: Optional[str] = None
 
 class SaveBulletRequest(BaseModel):
     user_id: str
@@ -64,6 +65,7 @@ class GenerateSectionRequest(BaseModel):
     num_points: int
     target_company: Optional[str] = None
     benchmark_text: Optional[str] = None
+    custom_instructions: Optional[str] = None
 
 class EditBulletRequest(BaseModel):
     bullet_text: str
@@ -315,7 +317,8 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
             req.target_role, 
             target_company=req.target_company or "",
             benchmark_text=req.benchmark_text or "",
-            existing_bullets=req.existing_bullets or []
+            existing_bullets=req.existing_bullets or [],
+            custom_instructions=req.custom_instructions or ""
         )
         
         if isinstance(gen_result, dict):
@@ -371,7 +374,8 @@ async def generate_section_bullets_api(request: Request, req: GenerateSectionReq
             req.target_role, 
             target_company=req.target_company or "",
             num_points=req.num_points,
-            benchmark_text=req.benchmark_text or ""
+            benchmark_text=req.benchmark_text or "",
+            custom_instructions=req.custom_instructions or ""
         )
         
         return variants_data
