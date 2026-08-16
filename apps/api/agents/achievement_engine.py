@@ -1,4 +1,6 @@
 import json
+import re
+
 import os
 import time
 import json_repair
@@ -567,7 +569,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             )
             
             # Clean up the JSON string
-            import re
+
             json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
             if json_match:
                 response_text = json_match.group(1)
@@ -579,12 +581,12 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             data = json_repair.loads(response_text)
             
             if isinstance(data, str):
-                import json
+
                 try:
                     data = json.loads(data)
                 except Exception:
                     # Attempt a final regex extraction if pure string
-                    import re
+
                     match = re.search(r'(\{.*\})', data, re.DOTALL)
                     if match:
                         try:
@@ -833,7 +835,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                 max_tokens=2500
             )
             
-            import re
+
             json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
             if json_match:
                 response_text = json_match.group(1)
@@ -842,7 +844,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             data = json_repair.loads(response_text)
             
             if isinstance(data, str):
-                import json
+
                 try:
                     data = json.loads(data)
                 except Exception:
@@ -869,7 +871,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                         prompt=system_prompt,
                         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
                     )
-                    import re
+
                     text = response.text.strip()
                     json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
                     if json_match:
@@ -1027,7 +1029,7 @@ def extract_final_resume_bullets(pdf_bytes: bytes = None, raw_text: str = None) 
                 temperature=0.1,
                 max_tokens=3500
             )
-            import re
+
             json_match = re.search(r'```(?:json)?\s*(\[.*\]|\{.*\})\s*```', response_text, re.DOTALL)
             if json_match:
                 response_text = json_match.group(1)
@@ -1258,7 +1260,7 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
             temperature=0.2,
             max_tokens=4000
         )
-        import re
+
         json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
         if json_match:
             response_text = json_match.group(1)
