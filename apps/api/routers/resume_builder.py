@@ -13,7 +13,8 @@ from agents.achievement_engine import (
     generate_section_bullets,
     run_metric_reconstruction_turn,
     generate_resume_strategy,
-    refine_bullet_with_ai
+    refine_bullet_with_ai,
+    extract_final_resume_bullets
 )
 
 router = APIRouter(prefix="/builder", tags=["resume_builder"])
@@ -78,6 +79,8 @@ class RefineBulletRequest(BaseModel):
     bullet_text: str
     instruction: str
     target_role: str
+    preserve_length: Optional[bool] = False
+    target_char_length: Optional[int] = None
 
 class StrategyRequest(BaseModel):
     user_id: str
@@ -450,10 +453,100 @@ def metric_chat(req: MetricChatRequest):
 @router.post("/refine-bullet")
 def refine_bullet(req: RefineBulletRequest):
     try:
-        result = refine_bullet_with_ai(req.bullet_text, req.instruction, req.target_role)
+        result = refine_bullet_with_ai(
+            req.bullet_text,
+            req.instruction,
+            req.target_role,
+            preserve_length=req.preserve_length or False,
+            target_char_length=req.target_char_length
+        )
         return result
     except Exception as e:
         print(f"Error in refine_bullet: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/extract/final-resume")
+@limiter.limit("5/minute")
+async def extract_final_resume(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    user_id: str = Form(...),
+    target_role: str = Form("consulting")
+):
+    from dependencies import get_supabase; supabase = get_supabase()
+    try:
+        pdf_bytes = None
+        if file:
+            pdf_bytes = await file.read()
+            
+        extracted = extract_final_resume_bullets(pdf_bytes=pdf_bytes, raw_text=raw_text)
+        if not extracted:
+            raise HTTPException(status_code=400, detail="Could not extract points from the provided resume.")
+            
+        inserted_bullets = []
+        for sec in extracted:
+            section_type = sec.get("section_type", "Professional Experience")
+            parent_experience = sec.get("parent_experience", "General Experience")
+            timeline = sec.get("timeline")
+            overview_line = sec.get("overview_line", "")
+            bullets = sec.get("bullets", [])
+            
+            # Check if an achievement for this parent_experience exists, else create one
+            ach_res = supabase.table('achievements').select("id").eq('user_id', user_id).eq('parent_experience', parent_experience).execute()
+            if ach_res.data:
+                ach_id = ach_res.data[0]["id"]
+            else:
+                ach_create = supabase.table('achievements').insert({
+                    "user_id": user_id,
+                    "section_type": section_type,
+                    "title": parent_experience,
+                    "parent_experience": parent_experience,
+                    "timeline": timeline,
+                    "original_description": overview_line or (bullets[0] if bullets else parent_experience),
+                    "source_type": "final_resume",
+                    "status": "approved"
+                }).execute()
+                ach_id = ach_create.data[0]["id"] if ach_create.data else None
+                
+            if not ach_id:
+                continue
+                
+            # Insert bullets into generated_bullets as finalized_resume points
+            bullet_records = []
+            for b_text in bullets:
+                b_clean = b_text.strip()
+                if b_clean.startswith("•") or b_clean.startswith("-") or b_clean.startswith("*"):
+                    b_clean = b_clean[1:].strip()
+                if b_clean.endswith("."):
+                    b_clean = b_clean[:-1]
+                if not b_clean:
+                    continue
+                    
+                bullet_records.append({
+                    "achievement_id": ach_id,
+                    "user_id": user_id,
+                    "target_role": target_role,
+                    "bullet_text": b_clean,
+                    "variant_type": "finalized_resume",
+                    "is_saved": True
+                })
+                
+            if bullet_records:
+                res = supabase.table('generated_bullets').insert(bullet_records).execute()
+                if res.data:
+                    inserted_bullets.extend(res.data)
+                    
+        return {
+            "status": "success",
+            "extracted_sections": len(extracted),
+            "saved_bullets_count": len(inserted_bullets),
+            "bullets": inserted_bullets
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in extract_final_resume: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/strategy")

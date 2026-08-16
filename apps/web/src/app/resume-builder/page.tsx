@@ -60,6 +60,11 @@ interface GeneratedBullet {
   recruiter_notes?: string;
   is_saved?: boolean;
   generation_group_id?: string;
+  achievements?: {
+    title?: string;
+    parent_experience?: string;
+    section_type?: string;
+  };
 }
 
 // Helper to highlight numbers and percentages in text
@@ -122,7 +127,15 @@ function ResumeBuilderPageContent() {
   const [editPointBankText, setEditPointBankText] = useState("")
   const [pointBankQuickSaveItem, setPointBankQuickSaveItem] = useState<Achievement | null>(null)
   
-    const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
+  // Point Bank Final Resume Upload & Filters State
+  const [isFinalResumeModalOpen, setIsFinalResumeModalOpen] = useState(false)
+  const [finalResumeUploadMode, setFinalResumeUploadMode] = useState<"pdf" | "text">("pdf")
+  const [finalResumeFile, setFinalResumeFile] = useState<File | null>(null)
+  const [finalResumeText, setFinalResumeText] = useState("")
+  const [isExtractingFinalResume, setIsExtractingFinalResume] = useState(false)
+  const [pointBankFilter, setPointBankFilter] = useState<"all" | "finalized" | "lab">("all")
+  
+  const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
   const [strategyDataSource, setStrategyDataSource] = useState("both")
   const [strategyTargetCompany, setStrategyTargetCompany] = useState("")
   const [strategyJobDescription, setStrategyJobDescription] = useState("")
@@ -141,7 +154,7 @@ function ResumeBuilderPageContent() {
   const [pendingContextSummary, setPendingContextSummary] = useState("")
   
   // Refinement Chat State
-  const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer", id: string, text: string, role: string, composerSetIdx?: number } | null>(null)
+  const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer", id: string, text: string, role: string, composerSetIdx?: number, isFinalResume?: boolean, charLength?: number } | null>(null)
   const [refineInstruction, setRefineInstruction] = useState("")
   const [isRefining, setIsRefining] = useState(false)
   const [refineHistory, setRefineHistory] = useState<{ instruction: string, result: string, explanation: string }[]>([])
@@ -559,18 +572,73 @@ function ResumeBuilderPageContent() {
     }
   }
 
+  const handleFinalResumeUpload = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    if (finalResumeUploadMode === "pdf" && !finalResumeFile) {
+      alert("Please select a PDF resume file.")
+      return
+    }
+    if (finalResumeUploadMode === "text" && !finalResumeText.trim()) {
+      alert("Please paste your resume text or LaTeX.")
+      return
+    }
+    
+    setIsExtractingFinalResume(true)
+    try {
+      const roleKey = activePointBankRole === "all" ? targetRole : (Object.keys(ROLE_LABELS).find(k => ROLE_LABELS[k].toLowerCase() === activePointBankRole.toLowerCase()) || activePointBankRole.toLowerCase())
+      const formData = new FormData()
+      formData.append("user_id", user.id)
+      formData.append("target_role", roleKey)
+      if (finalResumeUploadMode === "pdf" && finalResumeFile) {
+        formData.append("file", finalResumeFile)
+      } else if (finalResumeUploadMode === "text") {
+        formData.append("raw_text", finalResumeText)
+      }
+      
+      const res = await fetch(`${apiBase}/builder/extract/final-resume`, {
+        method: "POST",
+        body: formData
+      })
+      if (res.ok) {
+        const data = await res.json()
+        alert(`Success! Extracted and saved ${data.saved_bullets_count} finalized resume points across ${data.extracted_sections} sections into your Point Bank!`)
+        setIsFinalResumeModalOpen(false)
+        setFinalResumeFile(null)
+        setFinalResumeText("")
+        // Refresh point bank
+        const bankRes = await fetch(`${apiBase}/builder/point-bank?user_id=${user.id}`)
+        if (bankRes.ok) {
+          setPointBank(await bankRes.json())
+        }
+      } else {
+        const err = await res.json()
+        alert(err.detail || "Failed to extract resume points. Please try again.")
+      }
+    } catch (err) {
+      console.error(err)
+      alert("Failed to upload and extract resume points.")
+    } finally {
+      setIsExtractingFinalResume(false)
+    }
+  }
+
   const handleRefineSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!refineTarget || !refineInstruction.trim()) return
     setIsRefining(true)
     try {
+      const isFinal = refineTarget.isFinalResume || false
+      const currentText = refineHistory.length > 0 ? refineHistory[refineHistory.length - 1].result : refineTarget.text
       const res = await fetch(`${apiBase}/builder/refine-bullet`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           target_role: refineTarget.role,
-          bullet_text: refineHistory.length > 0 ? refineHistory[refineHistory.length - 1].result : refineTarget.text,
-          instruction: refineInstruction
+          bullet_text: currentText,
+          instruction: refineInstruction,
+          preserve_length: isFinal,
+          target_char_length: isFinal ? (refineTarget.charLength || refineTarget.text.length) : undefined
         })
       })
       if (res.ok) {
@@ -1691,96 +1759,191 @@ function ResumeBuilderPageContent() {
         <TabsContent value="bank" className="space-y-6 animate-in fade-in-50 duration-500">
           <Card className="border-border/60 shadow-md">
             <CardHeader className="border-b bg-muted/5 pb-5">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
                   <CardTitle className="text-2xl flex items-center gap-2">
                     <Save className="h-6 w-6 text-primary" /> Point Bank
                   </CardTitle>
-                  <CardDescription className="text-base">Your curated collection of saved, role-specific bullet points ready to be pasted into your resume template.</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {pointBank.length === 0 ? (
-                    <div className="text-center p-16 border-2 border-dashed rounded-xl border-muted bg-muted/10 text-muted-foreground flex flex-col items-center justify-center">
-                      <div className="p-4 bg-background rounded-full shadow-sm mb-4">
-                        <Save className="h-8 w-8 text-primary/40" />
+                  <CardDescription className="text-base mt-1">
+                    Your unified repository of saved points. Points extracted from your finalized domain resumes appear at the top, alongside points drafted in the Laboratory.
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button 
+                    variant="default"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm flex items-center gap-2"
+                    onClick={() => setIsFinalResumeModalOpen(true)}
+                  >
+                    <UploadCloud className="h-4 w-4" /> Upload Finalized Resume
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      const rawRole = pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting";
+                      setStrategyTargetRole(rawRole);
+                      setIsStrategyModalOpen(true);
+                    }}
+                    variant="outline"
+                    className="font-semibold shadow-sm"
+                  >
+                    <Target className="h-4 w-4 mr-2" /> Generate Strategy Report
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {pointBank.length === 0 ? (
+                <div className="text-center p-16 border-2 border-dashed rounded-xl border-muted bg-muted/10 text-muted-foreground flex flex-col items-center justify-center">
+                  <div className="p-4 bg-background rounded-full shadow-sm mb-4">
+                    <Save className="h-8 w-8 text-primary/40" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-1">Your bank is empty</h3>
+                  <p className="max-w-md text-sm">Upload your finalized domain resume to extract its points here, or generate bullets in the Laboratory.</p>
+                  <div className="flex gap-3 mt-6">
+                    <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setIsFinalResumeModalOpen(true)}>
+                      <UploadCloud className="h-4 w-4 mr-2" /> Upload Final Resume
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveTab("lab")}>Go to Laboratory</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Domain Selector & Filter Bar */}
+                  <div className="flex flex-col gap-4 border-b border-border/50 pb-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap gap-2.5">
+                        {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
+                          const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
+                          return (
+                            <button
+                              key={role} 
+                              onClick={() => setActivePointBankRole(role)}
+                              className={`px-4 py-2 rounded-full text-xs md:text-sm font-bold tracking-wide capitalize transition-all ${
+                                isActive
+                                  ? "bg-primary text-primary-foreground shadow-md scale-105" 
+                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              }`}
+                            >
+                              {role}
+                            </button>
+                          );
+                        })}
                       </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-1">Your bank is empty</h3>
-                      <p>Go to the Laboratory to generate and save your best bullets here.</p>
-                      <Button className="mt-6" variant="outline" onClick={() => setActiveTab("lab")}>Go to Laboratory</Button>
                     </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="flex flex-wrap gap-3 mb-8 border-b border-border/50 pb-5 items-center justify-between">
-                        <div className="flex flex-wrap gap-3">
-                          {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
-                            const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
-                            return (
-                              <button
-                                key={role} 
-                                onClick={() => setActivePointBankRole(role)}
-                                className={`px-5 py-2.5 rounded-full text-sm font-bold tracking-wide capitalize transition-all ${
-                                  isActive
-                                    ? "bg-primary text-primary-foreground shadow-md scale-105" 
-                                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                                }`}
-                              >
-                                {role}
-                              </button>
-                            );
-                          })}
+
+                    {/* Source Sub-filters */}
+                    {(() => {
+                      const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
+                      const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
+                      const currentRoleBullets = pointBank.filter(b => getRoleLabel(b.target_role) === displayRole);
+                      const totalCount = currentRoleBullets.length;
+                      const finalCount = currentRoleBullets.filter(b => b.variant_type === "finalized_resume").length;
+                      const labCount = currentRoleBullets.filter(b => b.variant_type !== "finalized_resume").length;
+
+                      return (
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="text-xs font-semibold text-muted-foreground mr-1">Filter Source:</span>
+                          <button
+                            onClick={() => setPointBankFilter("all")}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                              pointBankFilter === "all" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            All Points ({totalCount})
+                          </button>
+                          <button
+                            onClick={() => setPointBankFilter("finalized")}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${
+                              pointBankFilter === "finalized" ? "bg-emerald-600 text-white shadow-sm" : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            <Target className="h-3 w-3" /> Final Resume Points ({finalCount})
+                          </button>
+                          <button
+                            onClick={() => setPointBankFilter("lab")}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${
+                              pointBankFilter === "lab" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            <Sparkles className="h-3 w-3" /> Lab Saved ({labCount})
+                          </button>
                         </div>
-                        <Button 
-                          onClick={() => {
-                            const rawRole = pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting";
-                            setStrategyTargetRole(rawRole);
-                            setIsStrategyModalOpen(true);
-                          }}
-                          className="font-semibold shadow-sm"
-                        >
-                          <Target className="h-4 w-4 mr-2" /> Generate Strategy Report
-                        </Button>
-                      </div>
+                      );
+                    })()}
+                  </div>
 
-                      {(() => {
-                        const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
-                        const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
-                        const roleBullets = pointBank.filter(b => getRoleLabel(b.target_role) === displayRole);
-                        
-                        // Group by section type then parent experience
-                        const grouped: Record<string, Record<string, typeof roleBullets>> = {};
-                        roleBullets.forEach(bullet => {
-                          const ach = achievements.find(a => a.id === bullet.achievement_id);
-                          const section = ach?.section_type || "Other";
-                          const parent = ach?.parent_experience || "General";
-                          if (!grouped[section]) grouped[section] = {};
-                          if (!grouped[section][parent]) grouped[section][parent] = [];
-                          grouped[section][parent].push(bullet);
-                        });
+                  {(() => {
+                    const availableRoles = Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))));
+                    const displayRole = activePointBankRole === "all" ? (availableRoles[0] || "all") : getRoleLabel(activePointBankRole);
+                    let roleBullets = pointBank.filter(b => getRoleLabel(b.target_role) === displayRole);
+                    
+                    if (pointBankFilter === "finalized") {
+                      roleBullets = roleBullets.filter(b => b.variant_type === "finalized_resume");
+                    } else if (pointBankFilter === "lab") {
+                      roleBullets = roleBullets.filter(b => b.variant_type !== "finalized_resume");
+                    }
 
-                        return (
-                          <div className="space-y-10">
-                            {Object.entries(grouped)
-                              .sort(([secA], [secB]) => (SECTION_ORDER[secA] || 99) - (SECTION_ORDER[secB] || 99))
-                              .map(([section, parents]) => (
-                              <div key={section} className="space-y-6">
-                                <h3 className="text-xl font-extrabold text-foreground border-b-2 border-primary/20 pb-2 inline-block pr-8 uppercase tracking-wider">{section}</h3>
-                                <div className="space-y-8 pl-1 md:pl-2">
-                                  {Object.entries(parents).map(([parent, bullets]) => (
-                                    <div key={parent} className="space-y-4">
-                                      <div className="flex items-center justify-between">
-                                        <h4 className="font-bold text-lg text-foreground/90 flex items-center gap-2">
-                                          <Target className="h-5 w-5 text-primary" /> {parent}
-                                        </h4>
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="text-xs h-8 text-primary hover:bg-primary/10"
-                                          onClick={() => navigator.clipboard.writeText(bullets.map(b => `• ${b.bullet_text}`).join('\n'))}
-                                        >
-                                          <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Section
-                                        </Button>
-                                      </div>
-                                      <ul className="space-y-3">
-                                        {bullets.map(bullet => (
-                                          <li key={bullet.id} className="group relative rounded-xl border border-border/40 bg-background hover:bg-muted/10 hover:border-border/80 hover:shadow-sm transition-all overflow-hidden">
+                    if (roleBullets.length === 0) {
+                      return (
+                        <div className="text-center p-12 border border-dashed rounded-xl text-muted-foreground">
+                          <p>No points match the selected filter.</p>
+                        </div>
+                      );
+                    }
+                    
+                    // Group by section type then parent experience
+                    const grouped: Record<string, Record<string, typeof roleBullets>> = {};
+                    roleBullets.forEach(bullet => {
+                      const ach = achievements.find(a => a.id === bullet.achievement_id);
+                      const section = ach?.section_type || bullet.achievements?.section_type || "Professional Experience";
+                      const parent = ach?.parent_experience || bullet.achievements?.parent_experience || "General";
+                      if (!grouped[section]) grouped[section] = {};
+                      if (!grouped[section][parent]) grouped[section][parent] = [];
+                      grouped[section][parent].push(bullet);
+                    });
+
+                    return (
+                      <div className="space-y-10">
+                        {Object.entries(grouped)
+                          .sort(([secA], [secB]) => (SECTION_ORDER[secA] || 99) - (SECTION_ORDER[secB] || 99))
+                          .map(([section, parents]) => (
+                          <div key={section} className="space-y-6">
+                            <h3 className="text-xl font-extrabold text-foreground border-b-2 border-primary/20 pb-2 inline-block pr-8 uppercase tracking-wider">{section}</h3>
+                            <div className="space-y-8 pl-1 md:pl-2">
+                              {Object.entries(parents).map(([parent, bullets]) => {
+                                // Sort bullets: finalized_resume points at the top
+                                const sortedBullets = [...bullets].sort((a, b) => {
+                                  const aIsFinal = a.variant_type === "finalized_resume" ? 1 : 0;
+                                  const bIsFinal = b.variant_type === "finalized_resume" ? 1 : 0;
+                                  return bIsFinal - aIsFinal;
+                                });
+
+                                return (
+                                  <div key={parent} className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-bold text-lg text-foreground/90 flex items-center gap-2">
+                                        <Target className="h-5 w-5 text-primary" /> {parent}
+                                      </h4>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="text-xs h-8 text-primary hover:bg-primary/10"
+                                        onClick={() => navigator.clipboard.writeText(sortedBullets.map(b => `• ${b.bullet_text}`).join('\n'))}
+                                      >
+                                        <Copy className="h-3.5 w-3.5 mr-1.5" /> Copy Section
+                                      </Button>
+                                    </div>
+                                    <ul className="space-y-3">
+                                      {sortedBullets.map(bullet => {
+                                        const isFinal = bullet.variant_type === "finalized_resume";
+                                        return (
+                                          <li 
+                                            key={bullet.id} 
+                                            className={`group relative rounded-xl border transition-all overflow-hidden ${
+                                              isFinal 
+                                                ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 hover:border-emerald-500/70 hover:shadow-md" 
+                                                : "border-border/40 bg-background hover:bg-muted/10 hover:border-border/80 hover:shadow-sm"
+                                            }`}
+                                          >
                                             {editingPointBankBullet === bullet.id ? (
                                               <div className="p-4 flex flex-col gap-3">
                                                 <Textarea
@@ -1789,56 +1952,104 @@ function ResumeBuilderPageContent() {
                                                   className="min-h-[100px] w-full text-[15px] resize-none border-primary/40 focus:ring-primary/20"
                                                   autoFocus
                                                 />
-                                                <div className="flex justify-end gap-2">
-                                                  <Button variant="ghost" size="sm" onClick={() => setEditingPointBankBullet(null)}>Cancel</Button>
-                                                  <Button size="sm" onClick={() => handleSavePointBankEdit(bullet.id)}>Save Edit</Button>
+                                                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                                  <span>Length: {editPointBankText.length} chars</span>
+                                                  <div className="flex gap-2">
+                                                    <Button variant="ghost" size="sm" onClick={() => setEditingPointBankBullet(null)}>Cancel</Button>
+                                                    <Button size="sm" onClick={() => handleSavePointBankEdit(bullet.id)}>Save Edit</Button>
+                                                  </div>
                                                 </div>
                                               </div>
                                             ) : (
-                                              <div className="p-4 pr-16 flex gap-4 items-start">
-                                                <div className="mt-2 h-1.5 w-1.5 rounded-full bg-primary/60 shrink-0"></div>
-                                                <div className="flex flex-col gap-1 w-full">
-                                                  <div className="text-[15px] leading-relaxed text-foreground/90">{bullet.bullet_text}</div>
+                                              <div className="p-4 pr-20 flex gap-4 items-start">
+                                                <div className={`mt-2 h-2 w-2 rounded-full shrink-0 ${isFinal ? "bg-emerald-500 ring-4 ring-emerald-500/20" : "bg-primary/60"}`}></div>
+                                                <div className="flex flex-col gap-1.5 w-full">
+                                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                    {isFinal ? (
+                                                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/50 text-[10.5px] font-bold uppercase tracking-wider gap-1">
+                                                        <Target className="h-3 w-3" /> Final Resume Point
+                                                      </Badge>
+                                                    ) : (
+                                                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10.5px] font-semibold uppercase tracking-wider gap-1">
+                                                        <Sparkles className="h-3 w-3" /> Lab Generated
+                                                      </Badge>
+                                                    )}
+                                                    <span className="text-[11px] text-muted-foreground font-mono">
+                                                      {bullet.bullet_text.length} chars
+                                                    </span>
+                                                  </div>
+                                                  
+                                                  <div className="text-[15px] leading-relaxed text-foreground/95 font-normal">
+                                                    {highlightMetrics(bullet.bullet_text)}
+                                                  </div>
+                                                  
                                                   {bullet.generation_group_id && (
-                                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 font-medium bg-muted/30 px-2 py-0.5 rounded-sm w-fit mt-1">
-                                                      <Layers className="h-3 w-3" /> Group Generated
+                                                    <div className="text-[11px] text-muted-foreground flex items-center gap-1 font-medium bg-muted/30 px-2 py-0.5 rounded-sm w-fit mt-0.5">
+                                                      <Layers className="h-3 w-3" /> Set Generated
                                                     </div>
                                                   )}
                                                 </div>
                                                 
                                                 {/* Action Buttons Overlay */}
-                                                <div className="absolute right-0 top-0 bottom-0 flex flex-row items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-3 md:pr-4">
-                                                  <Button variant="ghost" size="icon" onClick={() => {
-                                                    setRefineTarget({ source: "bank", id: bullet.id, text: bullet.bullet_text, role: bullet.target_role });
-                                                    setRefineInstruction("");
-                                                    setRefineHistory([]);
-                                                  }} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-primary rounded-full shadow-sm" title="Refine with AI">
+                                                <div className="absolute right-0 top-0 bottom-0 flex flex-row items-center justify-end gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-gradient-to-l from-background via-background to-transparent pl-8 pr-3 md:pr-4">
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => {
+                                                      setRefineTarget({ 
+                                                        source: "bank", 
+                                                        id: bullet.id, 
+                                                        text: bullet.bullet_text, 
+                                                        role: bullet.target_role,
+                                                        isFinalResume: isFinal,
+                                                        charLength: bullet.bullet_text.length
+                                                      });
+                                                      setRefineInstruction("");
+                                                      setRefineHistory([]);
+                                                    }} 
+                                                    className={`h-8 w-8 rounded-full shadow-sm ${isFinal ? 'hover:bg-emerald-500/15 text-emerald-600 hover:text-emerald-700' : 'hover:bg-primary/10 text-primary'}`} 
+                                                    title={isFinal ? "AI Refine (Length Locked)" : "Refine with AI"}
+                                                  >
                                                     <Sparkles className="h-4 w-4" />
                                                   </Button>
-                                                  <Button variant="ghost" size="icon" onClick={() => {setEditingPointBankBullet(bullet.id); setEditPointBankText(bullet.bullet_text);}} className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full shadow-sm" title="Manual Edit">
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => {setEditingPointBankBullet(bullet.id); setEditPointBankText(bullet.bullet_text);}} 
+                                                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full shadow-sm" 
+                                                    title="Manual Edit"
+                                                  >
                                                     <Edit3 className="h-4 w-4" />
                                                   </Button>
-                                                  <Button variant="ghost" size="icon" onClick={() => deletePointBankItem(bullet.id)} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full shadow-sm">
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => deletePointBankItem(bullet.id)} 
+                                                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full shadow-sm"
+                                                    title="Delete Point"
+                                                  >
                                                     <Trash2 className="h-4 w-4" />
                                                   </Button>
                                                 </div>
                                               </div>
                                             )}
                                           </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
         
         <Dialog open={isStrategyModalOpen} onOpenChange={setIsStrategyModalOpen}>
@@ -2276,6 +2487,87 @@ function ResumeBuilderPageContent() {
         </DialogContent>
       </Dialog>
 
+      {/* Upload Finalized Resume Modal for Point Bank */}
+      <Dialog open={isFinalResumeModalOpen} onOpenChange={setIsFinalResumeModalOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
+              <UploadCloud className="h-6 w-6 text-emerald-600" /> Upload Finalized Resume
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Upload your finalized domain resume (PDF or text/LaTeX) for <strong>{getRoleLabel(activePointBankRole === "all" ? targetRole : activePointBankRole)}</strong>. All points will be extracted directly into your Point Bank and tagged on top.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleFinalResumeUpload} className="space-y-5 pt-2">
+            <div className="flex p-1 bg-muted/40 rounded-xl border border-border/60">
+              <button
+                type="button"
+                onClick={() => setFinalResumeUploadMode("pdf")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                  finalResumeUploadMode === "pdf" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Upload PDF Resume
+              </button>
+              <button
+                type="button"
+                onClick={() => setFinalResumeUploadMode("text")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                  finalResumeUploadMode === "text" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Paste LaTeX / Text
+              </button>
+            </div>
+
+            {finalResumeUploadMode === "pdf" ? (
+              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-emerald-500/50 transition-colors bg-muted/5">
+                <input
+                  type="file"
+                  id="final-resume-file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setFinalResumeFile(e.target.files?.[0] || null)}
+                />
+                <label htmlFor="final-resume-file" className="cursor-pointer flex flex-col items-center justify-center space-y-2">
+                  <FileText className="h-10 w-10 text-emerald-600/70" />
+                  <span className="text-sm font-semibold text-foreground">
+                    {finalResumeFile ? finalResumeFile.name : "Click to select your finalized PDF"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Supports 1-page standard placement PDF resumes
+                  </span>
+                </label>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-muted-foreground">Paste Resume LaTeX or Plain Text:</label>
+                <Textarea
+                  placeholder="Paste your section headings and bullet points here..."
+                  value={finalResumeText}
+                  onChange={(e) => setFinalResumeText(e.target.value)}
+                  className="min-h-[160px] text-xs font-mono"
+                />
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setIsFinalResumeModalOpen(false)} disabled={isExtractingFinalResume}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold" disabled={isExtractingFinalResume}>
+                {isExtractingFinalResume ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Extracting Points...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-2" /> Extract to Point Bank</>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Refine Bullet Dialog */}
       <Dialog open={!!refineTarget} onOpenChange={(open) => !open && setRefineTarget(null)}>
         <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
@@ -2284,10 +2576,23 @@ function ResumeBuilderPageContent() {
               <Sparkles className="h-5 w-5" /> Refine Point with AI
             </DialogTitle>
             <DialogDescription>
-              Provide instructions to edit this point (e.g., "Make it shorter", "Focus more on leadership", "Remove the metric").
+              Provide instructions to edit this point (e.g., "Make it punchier", "Focus on cross-functional leadership", "Front-load metric").
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
+            {refineTarget?.isFinalResume && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                <div>
+                  <span className="font-bold">Strict 1-Page Length Lock Active:</span>
+                  <p className="mt-0.5 leading-relaxed">
+                    This point is from your finalized resume ({refineTarget.charLength || refineTarget.text.length} chars). 
+                    The AI will strictly match this character length to prevent line-wrapping in your 1-page template.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="p-4 bg-muted/20 border rounded-lg text-sm leading-relaxed text-foreground/90 font-medium">
               {refineTarget?.text}
             </div>
@@ -2303,6 +2608,18 @@ function ResumeBuilderPageContent() {
                   <div className="absolute top-0 right-0 p-1 px-2 bg-primary/20 text-primary text-[10px] uppercase font-bold rounded-bl-lg rounded-tr-lg">New</div>
                   {item.result}
                 </div>
+                <div className="flex justify-between items-center text-[11.5px] text-muted-foreground px-1">
+                  <span>Length: {item.result.length} characters</span>
+                  {refineTarget?.charLength && (
+                    <span className={`font-mono font-medium ${Math.abs(item.result.length - refineTarget.charLength) <= 4 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600'}`}>
+                      {item.result.length === refineTarget.charLength 
+                        ? "Exact Match (0 char diff)" 
+                        : item.result.length > refineTarget.charLength 
+                          ? `+${item.result.length - refineTarget.charLength} chars` 
+                          : `-${refineTarget.charLength - item.result.length} chars`}
+                    </span>
+                  )}
+                </div>
                 <div className="text-xs text-muted-foreground flex items-start gap-2 bg-muted/30 p-2 rounded">
                   <Info className="h-4 w-4 shrink-0 mt-0.5" />
                   <p>{item.explanation}</p>
@@ -2314,7 +2631,7 @@ function ResumeBuilderPageContent() {
           <div className="pt-2 border-t mt-auto">
             <form onSubmit={handleRefineSubmit} className="space-y-3">
               <Textarea 
-                placeholder="Your instructions (e.g., Make it shorter)..." 
+                placeholder="Your instructions (e.g., Emphasize latency reduction)..." 
                 value={refineInstruction}
                 onChange={(e) => setRefineInstruction(e.target.value)}
                 className="min-h-[80px]"

@@ -959,14 +959,122 @@ def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[D
             
         return {"response": response_text, "extracted_metrics_update": {}, "new_context_summary": ""}
 
-def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: str) -> Dict[str, Any]:
-    """Refines a single bullet point based on user instruction."""
+def extract_final_resume_bullets(pdf_bytes: bytes = None, raw_text: str = None) -> List[Dict[str, Any]]:
+    """Extracts exact finalized resume sections, overview lines, and bullet points from a finalized domain resume."""
+    system_prompt = """
+    You are an elite resume parser specialized in IIT Bombay placement resumes.
+    Extract the complete, exact structure, parent organizations/projects, italicized overview lines, and bullet points from this finalized resume.
+    
+    CRITICAL INSTRUCTIONS:
+    1. Identify all major sections (e.g. 'Professional Experience', 'Projects', 'Positions of Responsibility', 'Extracurricular Activities', 'Scholastic Achievements').
+    2. Under each section, extract every parent organization or project:
+       - 'parent_experience': The Company, Organization, or Project title (e.g. 'McKinsey & Company', 'ABB India', 'Hyperloop Pod Competition').
+       - 'role': Designation or role if present (e.g. 'Summer Associate', 'Overall Coordinator').
+       - 'timeline': Dates if present (e.g. 'May 2025 - Jul 2025').
+       - 'overview_line': The top italicized/overview line directly under the title if present (e.g., 'Healthcare Market Entry | Facilitated the entry of a top 10 Indian conglomerate into the USD 630B+ market'). If none, leave as empty string.
+       - 'bullets': Array of strings containing the EXACT bullet points as written in the resume. Do NOT summarize or shorten them. Keep exact numbers, tools, and phrasing.
+    
+    Return STRICTLY a JSON array of section objects matching this schema:
+    [
+      {
+        "section_type": "Professional Experience",
+        "parent_experience": "Boston Consulting Group",
+        "role": "Summer Associate",
+        "timeline": "May 2025 - Jul 2025",
+        "overview_line": "Healthcare Market Entry | Facilitated entry of top 10 conglomerate into USD 630B+ market",
+        "bullets": [
+          "Crafted a 14-specialty Centres of Excellence strategy channelising investments of INR 350M",
+          "Synthesized 10+ competitor benchmarks and market trends across 15 operational KPIs"
+        ]
+      }
+    ]
+    """
+    
+    # Try Gemini if pdf_bytes
+    if pdf_bytes:
+        try:
+            response = gemini_client.generate_content(
+                model_name="gemini-3.5-flash",
+                prompt=system_prompt,
+                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1),
+                pdf_bytes=pdf_bytes
+            )
+            data = json_repair.loads(response.text)
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, list): return v
+                return [data]
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            print(f"Gemini PDF extraction failed for final resume: {e}")
+            import fitz
+            try:
+                pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                raw_text = ""
+                for page_num in range(pdf_doc.page_count):
+                    raw_text += pdf_doc[page_num].get_text()
+                pdf_doc.close()
+            except Exception as fitz_err:
+                print(f"PyMuPDF fallback failed: {fitz_err}")
+                return []
+                
+    if raw_text:
+        try:
+            full_prompt = f"{system_prompt}\n\nRESUME TEXT:\n{raw_text}"
+            response_text = cerebras_client.generate_chat_completion(
+                model="gpt-oss-120b",
+                messages=[{"role": "user", "content": full_prompt}],
+                temperature=0.1,
+                max_tokens=3500
+            )
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\[.*\]|\{.*\})\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+            data = json_repair.loads(response_text)
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, list): return v
+                return [data]
+            return data if isinstance(data, list) else []
+        except Exception as e:
+            print(f"Cerebras extraction failed for final resume text: {e}")
+            return []
+            
+    return []
+
+def refine_bullet_with_ai(
+    bullet_text: str,
+    user_instruction: str,
+    target_role: str,
+    preserve_length: bool = False,
+    target_char_length: int = None
+) -> Dict[str, Any]:
+    """Refines a single bullet point based on user instruction, with strict character-length preservation if requested."""
+    
+    target_len = target_char_length or len(bullet_text)
+    length_constraint_block = ""
+    if preserve_length or target_char_length is not None:
+        min_len = max(25, target_len - 8)
+        max_len = target_len + 4
+        length_constraint_block = f"""
+    CRITICAL STRICT LENGTH PRESERVATION CONSTRAINT (NO LINE OVERFLOW):
+    - Original Bullet: "{bullet_text}"
+    - Original Character Count: {target_len} characters ({len(bullet_text.split())} words).
+    - This point is extracted from the user's finalized 1-page placement resume.
+    - In standard LaTeX / Word 1-page resume templates, exceeding this length causes an unwanted line-wrap that destroys page alignment.
+    - YOUR REFINED BULLET MUST STRICTLY BE BETWEEN {min_len} AND {max_len} CHARACTERS IN TOTAL LENGTH.
+    - Count characters precisely before outputting. Under no circumstances should the length exceed {max_len} characters.
+    """
+    
     system_prompt = f"""
     You are an elite IIT Bombay placement resume writer. 
     The user wants to edit/refine a resume bullet point for a '{target_role}' role.
     
     Original Bullet: "{bullet_text}"
     User's Editing Instruction: "{user_instruction}"
+    
+    {length_constraint_block}
     
     CRITICAL INSTRUCTIONS:
     1. Apply the user's instruction precisely to refine the bullet.
@@ -986,22 +1094,13 @@ def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: 
     NEVER put a full stop (period) at the end of the refined_bullet string.
     """
     
-    try:
-        response = gemini_client.generate_content(
-            model_name="gemini-3.5-flash",
-            contents=system_prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
-        )
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Gemini generation failed for bullet refinement, falling back to Cerebras: {e}")
-        
+    # Generate refinement via Cerebras gpt-oss-120b
     try:
         response_text = cerebras_client.generate_chat_completion(
             model="gpt-oss-120b",
             messages=[{"role": "user", "content": system_prompt}],
             response_format={"type": "json_object"},
-            temperature=0.4,
+            temperature=0.3,
             max_tokens=1000
         )
         
@@ -1016,10 +1115,29 @@ def refine_bullet_with_ai(bullet_text: str, user_instruction: str, target_role: 
             if response_text.endswith("```"):
                 response_text = response_text[:-3]
                 
-        return json.loads(response_text.strip())
+        data = json_repair.loads(response_text.strip())
+        if isinstance(data, dict) and "refined_bullet" in data:
+            if data["refined_bullet"].endswith("."):
+                data["refined_bullet"] = data["refined_bullet"][:-1]
+            return data
     except Exception as e:
-        print(f"Failed to refine bullet via Cerebras: {e}")
-        return {"refined_bullet": bullet_text, "explanation": "Failed to refine bullet due to server error."}
+        print(f"Cerebras refinement failed, falling back to Gemini: {e}")
+        
+    try:
+        response = gemini_client.generate_content(
+            model_name="gemini-3.5-flash",
+            contents=system_prompt,
+            generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+        )
+        data = json_repair.loads(response.text)
+        if isinstance(data, dict) and "refined_bullet" in data:
+            if data["refined_bullet"].endswith("."):
+                data["refined_bullet"] = data["refined_bullet"][:-1]
+            return data
+    except Exception as e:
+        print(f"Gemini fallback also failed: {e}")
+        
+    return {"refined_bullet": bullet_text, "explanation": "Failed to refine bullet due to server error."}
 
 def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]], saved_bullets: List[Dict[str, Any]], target_role: str, rag_context: List[Dict[str, Any]], target_company: str = None, job_description: str = None) -> Dict[str, Any]:
     """Analyzes the user's current vault and bank to provide a detailed placement strategy using domain playbooks and RAG."""
