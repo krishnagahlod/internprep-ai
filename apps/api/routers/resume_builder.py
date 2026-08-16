@@ -104,8 +104,8 @@ async def extract_from_pdf(
     try:
         from dependencies import get_supabase; supabase = get_supabase()
         
-        # Fetch existing vault context
-        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).execute()
+        # Fetch existing vault context, ignoring final_resume dummy containers
+        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).neq('source_type', 'final_resume').execute()
         existing_vault = existing_res.data if existing_res else []
         
         pdf_bytes = await file.read()
@@ -173,8 +173,8 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
     try:
         from dependencies import get_supabase; supabase = get_supabase()
         
-        # Fetch existing vault context
-        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).execute()
+        # Fetch existing vault context, ignoring final_resume dummy containers
+        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).neq('source_type', 'final_resume').execute()
         existing_vault = existing_res.data if existing_res else []
         
         extracted = extract_achievements_from_text(body.text, existing_vault)
@@ -234,7 +234,7 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
 def get_achievements(user_id: str):
     from dependencies import get_supabase; supabase = get_supabase()
     try:
-        res = supabase.table('achievements').select("*").eq('user_id', user_id).order('created_at', desc=True).execute()
+        res = supabase.table('achievements').select("*").eq('user_id', user_id).neq('source_type', 'final_resume').order('created_at', desc=True).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
