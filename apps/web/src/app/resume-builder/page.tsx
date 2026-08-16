@@ -134,6 +134,7 @@ function ResumeBuilderPageContent() {
   const [finalResumeText, setFinalResumeText] = useState("")
   const [isExtractingFinalResume, setIsExtractingFinalResume] = useState(false)
   const [pointBankFilter, setPointBankFilter] = useState<"all" | "finalized" | "lab">("all")
+  const [finalResumeExtractionSuccessData, setFinalResumeExtractionSuccessData] = useState<{saved_bullets_count: number, extracted_sections: number} | null>(null)
   
   const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
   const [strategyDataSource, setStrategyDataSource] = useState("both")
@@ -602,7 +603,10 @@ function ResumeBuilderPageContent() {
       })
       if (res.ok) {
         const data = await res.json()
-        alert(`Success! Extracted and saved ${data.saved_bullets_count} finalized resume points across ${data.extracted_sections} sections into your Point Bank!`)
+        setFinalResumeExtractionSuccessData({
+          saved_bullets_count: data.saved_bullets_count,
+          extracted_sections: data.extracted_sections
+        })
         setIsFinalResumeModalOpen(false)
         setFinalResumeFile(null)
         setFinalResumeText("")
@@ -2457,6 +2461,34 @@ function ResumeBuilderPageContent() {
           
           <div className="p-4 border-t bg-background flex justify-end">
             <Button onClick={() => setExtractionSuccessData(null)} className="w-full sm:w-auto font-medium px-8" size="lg">Continue</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Final Resume Extraction Success Dialog */}
+      <Dialog open={!!finalResumeExtractionSuccessData} onOpenChange={(open) => !open && setFinalResumeExtractionSuccessData(null)}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden border-0 shadow-2xl">
+          <div className="p-6 pb-4 border-b bg-emerald-50 dark:bg-emerald-950/20">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3 text-xl text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                Extraction Complete!
+              </DialogTitle>
+              <DialogDescription className="text-[15px] pt-2 text-foreground/80">
+                We successfully extracted and saved <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{finalResumeExtractionSuccessData?.saved_bullets_count}</strong> finalized resume points across <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{finalResumeExtractionSuccessData?.extracted_sections}</strong> sections into your Point Bank!
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          
+          <div className="p-6 bg-muted/10 flex flex-col items-center justify-center text-center">
+             <Target className="h-16 w-16 text-emerald-500/20 mb-4" />
+             <p className="text-sm text-muted-foreground max-w-sm">
+                These points are now permanently locked in length and pinned to the top of your Point Bank for easy access.
+             </p>
+          </div>
+          
+          <div className="p-4 border-t bg-background flex justify-end">
+            <Button onClick={() => setFinalResumeExtractionSuccessData(null)} className="w-full sm:w-auto font-medium px-8 bg-emerald-600 hover:bg-emerald-700 text-white" size="lg">Awesome!</Button>
           </div>
         </DialogContent>
       </Dialog>
