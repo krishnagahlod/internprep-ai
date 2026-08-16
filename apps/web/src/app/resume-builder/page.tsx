@@ -135,6 +135,7 @@ function ResumeBuilderPageContent() {
   const [isExtractingFinalResume, setIsExtractingFinalResume] = useState(false)
   const [pointBankFilter, setPointBankFilter] = useState<"all" | "finalized" | "lab">("all")
   const [finalResumeExtractionSuccessData, setFinalResumeExtractionSuccessData] = useState<{saved_bullets_count: number, extracted_sections: number} | null>(null)
+  const [finalResumeUploadRole, setFinalResumeUploadRole] = useState("consulting")
   
   const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
   const [strategyDataSource, setStrategyDataSource] = useState("both")
@@ -573,6 +574,12 @@ function ResumeBuilderPageContent() {
     }
   }
 
+  const openFinalResumeModal = () => {
+    const defaultRole = activePointBankRole === "all" ? targetRole : (Object.keys(ROLE_LABELS).find(k => ROLE_LABELS[k].toLowerCase() === activePointBankRole.toLowerCase()) || targetRole)
+    setFinalResumeUploadRole(defaultRole)
+    setIsFinalResumeModalOpen(true)
+  }
+
   const handleFinalResumeUpload = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
@@ -587,10 +594,9 @@ function ResumeBuilderPageContent() {
     
     setIsExtractingFinalResume(true)
     try {
-      const roleKey = activePointBankRole === "all" ? targetRole : (Object.keys(ROLE_LABELS).find(k => ROLE_LABELS[k].toLowerCase() === activePointBankRole.toLowerCase()) || activePointBankRole.toLowerCase())
       const formData = new FormData()
       formData.append("user_id", user.id)
-      formData.append("target_role", roleKey)
+      formData.append("target_role", finalResumeUploadRole)
       if (finalResumeUploadMode === "pdf" && finalResumeFile) {
         formData.append("file", finalResumeFile)
       } else if (finalResumeUploadMode === "text") {
@@ -1776,7 +1782,7 @@ function ResumeBuilderPageContent() {
                   <Button 
                     variant="default"
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm flex items-center gap-2"
-                    onClick={() => setIsFinalResumeModalOpen(true)}
+                    onClick={openFinalResumeModal}
                   >
                     <UploadCloud className="h-4 w-4" /> Upload Finalized Resume
                   </Button>
@@ -1802,9 +1808,11 @@ function ResumeBuilderPageContent() {
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-1">Your bank is empty</h3>
                   <p className="max-w-md text-sm">Upload your finalized domain resume to extract its points here, or generate bullets in the Laboratory.</p>
-                  <div className="flex gap-3 mt-6">
-                    <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setIsFinalResumeModalOpen(true)}>
-                      <UploadCloud className="h-4 w-4 mr-2" /> Upload Final Resume
+                  <div className="text-center pt-8 pb-4">
+                    <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md font-semibold" 
+                    onClick={openFinalResumeModal}>
+                      <UploadCloud className="h-4 w-4 mr-2" />
+                      Upload Finalized Resume
                     </Button>
                     <Button variant="outline" onClick={() => setActiveTab("lab")}>Go to Laboratory</Button>
                   </div>
@@ -2527,11 +2535,25 @@ function ResumeBuilderPageContent() {
               <UploadCloud className="h-6 w-6 text-emerald-600" /> Upload Finalized Resume
             </DialogTitle>
             <DialogDescription className="text-sm">
-              Upload your finalized domain resume (PDF or text/LaTeX) for <strong>{getRoleLabel(activePointBankRole === "all" ? targetRole : activePointBankRole)}</strong>. All points will be extracted directly into your Point Bank and tagged on top.
+              Upload your finalized domain resume (PDF or text/LaTeX). All points will be extracted directly into your Point Bank and tagged on top.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleFinalResumeUpload} className="space-y-5 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Target Domain</label>
+              <Select value={finalResumeUploadRole} onValueChange={(v) => v && setFinalResumeUploadRole(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select target domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(ROLE_LABELS).map((key) => (
+                    <SelectItem key={key} value={key}>{ROLE_LABELS[key]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex p-1 bg-muted/40 rounded-xl border border-border/60">
               <button
                 type="button"
