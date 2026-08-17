@@ -834,22 +834,16 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                 temperature=0.3,
                 max_tokens=2500
             )
-            
-
-            json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(1)
-            response_text = response_text.strip()
 
             json_match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', response_text, re.DOTALL)
             if json_match:
                 response_text = json_match.group(1)
+            response_text = response_text.strip()
 
             data = json_repair.loads(response_text)
             
             if isinstance(data, str):
                 try:
-                    import json
                     data = json.loads(data)
                 except Exception:
                     pass
@@ -890,6 +884,12 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                     text = json_match.group(1).strip()
                 text = re.sub(r',\s*([}\]])', r'\1', text)
                 data = json_repair.loads(text)
+                
+                if isinstance(data, str):
+                    try:
+                        data = json.loads(data)
+                    except Exception:
+                        pass
                 
                 if isinstance(data, list):
                     data = {"variant_sets": data, "local_coaching_tips": []}
