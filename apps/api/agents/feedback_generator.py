@@ -86,7 +86,7 @@ def generate_interview_feedback(history: List[Dict[str, Any]], scratchpad: str, 
     try:
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
         response = gemini_client.generate_content(
-            model_name=os.getenv("ANALYSIS_MODEL", "gemini-3.5-flash"), 
+            model_name=os.getenv("ANALYSIS_MODEL", "gemini-1.5-flash"), 
             prompt=prompt, 
             generation_config=config
         )

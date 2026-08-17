@@ -31,7 +31,7 @@ class ResumeAnalysisResponse(typing.TypedDict):
     section_summaries: SectionSummaries
     bullets: list[BulletFeedback]
 
-model = genai.GenerativeModel('gemini-3.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash')
 config = genai.GenerationConfig(
     response_mime_type='application/json',
     temperature=0.0,

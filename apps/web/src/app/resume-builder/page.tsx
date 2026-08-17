@@ -1524,19 +1524,25 @@ function ResumeBuilderPageContent() {
                 <div className="h-px bg-border flex-1"></div>
               </div>
               
-              <div className="flex justify-center gap-4">
-                {composerResults.variant_sets.map((vSet: any, idx: number) => (
-                  <Button 
-                    key={idx} 
-                    variant={activeVariantSet === idx ? "default" : "outline"} 
-                    className="flex flex-col h-auto py-3 px-6"
-                    onClick={() => setActiveVariantSet(idx)}
-                  >
-                    <span className="font-bold">{vSet.set_label}</span>
-                    <span className="text-xs opacity-80 font-normal max-w-xs whitespace-normal">{vSet.set_description}</span>
-                  </Button>
-                ))}
-              </div>
+              {composerResults.variant_sets.length === 0 ? (
+                <div className="text-center text-muted-foreground py-10 bg-muted/30 rounded-xl border border-dashed">
+                  <p>AI generation returned no variants. Please try again or refine your instructions.</p>
+                </div>
+              ) : (
+                <div className="flex justify-center gap-4">
+                  {composerResults.variant_sets.map((vSet: any, idx: number) => (
+                    <Button 
+                      key={idx} 
+                      variant={activeVariantSet === idx ? "default" : "outline"} 
+                      className="flex flex-col h-auto py-3 px-6"
+                      onClick={() => setActiveVariantSet(idx)}
+                    >
+                      <span className="font-bold">{vSet.set_label}</span>
+                      <span className="text-xs opacity-80 font-normal max-w-xs whitespace-normal">{vSet.set_description}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
 
               {composerResults.variant_sets[activeVariantSet] && (
                 <div className="space-y-6">

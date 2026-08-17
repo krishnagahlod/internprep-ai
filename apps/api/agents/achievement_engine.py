@@ -69,7 +69,7 @@ def extract_achievements_from_pdf(pdf_bytes: bytes, existing_vault: List[Dict[st
     system_prompt = system_prompt.replace("{{VAULT_CONTEXT}}", vault_context)
     
     response = gemini_client.generate_content(
-        model_name="gemini-3.5-flash",
+        model_name="gemini-1.5-flash",
         prompt=system_prompt,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1),
         pdf_bytes=pdf_bytes
@@ -254,7 +254,7 @@ def extract_achievements_from_text(text: str, existing_vault: List[Dict[str, Any
     system_prompt = system_prompt.replace("{{VAULT_CONTEXT}}", vault_context)
     
     response = gemini_client.generate_content(
-        model_name="gemini-3.5-flash",
+        model_name="gemini-1.5-flash",
         prompt=system_prompt + "\n\nUser Text:\n" + text,
         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
     )
@@ -867,7 +867,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                 # Fallback to Gemini if Cerebras encounters unexpected issue
                 try:
                     response = gemini_client.generate_content(
-                        model_name="gemini-3.5-flash",
+                        model_name="gemini-1.5-flash",
                         prompt=system_prompt,
                         generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
                     )
@@ -996,7 +996,7 @@ def extract_final_resume_bullets(pdf_bytes: bytes = None, raw_text: str = None) 
     if pdf_bytes:
         try:
             response = gemini_client.generate_content(
-                model_name="gemini-3.5-flash",
+                model_name="gemini-1.5-flash",
                 prompt=system_prompt,
                 generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1),
                 pdf_bytes=pdf_bytes
@@ -1127,7 +1127,7 @@ def refine_bullet_with_ai(
         
     try:
         response = gemini_client.generate_content(
-            model_name="gemini-3.5-flash",
+            model_name="gemini-1.5-flash",
             contents=system_prompt,
             generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
         )
@@ -1242,7 +1242,7 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
     # Try Gemini 3.5 Flash first
     try:
         response = gemini_client.generate_content(
-            model_name="gemini-3.5-flash",
+            model_name="gemini-1.5-flash",
             prompt=system_prompt,
             generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
         )
