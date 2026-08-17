@@ -14,7 +14,9 @@ from agents.achievement_engine import (
     run_metric_reconstruction_turn,
     generate_resume_strategy,
     refine_bullet_with_ai,
-    extract_final_resume_bullets
+    extract_final_resume_bullets,
+    convert_resume_domain,
+    canonicalize_role_name
 )
 
 router = APIRouter(prefix="/builder", tags=["resume_builder"])
@@ -23,6 +25,28 @@ router = APIRouter(prefix="/builder", tags=["resume_builder"])
 class ExtractTextRequest(BaseModel):
     user_id: str
     text: str
+
+class BulletToSave(BaseModel):
+    achievement_id: Optional[str] = None
+    target_role: str
+    bullet_text: str
+    variant_type: Optional[str] = "domain_pivot"
+    generation_group_id: Optional[str] = None
+    parent_experience: Optional[str] = None
+    section_type: Optional[str] = None
+
+class SaveBulletsBatchRequest(BaseModel):
+    user_id: str
+    bullets: List[BulletToSave]
+
+class ConvertDomainRequest(BaseModel):
+    user_id: str
+    source_role: str
+    target_role: str
+    target_company: Optional[str] = ""
+    sections_to_convert: Optional[List[str]] = None
+    raw_sections: Optional[List[Dict[str, Any]]] = None
+
 
 class ManualAchievementRequest(BaseModel):
     user_id: str
@@ -610,3 +634,81 @@ async def get_strategy(request: Request, req: StrategyRequest):
         traceback.print_exc()
         print(f"Error in get_strategy: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/convert-domain")
+@limiter.limit("5/minute")
+async def convert_domain_endpoint(request: Request, req: ConvertDomainRequest):
+    from dependencies import get_supabase; supabase = get_supabase()
+    try:
+        res = convert_resume_domain(
+            supabase_client=supabase,
+            user_id=req.user_id,
+            source_role=req.source_role,
+            target_role=req.target_role,
+            sections_to_convert=req.sections_to_convert,
+            target_company=req.target_company or "",
+            raw_sections=req.raw_sections
+        )
+        return res
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in convert_domain_endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/save-bullets-batch")
+@limiter.limit("10/minute")
+async def save_bullets_batch(request: Request, req: SaveBulletsBatchRequest):
+    from dependencies import get_supabase; supabase = get_supabase()
+    try:
+        records_to_insert = []
+        for b in req.bullets:
+            ach_id = b.achievement_id
+            
+            # If achievement_id is missing, check or create a container
+            if not ach_id and b.parent_experience:
+                ach_check = supabase.table('achievements').select("id").eq('user_id', req.user_id).eq('parent_experience', b.parent_experience).execute()
+                if ach_check.data:
+                    ach_id = ach_check.data[0]["id"]
+                else:
+                    new_ach = supabase.table('achievements').insert({
+                        "user_id": req.user_id,
+                        "section_type": b.section_type or "Professional Experience",
+                        "title": b.parent_experience,
+                        "parent_experience": b.parent_experience,
+                        "original_description": b.bullet_text,
+                        "source_type": "domain_pivot",
+                        "status": "approved"
+                    }).execute()
+                    ach_id = new_ach.data[0]["id"] if new_ach.data else None
+
+            if not ach_id:
+                fallback_ach = supabase.table('achievements').select("id").eq('user_id', req.user_id).limit(1).execute()
+                ach_id = fallback_ach.data[0]["id"] if fallback_ach.data else None
+
+            if ach_id:
+                records_to_insert.append({
+                    "achievement_id": ach_id,
+                    "user_id": req.user_id,
+                    "target_role": b.target_role,
+                    "bullet_text": b.bullet_text,
+                    "variant_type": b.variant_type or "domain_pivot",
+                    "is_saved": True,
+                    "generation_group_id": b.generation_group_id
+                })
+
+        if not records_to_insert:
+            return {"status": "success", "count": 0, "saved_bullets": []}
+
+        res = supabase.table('generated_bullets').insert(records_to_insert).execute()
+        return {
+            "status": "success",
+            "count": len(res.data) if res.data else 0,
+            "saved_bullets": res.data or []
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in save_bullets_batch: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

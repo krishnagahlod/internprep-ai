@@ -1360,3 +1360,442 @@ def generate_resume_strategy(data_source: str, achievements: List[Dict[str, Any]
         return {}
 
 
+def canonicalize_role_name(target_role: str) -> str:
+    """Normalizes any role input string into one of the 5 canonical domain keys."""
+    r = target_role.lower().strip() if target_role else "consulting"
+    if "consult" in r:
+        return "consulting"
+    if "fin" in r:
+        return "finance"
+    if "prod" in r or "pm" in r:
+        return "product_management"
+    if "soft" in r or "it" in r or "swe" in r or "dev" in r:
+        return "software"
+    if "analyt" in r or "data" in r or "ds" in r:
+        return "analytics"
+    return "consulting"
+
+
+def load_domain_pivot_rules(source_role: str, target_role: str) -> Dict[str, Any]:
+    """Loads domain pivot reframing strategies and profiles from domain_pivot_rules.json."""
+    rules_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "domain_pivot_rules.json")
+    if not os.path.exists(rules_path):
+        return {}
+    try:
+        with open(rules_path, "r", encoding="utf-8") as f:
+            all_rules = json.load(f)
+            src = canonicalize_role_name(source_role)
+            tgt = canonicalize_role_name(target_role)
+            pair_key = f"{src}_to_{tgt}"
+            return {
+                "source_domain": src,
+                "target_domain": tgt,
+                "source_profile": all_rules.get("domain_profiles", {}).get(src, {}),
+                "target_profile": all_rules.get("domain_profiles", {}).get(tgt, {}),
+                "pivot_rule": all_rules.get("pivot_rules", {}).get(pair_key, {})
+            }
+    except Exception as e:
+        print(f"Failed to load domain pivot rules: {e}")
+        return {}
+
+
+def convert_resume_section_domain(
+    supabase_client,
+    section_data: Dict[str, Any],
+    source_role: str,
+    target_role: str,
+    target_company: str = "",
+    vault_lookup: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    Pivots an entire resume section (parent experience, overview line, bullets)
+    from source_role to target_role while strictly preserving character budgets and factual accuracy.
+    """
+    section_type = section_data.get("section_type", "Professional Experience")
+    parent_experience = section_data.get("parent_experience", "General Experience")
+    role = section_data.get("role", "")
+    timeline = section_data.get("timeline", "")
+    overview_line = section_data.get("overview_line", "")
+    bullets = section_data.get("bullets", [])
+
+    norm_sec = normalize_section_type(section_type)
+    
+    # 1. Retain scholastic and extracurricular sections as is without modification
+    if norm_sec in ["scholastic", "extracurricular"]:
+        retained_points = []
+        for idx, b in enumerate(bullets):
+            b_text = b.get("bullet_text", b) if isinstance(b, dict) else str(b)
+            b_id = b.get("id", f"p_{idx}") if isinstance(b, dict) else f"p_{idx}"
+            ach_id = b.get("achievement_id") if isinstance(b, dict) else None
+            retained_points.append({
+                "id": b_id,
+                "achievement_id": ach_id,
+                "original_text": b_text,
+                "original_char_length": len(b_text),
+                "converted_text": b_text,
+                "converted_char_length": len(b_text),
+                "conversion_confidence": "retained",
+                "conversion_notes": "Factual / Scholastic record preserved as-is.",
+                "vault_context_used": False,
+                "is_flagged": False,
+                "char_diff": 0
+            })
+        return {
+            "section_type": section_type,
+            "parent_experience": parent_experience,
+            "role": role,
+            "timeline": timeline,
+            "source_overview_line": overview_line,
+            "converted_overview_line": overview_line,
+            "point_conversions": retained_points
+        }
+
+    # 2. Load pivot rules and domain profiles
+    pivot_info = load_domain_pivot_rules(source_role, target_role)
+    src_profile = pivot_info.get("source_profile", {})
+    tgt_profile = pivot_info.get("target_profile", {})
+    pivot_rule = pivot_info.get("pivot_rule", {})
+
+    # 3. Format input points with vault context and length bounds
+    points_prompt_payload = []
+    bullet_meta_map = {}
+
+    for idx, b in enumerate(bullets):
+        b_text = b.get("bullet_text", b) if isinstance(b, dict) else str(b)
+        b_id = b.get("id", f"p_{idx}") if isinstance(b, dict) else f"p_{idx}"
+        ach_id = b.get("achievement_id") if isinstance(b, dict) else None
+        
+        bullet_meta_map[b_id] = {
+            "id": b_id,
+            "achievement_id": ach_id,
+            "original_text": b_text,
+            "original_char_length": len(b_text)
+        }
+
+        vault_extra = ""
+        if ach_id and vault_lookup and ach_id in vault_lookup:
+            v = vault_lookup[ach_id]
+            desc = v.get("original_description", "")
+            notes = v.get("user_notes", "")
+            metrics = v.get("quantified_metrics", {})
+            tags = v.get("competency_tags", [])
+            vault_extra = f" [VAULT CONTEXT: desc='{desc}', metrics={metrics}, notes='{notes}', tags={tags}]"
+
+        target_len = len(b_text)
+        min_len = max(30, target_len - 12)
+        max_len = target_len + 10
+
+        points_prompt_payload.append({
+            "point_id": b_id,
+            "original_bullet": b_text,
+            "original_char_length": target_len,
+            "strict_target_char_range": f"{min_len}-{max_len} chars",
+            "vault_context": vault_extra if vault_extra else "None"
+        })
+
+    company_clause = f"Target Company Focus: {target_company}\n" if target_company else ""
+
+    system_prompt = f"""
+    You are an elite IIT Bombay Placement Resume Strategist and Editor.
+    Your mission is to perform a high-precision, section-level DOMAIN CONVERSION on this resume section.
+
+    CONVERSION ROUTE:
+    - Source Domain: {src_profile.get('display_name', source_role)}
+    - Target Domain: {tgt_profile.get('display_name', target_role)}
+    {company_clause}
+    SECTION METADATA:
+    - Section Type: {section_type}
+    - Parent Experience / Organization: {parent_experience}
+    - Role / Designation: {role or 'Not specified'}
+    - Timeline: {timeline or 'Not specified'}
+    - Original Overview Line: "{overview_line}"
+
+    DOMAIN REFRAMING STRATEGY:
+    {pivot_rule.get('reframe_strategy', 'Pivot narrative to highlight target domain competencies.')}
+
+    DOMAIN COMPARISON:
+    - Source Domain Core Focus: {src_profile.get('core_focus', 'N/A')}
+    - Target Domain Core Focus: {tgt_profile.get('core_focus', 'N/A')}
+    - Preferred Target Verbs: {", ".join(tgt_profile.get('ideal_verbs', []))}
+    - Preferred Target Metrics: {", ".join(tgt_profile.get('metric_types', []))}
+    - Flag Criteria: {pivot_rule.get('flag_criteria', 'Points that cannot be transferred to target domain.')}
+
+    INPUT BULLETS TO CONVERT:
+    {json.dumps(points_prompt_payload, indent=2)}
+
+    CRITICAL RULES (NON-NEGOTIABLE):
+    1. STRICT CHARACTER LENGTH PRESERVATION (LATEX TEMPLATE FIT):
+       - Placement resumes are formatted in strict 1-page LaTeX templates where each bullet occupies a fixed number of lines.
+       - Each converted bullet MUST fall strictly within its specified `strict_target_char_range` (±10 to 12 chars of the original).
+       - Count characters carefully. Do not exceed the max length or fall significantly short.
+    2. ZERO HALLUCINATION / FACTUAL RIGOR:
+       - Use ONLY facts, tools, frameworks, and metrics present in the original bullet or the associated Vault Context.
+       - DO NOT fabricate technologies, frameworks, metrics, or credentials.
+    3. UNCONVERTIBLE POINT FLAGGING:
+       - If a bullet is purely domain-specific with no transferable substance to {tgt_profile.get('display_name', target_role)} (e.g. purely partner LoR, consulting slide deck layout with no data/technical aspect):
+         * Set "converted_text": null
+         * Set "conversion_confidence": "not_convertible"
+         * Set "is_flagged": true
+         * Set "conversion_notes": "Explain why this point does not translate and suggest what technical/domain achievement from the vault should replace it."
+    4. OVERVIEW 1-LINER REFRAMING:
+       - Provide a "converted_overview_line" that reframes this parent experience for the target domain while preserving company/project truth. If no overview line existed, provide a compelling 1-line overview or empty string.
+    5. FORMATTING:
+       - Do not start bullets with symbols (*, -, •).
+       - Do not end bullets with a period (.).
+       - Every converted bullet must start with a powerful capitalized Action Verb.
+
+    Return STRICTLY a JSON object matching this schema:
+    {{
+      "converted_overview_line": "Reframed overview 1-liner tailored for target domain",
+      "points": [
+        {{
+          "point_id": "matching point_id from input",
+          "converted_text": "Reframed bullet text (or null if unconvertible)",
+          "conversion_confidence": "high|medium|low|not_convertible",
+          "conversion_notes": "Brief explanation of framing shift and which details were emphasized",
+          "vault_context_used": true|false,
+          "is_flagged": true|false
+        }}
+      ]
+    }}
+    """
+
+    parsed_result = None
+
+    # 4. Try Cerebras first (fast, high throughput)
+    try:
+        response_text = cerebras_client.generate_chat_completion(
+            model="gpt-oss-120b",
+            messages=[{"role": "user", "content": system_prompt}],
+            temperature=0.2,
+            max_tokens=2500
+        )
+        json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(1)
+        response_text = response_text.strip()
+        data = json_repair.loads(response_text)
+        if isinstance(data, dict) and "points" in data:
+            parsed_result = data
+    except Exception as e:
+        print(f"Cerebras domain section conversion failed: {e}")
+
+    # 5. Fallback to Gemini 1.5 Flash
+    if not parsed_result:
+        try:
+            response = gemini_client.generate_content(
+                model_name="gemini-1.5-flash",
+                prompt=system_prompt,
+                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
+            )
+            text = response.text.strip()
+            json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+            if json_match:
+                text = json_match.group(1).strip()
+            data = json_repair.loads(text)
+            if isinstance(data, dict) and "points" in data:
+                parsed_result = data
+        except Exception as e:
+            print(f"Gemini domain section conversion failed: {e}")
+
+    # 6. Build structured output side-by-side
+    converted_overview_line = overview_line
+    converted_points = []
+    points_dict = {}
+
+    if parsed_result:
+        converted_overview_line = parsed_result.get("converted_overview_line", overview_line) or overview_line
+        for p in parsed_result.get("points", []):
+            pid = str(p.get("point_id", ""))
+            points_dict[pid] = p
+
+    for idx, b in enumerate(bullets):
+        b_id = b.get("id", f"p_{idx}") if isinstance(b, dict) else f"p_{idx}"
+        meta = bullet_meta_map.get(b_id, {
+            "id": b_id,
+            "achievement_id": None,
+            "original_text": str(b),
+            "original_char_length": len(str(b))
+        })
+
+        orig_text = meta["original_text"]
+        orig_len = meta["original_char_length"]
+        p_res = points_dict.get(b_id) or points_dict.get(str(idx))
+
+        if p_res and p_res.get("converted_text"):
+            conv_text = p_res["converted_text"].strip()
+            if conv_text.endswith("."):
+                conv_text = conv_text[:-1]
+            conv_len = len(conv_text)
+            conf = p_res.get("conversion_confidence", "high")
+            notes = p_res.get("conversion_notes", "Reframed for target domain.")
+            vault_used = p_res.get("vault_context_used", False)
+            flagged = p_res.get("is_flagged", False)
+        elif p_res and p_res.get("is_flagged"):
+            conv_text = None
+            conv_len = 0
+            conf = "not_convertible"
+            notes = p_res.get("conversion_notes", "Point is purely domain-specific and has no direct target domain equivalent.")
+            vault_used = False
+            flagged = True
+        else:
+            # Fallback: maintain original text if LLM did not return this point
+            conv_text = orig_text
+            conv_len = orig_len
+            conf = "medium"
+            notes = "Preserved with standard domain framing."
+            vault_used = False
+            flagged = False
+
+        char_diff = (conv_len - orig_len) if conv_text else 0
+
+        converted_points.append({
+            "id": b_id,
+            "achievement_id": meta.get("achievement_id"),
+            "original_text": orig_text,
+            "original_char_length": orig_len,
+            "converted_text": conv_text,
+            "converted_char_length": conv_len,
+            "conversion_confidence": conf,
+            "conversion_notes": notes,
+            "vault_context_used": vault_used,
+            "is_flagged": flagged,
+            "char_diff": char_diff
+        })
+
+    return {
+        "section_type": section_type,
+        "parent_experience": parent_experience,
+        "role": role,
+        "timeline": timeline,
+        "source_overview_line": overview_line,
+        "converted_overview_line": converted_overview_line,
+        "point_conversions": converted_points
+    }
+
+
+def convert_resume_domain(
+    supabase_client,
+    user_id: str,
+    source_role: str,
+    target_role: str,
+    sections_to_convert: List[str] = None,
+    target_company: str = "",
+    raw_sections: List[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Executes a full-resume domain pivot.
+    Processes all sections, pulls Achievement Vault context, preserves line length budgets,
+    and returns a complete side-by-side comparison payload.
+    """
+    # 1. Fetch vault achievements for rich context enrichment
+    vault_lookup = {}
+    if supabase_client and user_id:
+        try:
+            ach_res = supabase_client.table('achievements').select("*").eq('user_id', user_id).execute()
+            if ach_res and ach_res.data:
+                for a in ach_res.data:
+                    vault_lookup[a["id"]] = a
+        except Exception as e:
+            print(f"Failed to fetch vault lookup for domain conversion: {e}")
+
+    # 2. Gather sections to process
+    sections_to_process = []
+
+    if raw_sections and len(raw_sections) > 0:
+        sections_to_process = raw_sections
+    elif supabase_client and user_id:
+        # Fetch from Supabase generated_bullets
+        try:
+            b_res = supabase_client.table('generated_bullets').select("*, achievements(*)").eq('user_id', user_id).eq('target_role', source_role).eq('is_saved', True).execute()
+            bullets = b_res.data or []
+            
+            # Group by section_type -> parent_experience
+            grouped: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+            for b in bullets:
+                ach = b.get("achievements") or {}
+                sec = ach.get("section_type") or "Professional Experience"
+                parent = ach.get("parent_experience") or "General Experience"
+                if sec not in grouped:
+                    grouped[sec] = {}
+                if parent not in grouped[sec]:
+                    grouped[sec][parent] = []
+                grouped[sec][parent].append({
+                    "id": b["id"],
+                    "achievement_id": b["achievement_id"],
+                    "bullet_text": b["bullet_text"],
+                    "variant_type": b.get("variant_type", "finalized_resume")
+                })
+            
+            for sec, parents in grouped.items():
+                for parent, b_list in parents.items():
+                    # Retrieve timeline and overview_line from achievements if available
+                    timeline = ""
+                    overview_line = ""
+                    if b_list and b_list[0].get("achievement_id") in vault_lookup:
+                        v = vault_lookup[b_list[0]["achievement_id"]]
+                        timeline = v.get("timeline", "")
+                        overview_line = v.get("original_description", "") if v.get("source_type") == "final_resume" else ""
+                    
+                    sections_to_process.append({
+                        "section_type": sec,
+                        "parent_experience": parent,
+                        "timeline": timeline,
+                        "overview_line": overview_line,
+                        "bullets": b_list
+                    })
+        except Exception as e:
+            print(f"Failed to gather source bullets from database: {e}")
+
+    # Filter sections if sections_to_convert is explicitly specified
+    if sections_to_convert and len(sections_to_convert) > 0:
+        allowed_set = {s.lower().strip() for s in sections_to_convert}
+        sections_to_process = [
+            s for s in sections_to_process 
+            if s.get("section_type", "").lower().strip() in allowed_set or s.get("parent_experience", "").lower().strip() in allowed_set
+        ]
+
+    # 3. Convert sections
+    converted_sections = []
+    total_points = 0
+    converted_count = 0
+    flagged_count = 0
+
+    for s in sections_to_process:
+        res = convert_resume_section_domain(
+            supabase_client=supabase_client,
+            section_data=s,
+            source_role=source_role,
+            target_role=target_role,
+            target_company=target_company,
+            vault_lookup=vault_lookup
+        )
+        converted_sections.append(res)
+        
+        for pt in res.get("point_conversions", []):
+            total_points += 1
+            if pt.get("is_flagged") or pt.get("conversion_confidence") == "not_convertible":
+                flagged_count += 1
+            else:
+                converted_count += 1
+
+    pivot_info = load_domain_pivot_rules(source_role, target_role)
+    src_label = pivot_info.get("source_profile", {}).get("display_name", source_role)
+    tgt_label = pivot_info.get("target_profile", {}).get("display_name", target_role)
+
+    return {
+        "status": "success",
+        "source_domain": canonicalize_role_name(source_role),
+        "target_domain": canonicalize_role_name(target_role),
+        "source_domain_label": src_label,
+        "target_domain_label": tgt_label,
+        "target_company": target_company,
+        "total_sections": len(converted_sections),
+        "total_points": total_points,
+        "converted_points_count": converted_count,
+        "flagged_points_count": flagged_count,
+        "sections": converted_sections
+    }
+
+
+

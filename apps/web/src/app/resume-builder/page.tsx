@@ -36,10 +36,21 @@ const ROLE_LABELS: Record<string, string> = {
   "consulting": "Consulting",
   "finance": "Finance",
   "product management": "Product Management",
+  "product_management": "Product Management",
   "analytics": "Data & Analytics",
-  "it-software": "Software Engineering"
+  "it-software": "Software Engineering",
+  "software": "Software Engineering"
 };
 const getRoleLabel = (r: string) => { if (!r) return "Unknown"; return ROLE_LABELS[r.toLowerCase()] || r; };
+
+const DOMAIN_OPTIONS = [
+  { value: "consulting", label: "Management Consulting" },
+  { value: "software", label: "Software Engineering / IT" },
+  { value: "product_management", label: "Product Management" },
+  { value: "finance", label: "Finance / Investment Banking" },
+  { value: "analytics", label: "Data Science & Analytics" }
+];
+
 
 const SECTION_ORDER: Record<string, number> = {
   "Scholastic Achievements": 1,
@@ -137,6 +148,19 @@ function ResumeBuilderPageContent() {
   const [finalResumeExtractionSuccessData, setFinalResumeExtractionSuccessData] = useState<{saved_bullets_count: number, extracted_sections: number} | null>(null)
   const [finalResumeUploadRole, setFinalResumeUploadRole] = useState("consulting")
   
+  // Domain Pivot Engine State
+  const [isDomainPivotModalOpen, setIsDomainPivotModalOpen] = useState(false)
+  const [pivotSourceRole, setPivotSourceRole] = useState("consulting")
+  const [pivotTargetRole, setPivotTargetRole] = useState("software")
+  const [pivotTargetCompany, setPivotTargetCompany] = useState("")
+  const [pivotSelectedSections, setPivotSelectedSections] = useState<string[]>([])
+  const [isPivotConverting, setIsPivotConverting] = useState(false)
+  const [pivotResults, setPivotResults] = useState<any>(null)
+  const [pivotAcceptedPoints, setPivotAcceptedPoints] = useState<Record<string, boolean>>({})
+  const [pivotEditedPoints, setPivotEditedPoints] = useState<Record<string, string>>({})
+  const [isBatchSavingPivot, setIsBatchSavingPivot] = useState(false)
+  const [batchSaveSuccessMessage, setBatchSaveSuccessMessage] = useState<string | null>(null)
+
   const [strategyTargetRole, setStrategyTargetRole] = useState("consulting")
   const [strategyDataSource, setStrategyDataSource] = useState("both")
   const [strategyTargetCompany, setStrategyTargetCompany] = useState("")
@@ -156,10 +180,11 @@ function ResumeBuilderPageContent() {
   const [pendingContextSummary, setPendingContextSummary] = useState("")
   
   // Refinement Chat State
-  const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer", id: string, text: string, role: string, composerSetIdx?: number, isFinalResume?: boolean, charLength?: number } | null>(null)
+  const [refineTarget, setRefineTarget] = useState<{ source: "bank" | "lab_single" | "lab_composer" | "pivot_review", id: string, text: string, role: string, composerSetIdx?: number, isFinalResume?: boolean, charLength?: number } | null>(null)
   const [refineInstruction, setRefineInstruction] = useState("")
   const [isRefining, setIsRefining] = useState(false)
   const [refineHistory, setRefineHistory] = useState<{ instruction: string, result: string, explanation: string }[]>([])
+
   
   // API Base
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000"
@@ -685,12 +710,185 @@ function ResumeBuilderPageContent() {
       const set = newResults.variant_sets[refineTarget.composerSetIdx]
       set.bullets = set.bullets.map((b: any) => b.id === refineTarget.id ? { ...b, bullet_text: newText } : b)
       setComposerResults(newResults)
+    } else if (refineTarget.source === "pivot_review") {
+      setPivotEditedPoints(prev => ({
+        ...prev,
+        [refineTarget.id]: newText
+      }))
     }
     
     setRefineTarget(null)
     setRefineHistory([])
     setRefineInstruction("")
   }
+
+  const openDomainPivotModal = () => {
+    // Find current active role in point bank
+    const availableRoles = Array.from(new Set(pointBank.map(b => b.target_role)))
+    const currentRole = activePointBankRole === "all" ? (availableRoles[0] || "consulting") : (pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting")
+    
+    setPivotSourceRole(currentRole)
+    // Pick default target role that is different from source
+    const otherRole = DOMAIN_OPTIONS.find(d => d.value.toLowerCase() !== currentRole.toLowerCase())?.value || "software"
+    setPivotTargetRole(otherRole)
+    setPivotTargetCompany("")
+    
+    // Extract all sections present in current source role bullets
+    const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(currentRole))
+    const sectionsSet = new Set<string>()
+    sourceBullets.forEach(b => {
+      const ach = achievements.find(a => a.id === b.achievement_id)
+      const sec = ach?.section_type || b.achievements?.section_type || "Professional Experience"
+      sectionsSet.add(sec)
+    })
+    
+    const allSecs = sectionsSet.size > 0 ? Array.from(sectionsSet) : ["Professional Experience", "Projects", "Positions of Responsibility"]
+    setPivotSelectedSections(allSecs)
+    setIsDomainPivotModalOpen(true)
+  }
+
+  const handleRunDomainPivot = async () => {
+    if (!user) return
+    setIsPivotConverting(true)
+    try {
+      // Build structured sections from current pointBank to ensure exact client-side state is sent
+      const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole))
+      const grouped: Record<string, Record<string, any[]>> = {}
+      
+      sourceBullets.forEach(b => {
+        const ach = achievements.find(a => a.id === b.achievement_id)
+        const sec = ach?.section_type || b.achievements?.section_type || "Professional Experience"
+        const parent = ach?.parent_experience || b.achievements?.parent_experience || "General"
+        if (!grouped[sec]) grouped[sec] = {}
+        if (!grouped[sec][parent]) grouped[sec][parent] = []
+        grouped[sec][parent].push({
+          id: b.id,
+          achievement_id: b.achievement_id,
+          bullet_text: b.bullet_text,
+          variant_type: b.variant_type
+        })
+      })
+
+      const rawSections: any[] = []
+      Object.entries(grouped).forEach(([sec, parents]) => {
+        // Check if user selected this section
+        if (pivotSelectedSections.length === 0 || pivotSelectedSections.includes(sec)) {
+          Object.entries(parents).forEach(([parent, bList]) => {
+            const ach = achievements.find(a => a.id === bList[0]?.achievement_id)
+            rawSections.push({
+              section_type: sec,
+              parent_experience: parent,
+              timeline: ach?.timeline || "",
+              overview_line: ach?.original_description || "",
+              bullets: bList
+            })
+          })
+        }
+      })
+
+      const res = await fetch(`${apiBase}/builder/convert-domain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          source_role: pivotSourceRole,
+          target_role: pivotTargetRole,
+          target_company: pivotTargetCompany,
+          sections_to_convert: pivotSelectedSections,
+          raw_sections: rawSections.length > 0 ? rawSections : undefined
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setPivotResults(data)
+        
+        // Initialize accepted points: default true for non-flagged points
+        const initialAccepted: Record<string, boolean> = {}
+        data.sections?.forEach((sec: any) => {
+          sec.point_conversions?.forEach((pt: any) => {
+            initialAccepted[pt.id] = !pt.is_flagged && pt.conversion_confidence !== "not_convertible"
+          })
+        })
+        setPivotAcceptedPoints(initialAccepted)
+        setPivotEditedPoints({})
+        setIsDomainPivotModalOpen(false)
+      } else {
+        const err = await res.json()
+        alert(err.detail || "Failed to convert domain resume. Please try again.")
+      }
+    } catch (err) {
+      console.error("Domain pivot error:", err)
+      alert("An error occurred during domain conversion. Please try again.")
+    } finally {
+      setIsPivotConverting(false)
+    }
+  }
+
+  const handleSaveAllPivotAccepted = async () => {
+    if (!user || !pivotResults) return
+    setIsBatchSavingPivot(true)
+    try {
+      const bulletsToSave: any[] = []
+      
+      pivotResults.sections?.forEach((sec: any) => {
+        sec.point_conversions?.forEach((pt: any) => {
+          if (pivotAcceptedPoints[pt.id]) {
+            const textToSave = pivotEditedPoints[pt.id] || pt.converted_text || pt.original_text
+            if (textToSave && textToSave.trim()) {
+              bulletsToSave.push({
+                achievement_id: pt.achievement_id,
+                target_role: pivotResults.target_domain || pivotTargetRole,
+                bullet_text: textToSave.trim(),
+                variant_type: "domain_pivot",
+                parent_experience: sec.parent_experience,
+                section_type: sec.section_type
+              })
+            }
+          }
+        })
+      })
+
+      if (bulletsToSave.length === 0) {
+        alert("No points are selected to save.")
+        setIsBatchSavingPivot(false)
+        return
+      }
+
+      const res = await fetch(`${apiBase}/builder/save-bullets-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          bullets: bulletsToSave
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setBatchSaveSuccessMessage(`Successfully saved ${data.count} points to ${getRoleLabel(pivotResults.target_domain || pivotTargetRole)} Point Bank!`)
+        // Refresh Point Bank
+        const bankRes = await fetch(`${apiBase}/builder/point-bank?user_id=${user.id}`)
+        if (bankRes.ok) {
+          setPointBank(await bankRes.json())
+        }
+        // Switch active tab to target role
+        setActivePointBankRole(getRoleLabel(pivotResults.target_domain || pivotTargetRole))
+        // Clear pivot results
+        setPivotResults(null)
+        setTimeout(() => setBatchSaveSuccessMessage(null), 6000)
+      } else {
+        const err = await res.json()
+        alert(err.detail || "Failed to save points to Point Bank.")
+      }
+    } catch (err) {
+      console.error("Save batch error:", err)
+      alert("Failed to save converted points.")
+    } finally {
+      setIsBatchSavingPivot(false)
+    }
+  }
+
 
   // Effect to load point bank
   const sendChatMessage = async (forceStart = false) => {
@@ -1808,6 +2006,15 @@ function ResumeBuilderPageContent() {
                     <UploadCloud className="h-4 w-4" /> Upload Finalized Resume
                   </Button>
                   <Button 
+                    variant="outline"
+                    className="border-primary/50 text-primary hover:bg-primary/10 font-bold shadow-sm flex items-center gap-2"
+                    onClick={openDomainPivotModal}
+                    disabled={pointBank.length === 0}
+                    title={pointBank.length === 0 ? "Upload or save points to point bank first" : "Reframe points to another domain"}
+                  >
+                    <RefreshCw className="h-4 w-4" /> Pivot Domain
+                  </Button>
+                  <Button 
                     onClick={() => {
                       const rawRole = pointBank.find(b => getRoleLabel(b.target_role) === getRoleLabel(activePointBankRole))?.target_role || "consulting";
                       setStrategyTargetRole(rawRole);
@@ -1822,7 +2029,306 @@ function ResumeBuilderPageContent() {
               </div>
             </CardHeader>
             <CardContent className="pt-6">
-              {pointBank.length === 0 ? (
+              {batchSaveSuccessMessage && (
+                <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 flex items-center justify-between shadow-sm animate-in fade-in-50">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <span className="font-semibold text-sm">{batchSaveSuccessMessage}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setBatchSaveSuccessMessage(null)} className="h-7 text-xs">
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+
+              {pivotResults ? (
+                <div className="space-y-8 animate-in fade-in-50 duration-500">
+                  {/* Pivot Review Studio Header Banner */}
+                  <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-muted/30 to-background border-2 border-primary/30 shadow-md">
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Badge className="bg-primary text-primary-foreground font-bold px-3 py-1 text-xs">
+                            <RefreshCw className="h-3 w-3 mr-1" /> Domain Pivot Studio
+                          </Badge>
+                          {pivotResults.target_company && (
+                            <Badge variant="outline" className="border-primary/40 text-foreground font-medium">
+                              Focus: {pivotResults.target_company}
+                            </Badge>
+                          )}
+                        </div>
+                        <h3 className="text-2xl font-black text-foreground flex items-center gap-2">
+                          <span>{pivotResults.source_domain_label || getRoleLabel(pivotResults.source_domain)}</span>
+                          <ArrowRight className="h-5 w-5 text-primary" />
+                          <span className="text-primary">{pivotResults.target_domain_label || getRoleLabel(pivotResults.target_domain)}</span>
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                          Review your side-by-side reframed points. Character lengths are strictly preserved for 1-page template line budgets. Unconvertible points are flagged for factual integrity.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPivotResults(null)}
+                          className="font-medium shadow-sm"
+                        >
+                          Exit Review
+                        </Button>
+                        <Button
+                          onClick={handleSaveAllPivotAccepted}
+                          disabled={isBatchSavingPivot || Object.values(pivotAcceptedPoints).filter(Boolean).length === 0}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md flex items-center gap-2"
+                        >
+                          {isBatchSavingPivot ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Saving to Point Bank...</>
+                          ) : (
+                            <><Save className="h-4 w-4" /> Save {Object.values(pivotAcceptedPoints).filter(Boolean).length} Points to {pivotResults.target_domain_label || getRoleLabel(pivotResults.target_domain)}</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Summary KPI Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-border/60">
+                      <div className="p-3 bg-background/80 rounded-xl border shadow-sm">
+                        <div className="text-xs text-muted-foreground font-medium">Total Points</div>
+                        <div className="text-xl font-black text-foreground mt-0.5">{pivotResults.total_points}</div>
+                      </div>
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl shadow-sm">
+                        <div className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Successfully Converted
+                        </div>
+                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{pivotResults.converted_points_count}</div>
+                      </div>
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl shadow-sm">
+                        <div className="text-xs text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1">
+                          <AlertTriangle className="h-3.5 w-3.5" /> Flagged / Inconvertible
+                        </div>
+                        <div className="text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5">{pivotResults.flagged_points_count}</div>
+                      </div>
+                      <div className="p-3 bg-primary/10 border border-primary/30 rounded-xl shadow-sm">
+                        <div className="text-xs text-primary font-semibold flex items-center gap-1">
+                          <CheckSquare className="h-3.5 w-3.5" /> Selected to Save
+                        </div>
+                        <div className="text-xl font-black text-primary mt-0.5">
+                          {Object.values(pivotAcceptedPoints).filter(Boolean).length} / {pivotResults.total_points}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section by Section Side-by-Side Review */}
+                  <div className="space-y-8">
+                    {pivotResults.sections?.map((sec: any, secIdx: number) => (
+                      <Card key={secIdx} className="border-border/70 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-muted/15 border-b pb-4">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div>
+                              <Badge variant="outline" className="text-[11px] font-bold uppercase tracking-wider mb-1 bg-background">
+                                {sec.section_type}
+                              </Badge>
+                              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                <Target className="h-4 w-4 text-primary" /> {sec.parent_experience}
+                                {sec.timeline && <span className="text-xs font-normal text-muted-foreground font-sans">({sec.timeline})</span>}
+                              </CardTitle>
+                            </div>
+
+                            {/* Section-level toggle */}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs h-7 text-primary hover:bg-primary/10"
+                                onClick={() => {
+                                  const next = { ...pivotAcceptedPoints };
+                                  const allSecChecked = sec.point_conversions.every((pt: any) => next[pt.id]);
+                                  sec.point_conversions.forEach((pt: any) => {
+                                    if (!pt.is_flagged || allSecChecked) {
+                                      next[pt.id] = !allSecChecked;
+                                    }
+                                  });
+                                  setPivotAcceptedPoints(next);
+                                }}
+                              >
+                                {sec.point_conversions.every((pt: any) => pivotAcceptedPoints[pt.id]) ? "Deselect Section" : "Select Section"}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Overview 1-Liner Comparison */}
+                          {(sec.source_overview_line || sec.converted_overview_line) && (
+                            <div className="mt-3 p-3 bg-background rounded-xl border border-border/60 text-xs space-y-1.5">
+                              <div className="flex items-start gap-2">
+                                <span className="font-bold text-muted-foreground shrink-0 w-24">Original Overview:</span>
+                                <span className="italic text-foreground/80">{sec.source_overview_line || "None"}</span>
+                              </div>
+                              <div className="flex items-start gap-2 pt-1 border-t border-border/40">
+                                <span className="font-bold text-primary shrink-0 w-24">Pivot Overview:</span>
+                                <span className="italic font-medium text-foreground">{sec.converted_overview_line || sec.source_overview_line}</span>
+                              </div>
+                            </div>
+                          )}
+                        </CardHeader>
+
+                        <CardContent className="pt-5 space-y-4">
+                          {sec.point_conversions?.map((pt: any, ptIdx: number) => {
+                            const isAccepted = !!pivotAcceptedPoints[pt.id];
+                            const isFlagged = pt.is_flagged || pt.conversion_confidence === "not_convertible";
+                            const currentConvertedText = pivotEditedPoints[pt.id] || pt.converted_text;
+                            const charDiff = currentConvertedText ? (currentConvertedText.length - pt.original_char_length) : 0;
+
+                            return (
+                              <div
+                                key={pt.id || ptIdx}
+                                className={`rounded-2xl border transition-all p-4 ${
+                                  isFlagged
+                                    ? "border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/20"
+                                    : isAccepted
+                                      ? "border-emerald-500/50 bg-emerald-500/5 dark:bg-emerald-950/15 shadow-sm"
+                                      : "border-border/60 bg-background hover:bg-muted/10 opacity-75"
+                                }`}
+                              >
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                                  {/* Left: Original Point */}
+                                  <div className="lg:col-span-5 space-y-2 border-b lg:border-b-0 lg:border-r border-border/60 pb-3 lg:pb-0 lg:pr-4">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                                        Original ({pivotResults.source_domain_label || "Source"})
+                                      </span>
+                                      <span className="text-[11px] text-muted-foreground font-mono">
+                                        {pt.original_char_length} chars
+                                      </span>
+                                    </div>
+                                    <div className="text-[14px] leading-relaxed text-foreground/90 font-normal">
+                                      {highlightMetrics(pt.original_text)}
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Converted Point */}
+                                  <div className="lg:col-span-7 space-y-2.5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2">
+                                        {isFlagged ? (
+                                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700/50 text-[10.5px] font-bold uppercase gap-1">
+                                            <AlertTriangle className="h-3 w-3" /> Flagged / Inconvertible
+                                          </Badge>
+                                        ) : (
+                                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/50 text-[10.5px] font-bold uppercase gap-1">
+                                            <Sparkles className="h-3 w-3" /> {pt.conversion_confidence || "Converted"}
+                                          </Badge>
+                                        )}
+                                        {currentConvertedText && (
+                                          <span className="text-[11px] font-mono text-muted-foreground">
+                                            {currentConvertedText.length} chars (
+                                            <span className={Math.abs(charDiff) <= 5 ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>
+                                              {charDiff > 0 ? `+${charDiff}` : charDiff}
+                                            </span>)
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Point action buttons & accept toggle */}
+                                      <div className="flex items-center gap-2">
+                                        {currentConvertedText && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs text-primary hover:bg-primary/10 gap-1"
+                                            onClick={() => {
+                                              setRefineTarget({
+                                                source: "pivot_review",
+                                                id: pt.id,
+                                                text: currentConvertedText,
+                                                role: pivotResults.target_domain || pivotTargetRole,
+                                                isFinalResume: true,
+                                                charLength: pt.original_char_length
+                                              });
+                                              setRefineInstruction("");
+                                              setRefineHistory([]);
+                                            }}
+                                          >
+                                            <Sparkles className="h-3.5 w-3.5" /> AI Refine
+                                          </Button>
+                                        )}
+                                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-foreground">
+                                          <input
+                                            type="checkbox"
+                                            checked={isAccepted}
+                                            onChange={(e) => {
+                                              setPivotAcceptedPoints(prev => ({
+                                                ...prev,
+                                                [pt.id]: e.target.checked
+                                              }));
+                                            }}
+                                            className="h-4 w-4 rounded text-primary focus:ring-primary cursor-pointer"
+                                          />
+                                          {isAccepted ? "Accepted" : "Include"}
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    {/* Converted Text Display / Flagged Notice */}
+                                    {isFlagged ? (
+                                      <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                                        <p className="font-semibold">Why this point was flagged:</p>
+                                        <p className="leading-relaxed">{pt.conversion_notes}</p>
+                                      </div>
+                                    ) : (
+                                      <div className="text-[14.5px] leading-relaxed text-foreground font-medium bg-background/60 p-2.5 rounded-xl border border-border/50">
+                                        {highlightMetrics(currentConvertedText)}
+                                      </div>
+                                    )}
+
+                                    {/* Conversion Framing Rationale Note */}
+                                    {!isFlagged && pt.conversion_notes && (
+                                      <div className="text-[11.5px] text-muted-foreground flex items-center gap-1.5 bg-muted/20 px-2.5 py-1 rounded-lg">
+                                        <Info className="h-3.5 w-3.5 text-primary/70 shrink-0" />
+                                        <span>{pt.conversion_notes}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Sticky Bottom Bar */}
+                  <div className="p-4 bg-background/95 backdrop-blur-md rounded-2xl border-2 border-primary/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 sticky bottom-4">
+                    <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <CheckSquare className="h-5 w-5 text-emerald-600" />
+                      <span>
+                        <strong className="text-primary">{Object.values(pivotAcceptedPoints).filter(Boolean).length}</strong> of {pivotResults.total_points} points selected for {pivotResults.target_domain_label || getRoleLabel(pivotResults.target_domain)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                      <Button
+                        variant="outline"
+                        onClick={() => setPivotResults(null)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveAllPivotAccepted}
+                        disabled={isBatchSavingPivot || Object.values(pivotAcceptedPoints).filter(Boolean).length === 0}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md flex-1 sm:flex-none flex items-center justify-center gap-2"
+                      >
+                        {isBatchSavingPivot ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+                        ) : (
+                          <><Save className="h-4 w-4" /> Save Accepted Points to Bank</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : pointBank.length === 0 ? (
                 <div className="text-center p-16 border-2 border-dashed rounded-xl border-muted bg-muted/10 text-muted-foreground flex flex-col items-center justify-center">
                   <div className="p-4 bg-background rounded-full shadow-sm mb-4">
                     <Save className="h-8 w-8 text-primary/40" />
@@ -1845,6 +2351,7 @@ function ResumeBuilderPageContent() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex flex-wrap gap-2.5">
                         {Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role)))).map(role => {
+
                           const isActive = activePointBankRole === role || (activePointBankRole === "all" && Array.from(new Set(pointBank.map(b => getRoleLabel(b.target_role))))[0] === role) || getRoleLabel(activePointBankRole) === role;
                           return (
                             <button
@@ -2640,6 +3147,163 @@ function ResumeBuilderPageContent() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Domain Pivot Configuration Modal */}
+      <Dialog open={isDomainPivotModalOpen} onOpenChange={setIsDomainPivotModalOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-foreground">
+              <RefreshCw className="h-5 w-5 text-primary" /> Cross-Domain Resume Pivot Engine
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Reframe your finalized resume points into another target industry in one pass. Point lengths are strictly preserved for your 1-page template.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 pt-2">
+            {/* Source Domain Indicator */}
+            <div className="p-3 bg-muted/30 border rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Source Resume Domain</span>
+                <div className="text-sm font-bold text-foreground mt-0.5">
+                  {getRoleLabel(pivotSourceRole)}
+                </div>
+              </div>
+              <Badge variant="outline" className="bg-background text-primary border-primary/30 font-semibold">
+                Source Domain
+              </Badge>
+            </div>
+
+            {/* Target Domain Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                <Target className="h-4 w-4 text-primary" /> Target Domain to Pivot Into
+              </label>
+              <Select value={pivotTargetRole} onValueChange={(v) => v && setPivotTargetRole(v)}>
+                <SelectTrigger className="w-full h-11">
+                  <SelectValue placeholder="Select target domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOMAIN_OPTIONS
+                    .filter(d => d.value.toLowerCase() !== pivotSourceRole.toLowerCase())
+                    .map((d) => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Target Company Focus (Optional) */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground flex items-center justify-between">
+                <span>Target Company Focus <span className="text-xs text-muted-foreground font-normal">(Optional)</span></span>
+              </label>
+              <Input
+                placeholder="e.g. Google, McKinsey, Goldman Sachs, Microsoft"
+                value={pivotTargetCompany}
+                onChange={(e) => setPivotTargetCompany(e.target.value)}
+                className="h-11"
+              />
+            </div>
+
+            {/* Sections to Include Checkboxes */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-foreground">Sections to Convert</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole));
+                      const allSecs = Array.from(new Set(sourceBullets.map(b => {
+                        const ach = achievements.find(a => a.id === b.achievement_id);
+                        return ach?.section_type || b.achievements?.section_type || "Professional Experience";
+                      })));
+                      setPivotSelectedSections(allSecs);
+                    }}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <button
+                    type="button"
+                    onClick={() => setPivotSelectedSections([])}
+                    className="text-xs font-semibold text-muted-foreground hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole));
+                const availableSections = Array.from(new Set(sourceBullets.map(b => {
+                  const ach = achievements.find(a => a.id === b.achievement_id);
+                  return ach?.section_type || b.achievements?.section_type || "Professional Experience";
+                })));
+
+                if (availableSections.length === 0) {
+                  return (
+                    <div className="text-xs text-muted-foreground p-3 border rounded-lg bg-muted/10">
+                      No saved sections found for {getRoleLabel(pivotSourceRole)}. Upload a finalized resume first.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-muted/15 border rounded-xl">
+                    {availableSections.map(sec => {
+                      const count = sourceBullets.filter(b => {
+                        const ach = achievements.find(a => a.id === b.achievement_id);
+                        return (ach?.section_type || b.achievements?.section_type || "Professional Experience") === sec;
+                      }).length;
+                      const checked = pivotSelectedSections.includes(sec);
+
+                      return (
+                        <label key={sec} className="flex items-center gap-2 text-xs font-medium cursor-pointer p-1.5 rounded-lg hover:bg-background/80 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setPivotSelectedSections(prev => [...prev, sec]);
+                              } else {
+                                setPivotSelectedSections(prev => prev.filter(s => s !== sec));
+                              }
+                            }}
+                            className="rounded text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                          />
+                          <span className="text-foreground">{sec}</span>
+                          <span className="text-muted-foreground font-mono">({count})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+              <Button type="button" variant="outline" onClick={() => setIsDomainPivotModalOpen(false)} disabled={isPivotConverting}>
+                Cancel
+              </Button>
+              <Button 
+                type="button" 
+                onClick={handleRunDomainPivot} 
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md"
+                disabled={isPivotConverting || pivotSelectedSections.length === 0}
+              >
+                {isPivotConverting ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Converting Resume...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-2" /> Convert to {getRoleLabel(pivotTargetRole)}</>
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

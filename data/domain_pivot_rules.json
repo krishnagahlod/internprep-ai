@@ -1,0 +1,244 @@
+{
+  "domains": [
+    "consulting",
+    "software",
+    "product_management",
+    "finance",
+    "analytics"
+  ],
+  "domain_profiles": {
+    "consulting": {
+      "display_name": "Management Consulting",
+      "core_focus": "Structured problem solving, business impact ($/₹ revenue, cost reduction, efficiency), market sizing, C-suite/stakeholder advisory, zero-to-one strategy frameworks.",
+      "ideal_verbs": ["Spearheaded", "Formulated", "Orchestrated", "Synthesized", "Advised", "Streamlined", "Pioneered"],
+      "metric_types": ["Revenue impact", "EBITDA growth", "Cost reduction %", "Market share", "Stakeholder/client count", "Implementation adoption"]
+    },
+    "software": {
+      "display_name": "Software Engineering / IT",
+      "core_focus": "System architecture, low-latency performance, algorithmic complexity, full-stack scalability, APIs/microservices, modern tech stack, uptime/throughput (QPS/TPS), clean engineering.",
+      "ideal_verbs": ["Architected", "Engineered", "Optimized", "Implemented", "Automated", "Refactored", "Deployed"],
+      "metric_types": ["Latency reduction (ms/%)", "Throughput/TPS/QPS", "Resource utilization (CPU/Memory %)", "Uptime %", "Data throughput (GB/TB)", "Test coverage %"]
+    },
+    "product_management": {
+      "display_name": "Product Management",
+      "core_focus": "User empathy, product discovery, TAM/SAM sizing, roadmap execution, A/B testing, user acquisition/retention funnel (DAU/MAU, CTR, churn, NPS), cross-functional leadership between engineering/design/business.",
+      "ideal_verbs": ["Championed", "Defined", "Launched", "Piloted", "Conceptualized", "Iterated", "Scaled"],
+      "metric_types": ["DAU/MAU growth %", "Conversion/CTR improvement", "Retention/Churn rate reduction", "NPS score", "Feature adoption %", "Time-to-value reduction"]
+    },
+    "finance": {
+      "display_name": "Finance / Investment Banking",
+      "core_focus": "Financial modeling (DCF, LBO, Comparable comps), valuation accuracy, IRR/ROI maximization, capital allocation, risk management, regulatory diligence, quantitative financial analysis.",
+      "ideal_verbs": ["Modeled", "Evaluated", "Valued", "Structured", "Forecasted", "Underwrote", "Audited"],
+      "metric_types": ["Valuation precision", "IRR / ROI %", "Portfolio alpha / Sharpe ratio", "Capital deployed ($/₹)", "Cost of capital reduction (bps)", "Forecast accuracy %"]
+    },
+    "analytics": {
+      "display_name": "Data Science & Analytics",
+      "core_focus": "Predictive modeling, machine learning pipelines, ETL pipelines, statistical inference, feature engineering, dashboarding/BI automation, decision science metrics (AUC-ROC, F1-score, MAPE).",
+      "ideal_verbs": ["Developed", "Trained", "Queried", "Segmented", "Uncovered", "Benchmarked", "Pipelines"],
+      "metric_types": ["Model accuracy / F1 / AUC-ROC", "Forecast error reduction (MAPE %)", "Processing time reduction", "Data volume analyzed (Rows/GB)", "Automated reporting hours saved"]
+    }
+  },
+  "pivot_rules": {
+    "consulting_to_software": {
+      "reframe_strategy": "Shift from high-level business strategy to technical implementation and system architecture. Highlight underlying algorithms, data processing pipelines, software tools, and computational methods used during the project. De-emphasize client decks and stakeholder management unless it relates to technical sprint coordination.",
+      "verb_replacements": {
+        "Spearheaded": "Architected",
+        "Formulated strategy": "Engineered scalable pipeline",
+        "Synthesized insights": "Built data extraction & analytics backend",
+        "Advised leadership": "Delivered technical specifications & design docs"
+      },
+      "metric_pivot": "Convert high-level business impact into technical efficiency, algorithmic performance, processing time, or query optimization metrics if supported by raw vault descriptions.",
+      "flag_criteria": "Points that are purely executive communication, client advisory, case competitions, or LoR/commendations with zero technical/analytical tooling."
+    },
+    "consulting_to_product_management": {
+      "reframe_strategy": "Shift from external advisory/consultant lens to internal product ownership. Reframe market entry frameworks as product strategy and market sizing (TAM/SAM). Reframe competitor benchmarking as user research and feature gap analysis. Highlight user journey, MVP scoping, and North Star metrics.",
+      "verb_replacements": {
+        "Formulated GTM strategy": "Defined MVP roadmap and launch strategy",
+        "Conducted 40+ interviews": "Executed user research & discovery across 40+ target personas",
+        "Synthesized benchmark": "Prioritized feature backlog based on competitive tear-down"
+      },
+      "metric_pivot": "Focus on user adoption, conversion rates, NPS, retention, and business growth metrics.",
+      "flag_criteria": "Strict cost-cutting operational audit points that have no user, workflow, or product innovation component."
+    },
+    "consulting_to_finance": {
+      "reframe_strategy": "Emphasize quantitative financial analysis, revenue/cost modeling, EBITDA impact, ROI calculations, and market valuation. Reframe strategic decisions into capital allocation, profitability drivers, and investment thesis validation.",
+      "verb_replacements": {
+        "Crafted business model": "Built 3-statement financial model & valuation framework",
+        "Evaluated market expansion": "Conducted DCF/comparable valuation and risk sensitivity analysis",
+        "Identified optimization levers": "Quantified unit economics and cost optimization levers"
+      },
+      "metric_pivot": "Emphasize IRR, NPV, ROI, cost reduction in ₹/$, margin expansion, and financial valuation metrics.",
+      "flag_criteria": "Soft qualitative stakeholder alignment or organizational design points without financial/numerical rigor."
+    },
+    "consulting_to_analytics": {
+      "reframe_strategy": "Amplify data extraction, quantitative modeling, statistical testing, SQL/Python scripts, and BI dashboards that powered the consulting findings. Transform qualitative recommendations into data-driven analytical models.",
+      "verb_replacements": {
+        "Benchmarked market trends": "Engineered automated ETL pipeline and cohort analysis",
+        "Synthesized survey data": "Conducted multi-variable regression and statistical clustering",
+        "Presented recommendations": "Designed executive BI dashboard tracking 15+ KPIs"
+      },
+      "metric_pivot": "Highlight data scale (rows/records), model confidence, statistical significance, and dashboard automation hours.",
+      "flag_criteria": "Purely qualitative organizational restructuring points with no quantitative data analysis."
+    },
+    "software_to_consulting": {
+      "reframe_strategy": "Elevate technical details to business value, organizational scale, operational cost savings, and client/user impact. Frame software systems as business transformation initiatives. Highlight cross-functional leadership.",
+      "verb_replacements": {
+        "Wrote REST API": "Engineered automated core platform driving $X business operations",
+        "Refactored database": "Optimized enterprise infrastructure, slashing server overhead by X%",
+        "Fixed critical bugs": "Mitigated system vulnerabilities, safeguarding transaction continuity"
+      },
+      "metric_pivot": "Translate latency/QPS into business metrics: revenue unlocked, operational hours saved, user capacity scaled.",
+      "flag_criteria": "Niche syntax/library upgrades (e.g., 'Migrated React 17 to 18') with zero demonstrable business or user impact."
+    },
+    "software_to_product_management": {
+      "reframe_strategy": "Shift from 'how it was coded' to 'what user problem was solved and why'. Highlight feature scoping, technical feasibility trade-offs, release management, user feedback iteration, and end-user adoption.",
+      "verb_replacements": {
+        "Implemented frontend component": "Shipped redesigned user interface, improving workflow completion by X%",
+        "Built microservice": "Launched core microservice enabling new product capability for X users",
+        "Managed database schema": "Structured data schema to support scalable multi-tenant product features"
+      },
+      "metric_pivot": "Focus on user engagement, workflow completion rates, user retention, and feature adoption.",
+      "flag_criteria": "Pure backend CI/CD plumbing or compiler optimizations that have no visible user impact or product workflow."
+    },
+    "software_to_finance": {
+      "reframe_strategy": "Highlight computational finance, high-frequency low-latency transaction handling, algorithmic data processing, risk calculation modules, and cost reduction via cloud/infrastructure optimization.",
+      "verb_replacements": {
+        "Engineered API": "Engineered high-throughput financial transaction processing engine",
+        "Optimized queries": "Slashed computational query latency for real-time pricing analysis",
+        "Built monitoring system": "Created automated risk alerting and fraud detection pipeline"
+      },
+      "metric_pivot": "Highlight transaction volume processed ($/₹), cost per transaction, latency reduction for execution, and infrastructure ROI.",
+      "flag_criteria": "Pure consumer UI animations or design-heavy frontends with zero quantitative or financial relevance."
+    },
+    "software_to_analytics": {
+      "reframe_strategy": "Highlight data pipelines, ETL architecture, database indexing, distributed computing (Spark, Hadoop, Kafka), machine learning model serving, and data warehouse integration.",
+      "verb_replacements": {
+        "Built backend server": "Constructed robust ETL and streaming pipeline handling X GB/day",
+        "Created database tables": "Architected distributed data lakehouse optimized for OLAP analytical queries",
+        "Integrated third-party APIs": "Automated data ingestion pipeline across 5+ external endpoints"
+      },
+      "metric_pivot": "Highlight data throughput (GB/s, records/sec), query execution speed, pipeline reliability, and data lake scale.",
+      "flag_criteria": "Pure UI styling or graphic design points."
+    },
+    "product_management_to_consulting": {
+      "reframe_strategy": "Highlight strategic market research, competitive positioning, business case development, cross-functional stakeholder alignment, and top-line revenue/margin growth.",
+      "verb_replacements": {
+        "Owned product roadmap": "Formulated comprehensive product-market strategy and resource allocation plan",
+        "Ran sprint planning": "Orchestrated cross-functional teams of X engineers and designers to execute deliverables",
+        "Conducted user testing": "Synthesized actionable voice-of-customer insights across X demographic cohorts"
+      },
+      "metric_pivot": "Highlight market share captured, revenue generated, operational efficiency gained, and executive buy-in.",
+      "flag_criteria": "Granular ticket management or JIRA grooming details without strategic or business outcomes."
+    },
+    "product_management_to_software": {
+      "reframe_strategy": "Emphasize the technical architecture, data flow diagrams, API specifications, technical debt reduction, system integrations, and analytical experiments conducted.",
+      "verb_replacements": {
+        "Defined product specs": "Authored comprehensive technical requirements and API contract specifications",
+        "Prioritized engineering backlog": "Collaborated on system design trade-offs and modular service decomposition",
+        "Launched web platform": "Co-engineered and deployed responsive web application with modern tech stack"
+      },
+      "metric_pivot": "Highlight system response times, automated workflow efficiency, API endpoints supported, and technical uptime.",
+      "flag_criteria": "Pure user persona design or branding campaigns with zero software or technical engagement."
+    },
+    "product_management_to_finance": {
+      "reframe_strategy": "Emphasize product unit economics (LTV/CAC, gross margin), monetization strategies, pricing tier models, revenue forecasting, and ROI on engineering investments.",
+      "verb_replacements": {
+        "Set product pricing": "Constructed dynamic tiered monetization model, optimizing gross margin to X%",
+        "Evaluated feature viability": "Conducted capital allocation and ROI sensitivity analysis for roadmap initiatives",
+        "Scaled user base": "Accelerated ARR growth by X% while lowering customer acquisition cost (CAC) by Y%"
+      },
+      "metric_pivot": "Highlight ARR/MRR growth, LTV/CAC ratio, payback period, and gross margin improvements.",
+      "flag_criteria": "Qualitative design thinking workshops without financial or commercial metrics."
+    },
+    "product_management_to_analytics": {
+      "reframe_strategy": "Highlight A/B testing methodologies, cohort retention analysis, funnel drop-off analytics, telemetry data instrumentation, and data-driven prioritization algorithms.",
+      "verb_replacements": {
+        "Ran A/B experiments": "Designed and evaluated rigorous randomized A/B tests with statistical significance (p < 0.05)",
+        "Analyzed user behavior": "Built SQL cohort retention and funnel conversion models analyzing X million events",
+        "Defined KPIs": "Engineered automated telemetry tracking framework and executive KPI dashboards"
+      },
+      "metric_pivot": "Highlight statistical confidence, sample sizes, conversion lift %, and event volume analyzed.",
+      "flag_criteria": "Qualitative PR announcements or creative copy reviews with no empirical data."
+    },
+    "finance_to_consulting": {
+      "reframe_strategy": "Translate financial models into strategic business recommendations, market competitive insights, restructuring strategies, and M&A synergy realizations.",
+      "verb_replacements": {
+        "Built valuation model": "Formulated corporate valuation and strategic M&A thesis for $X enterprise",
+        "Audited portfolio risk": "Advised C-suite on financial restructuring and risk mitigation roadmap",
+        "Calculated cost of capital": "Identified operational efficiency levers, unlocking $X in annual free cash flow"
+      },
+      "metric_pivot": "Highlight strategic savings, enterprise value created, deal size, and executive advisory scope.",
+      "flag_criteria": "Routine back-office accounting journal entries without strategic impact."
+    },
+    "finance_to_software": {
+      "reframe_strategy": "Amplify quantitative algorithms, Python/R financial modeling scripts, automated data reconciliation scripts, database queries, and algorithmic trading/pricing models.",
+      "verb_replacements": {
+        "Created Excel model": "Engineered automated Python financial simulation algorithm using Monte Carlo methods",
+        "Extracted market feeds": "Built automated data scraper and API integration for real-time market data",
+        "Reconciled ledgers": "Programmed automated database scripts, cutting reconciliation runtime by X%"
+      },
+      "metric_pivot": "Highlight runtime reduction, algorithm accuracy, data throughput, and script automation hours.",
+      "flag_criteria": "Manual regulatory paper filings or non-automated administrative compliance tasks."
+    },
+    "finance_to_product_management": {
+      "reframe_strategy": "Highlight fintech product workflows, user onboarding for trading/investment platforms, pricing model design, and risk evaluation tools as user-facing products.",
+      "verb_replacements": {
+        "Evaluated fintech tools": "Product-managed deployment of automated underwriting workflow for X users",
+        "Structured investment deck": "Defined customer value proposition and go-to-market pricing tiers",
+        "Optimized trading flow": "Streamlined transaction checkout UX, slashing user drop-off by X%"
+      },
+      "metric_pivot": "Highlight user transaction volume, platform adoption, checkout conversion %, and UX efficiency.",
+      "flag_criteria": "Pure compliance reporting with no product, workflow, or user interaction."
+    },
+    "finance_to_analytics": {
+      "reframe_strategy": "Highlight quantitative time-series modeling, portfolio risk analytics (VaR, Sharpe), econometric regressions, scenario simulations, and automated financial dashboards.",
+      "verb_replacements": {
+        "Modeled cash flows": "Built stochastic time-series forecasting model with 95%+ historical predictive accuracy",
+        "Analyzed market trends": "Executed multi-factor econometric regressions and risk factor decomposition",
+        "Reported monthly returns": "Created automated Tableau/PowerBI dashboard visualizing portfolio exposures"
+      },
+      "metric_pivot": "Highlight regression R-squared, forecast accuracy %, risk metric optimization, and data points analyzed.",
+      "flag_criteria": "Manual slide preparation with basic pie charts and no statistical depth."
+    },
+    "analytics_to_consulting": {
+      "reframe_strategy": "Elevate statistical models to strategic business insights, commercial recommendations, revenue opportunities, and operational transformations.",
+      "verb_replacements": {
+        "Trained predictive model": "Uncovered $X revenue expansion opportunities through predictive customer segmentation",
+        "Cleaned dataset": "Structured foundational enterprise data strategy, driving operational transparency",
+        "Built BI dashboard": "Delivered executive dashboard enabling data-driven decision making for leadership"
+      },
+      "metric_pivot": "Highlight business revenue unlocked, operational costs slashed, customer retention improved, and executive adoption.",
+      "flag_criteria": "Hyper-technical hyperparameter tuning details (e.g., 'learning rate 0.001') with no business outcome."
+    },
+    "analytics_to_software": {
+      "reframe_strategy": "Focus on production ML engineering (MLOps), model deployment, low-latency inference APIs, containerization (Docker/Kubernetes), and scalable data infrastructure.",
+      "verb_replacements": {
+        "Built ML model": "Deployed end-to-end machine learning inference API with <50ms response latency",
+        "Wrote SQL queries": "Optimized complex distributed database queries, cutting compute runtime by X%",
+        "Created pipeline": "Architected automated CI/CD and data validation pipeline handling X TB daily"
+      },
+      "metric_pivot": "Highlight API latency (ms), throughput (RPS), pipeline uptime %, compute cost savings, and code coverage.",
+      "flag_criteria": "Purely academic statistical proofs without implementation code or deployed software."
+    },
+    "analytics_to_product_management": {
+      "reframe_strategy": "Highlight how analytics uncovered user pain points, shaped product roadmaps, defined core product metrics (North Star), and guided A/B experimentation.",
+      "verb_replacements": {
+        "Segmented users": "Identified high-churn user cohorts, driving product feature redesign that lifted retention by X%",
+        "Analyzed clickstream": "Defined core product engagement telemetry and prioritized feature backlog based on usage",
+        "Evaluated experiment": "Led experimentation roadmap, validating product hypothesis across X thousand active users"
+      },
+      "metric_pivot": "Highlight user retention lift, conversion rate improvement, churn reduction, and MAU growth.",
+      "flag_criteria": "Low-level database administration or ETL maintenance with no user-facing or feature impact."
+    },
+    "analytics_to_finance": {
+      "reframe_strategy": "Focus on quantitative risk modeling, financial time-series forecasting, algorithmic pricing, fraud detection, and customer lifetime value (LTV) econometric models.",
+      "verb_replacements": {
+        "Built classification model": "Engineered real-time fraud detection classifier, preventing $X in transaction risk",
+        "Forecasted trends": "Constructed multi-variate financial forecasting model, improving cash-flow visibility by X%",
+        "Clustered customers": "Developed econometric LTV valuation model to optimize marketing capital allocation"
+      },
+      "metric_pivot": "Highlight fraud loss reduction ($/₹), forecasting accuracy %, capital allocation efficiency, and ROI.",
+      "flag_criteria": "NLP text scraping of social media with zero quantitative financial impact."
+    }
+  }
+}
