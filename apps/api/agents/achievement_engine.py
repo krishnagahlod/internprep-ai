@@ -840,17 +840,26 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
             if json_match:
                 response_text = json_match.group(1)
             response_text = response_text.strip()
-            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
+
+            json_match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(1)
+
             data = json_repair.loads(response_text)
             
             if isinstance(data, str):
-
                 try:
+                    import json
                     data = json.loads(data)
                 except Exception:
                     pass
-
+            
+            if isinstance(data, list):
+                # If LLM returned the array directly, wrap it
+                data = {"variant_sets": data, "local_coaching_tips": []}
+            
             if isinstance(data, dict) and "variant_sets" in data:
+                # Clean up punctuation from AI generated texts
                 for v_set in data.get("variant_sets", []):
                     if v_set.get("overview_line") and v_set["overview_line"].endswith("."):
                         v_set["overview_line"] = v_set["overview_line"][:-1]
@@ -861,37 +870,47 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                         if v.get("bullet_text") and v["bullet_text"].endswith("."):
                             v["bullet_text"] = v["bullet_text"][:-1]
                 return data
+            else:
+                print(f"Cerebras returned invalid JSON structure on attempt {attempt+1}: {type(data)} -> {str(data)[:200]}")
         except Exception as e:
             print(f"Failed to generate section variants JSON via Cerebras (attempt {attempt+1}): {e}")
-            if attempt == max_retries - 1:
-                # Fallback to Gemini if Cerebras encounters unexpected issue
-                try:
-                    response = gemini_client.generate_content(
-                        model_name="gemini-1.5-flash",
-                        prompt=system_prompt,
-                        generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
-                    )
+            
+        if attempt == max_retries - 1:
+            # Fallback to Gemini if Cerebras encounters unexpected issue
+            try:
+                response = gemini_client.generate_content(
+                    model_name="gemini-1.5-flash",
+                    prompt=system_prompt,
+                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+                )
 
-                    text = response.text.strip()
-                    json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
-                    if json_match:
-                        text = json_match.group(1).strip()
-                    text = re.sub(r',\s*([}\]])', r'\1', text)
-                    data = json_repair.loads(text)
-                    if isinstance(data, dict) and "variant_sets" in data:
-                        for v_set in data.get("variant_sets", []):
-                            if v_set.get("overview_line") and v_set["overview_line"].endswith("."):
-                                v_set["overview_line"] = v_set["overview_line"][:-1]
-                            for ov in v_set.get("overview_line_variants", []):
-                                if ov.get("text") and ov["text"].endswith("."):
-                                    ov["text"] = ov["text"][:-1]
-                            for v in v_set.get("bullets", []):
-                                if v.get("bullet_text") and v["bullet_text"].endswith("."):
-                                    v["bullet_text"] = v["bullet_text"][:-1]
-                        return data
-                except Exception as fallback_err:
-                    print(f"Gemini fallback also failed: {fallback_err}")
-                return {"variant_sets": [], "local_coaching_tips": []}
+                text = response.text.strip()
+                json_match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', text, re.DOTALL)
+                if json_match:
+                    text = json_match.group(1).strip()
+                text = re.sub(r',\s*([}\]])', r'\1', text)
+                data = json_repair.loads(text)
+                
+                if isinstance(data, list):
+                    data = {"variant_sets": data, "local_coaching_tips": []}
+                    
+                if isinstance(data, dict) and "variant_sets" in data:
+                    for v_set in data.get("variant_sets", []):
+                        if v_set.get("overview_line") and v_set["overview_line"].endswith("."):
+                            v_set["overview_line"] = v_set["overview_line"][:-1]
+                        for ov in v_set.get("overview_line_variants", []):
+                            if ov.get("text") and ov["text"].endswith("."):
+                                ov["text"] = ov["text"][:-1]
+                        for v in v_set.get("bullets", []):
+                            if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                                v["bullet_text"] = v["bullet_text"][:-1]
+                    return data
+                else:
+                    print(f"Gemini fallback returned invalid structure: {type(data)} -> {str(data)[:200]}")
+            except Exception as fallback_err:
+                print(f"Gemini fallback also failed: {fallback_err}")
+            return {"variant_sets": [], "local_coaching_tips": []}
+    
     return {"variant_sets": [], "local_coaching_tips": []}
 
 def run_metric_reconstruction_turn(achievement: Dict[str, Any], messages: List[Dict[str, str]]) -> Dict[str, Any]:
