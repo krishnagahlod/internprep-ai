@@ -584,59 +584,86 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
             response_text = cerebras_client.generate_chat_completion(
                 model="gpt-oss-120b",
                 messages=[{"role": "user", "content": system_prompt}],
-                temperature=0.4,
+                temperature=0.3,
                 max_tokens=2048
             )
-            
-            # Clean up the JSON string
 
-            json_match = re.search(r'```(?:json)?\s*(\{.*\})\s*```', response_text, re.DOTALL)
+            json_match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', response_text, re.DOTALL)
             if json_match:
                 response_text = json_match.group(1)
             response_text = response_text.strip()
             
-            # Remove trailing commas which break standard json.loads
-            response_text = re.sub(r',\s*([}\]])', r'\1', response_text)
-            
             data = json_repair.loads(response_text)
             
             if isinstance(data, str):
-
                 try:
                     data = json.loads(data)
                 except Exception:
-                    # Attempt a final regex extraction if pure string
+                    pass
 
-                    match = re.search(r'(\{.*\})', data, re.DOTALL)
-                    if match:
-                        try:
-                            data = json.loads(match.group(1))
-                        except Exception:
-                            data = {}
-                    else:
-                        data = {}
-            if not isinstance(data, dict):
-                data = {}
+            if isinstance(data, list):
+                data = {"variants": data, "local_coaching_tips": []}
                 
-            variants = data.get("variants", [])
-            coaching_tips = data.get("local_coaching_tips", [])
-            
-            # Ensure no full stops made it through
-            for v in variants:
-                if v.get("bullet_text") and v["bullet_text"].endswith("."):
-                    v["bullet_text"] = v["bullet_text"][:-1]
-                # Attach coaching tips to variants for backwards compatibility
-                if coaching_tips:
-                    v["coaching_tips"] = coaching_tips
-                    
-            return {
-                "variants": variants,
-                "coaching_tips": coaching_tips
-            }
+            if isinstance(data, dict) and "variants" in data and len(data.get("variants", [])) > 0:
+                variants = data.get("variants", [])
+                coaching_tips = data.get("local_coaching_tips", [])
+                for v in variants:
+                    if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                        v["bullet_text"] = v["bullet_text"][:-1]
+                    if coaching_tips:
+                        v["coaching_tips"] = coaching_tips
+                return {
+                    "variants": variants,
+                    "coaching_tips": coaching_tips
+                }
+            else:
+                print(f"Cerebras returned invalid variants structure on attempt {attempt+1}: {type(data)} -> {str(data)[:200]}")
         except Exception as e:
-            print(f"Failed to generate variants JSON (attempt {attempt+1}): {e}")
-            if attempt == max_retries - 1:
-                return {"variants": [], "coaching_tips": []}
+            print(f"Failed to generate variants JSON via Cerebras (attempt {attempt+1}): {e}")
+            
+        if attempt == max_retries - 1:
+            # Fallback to Gemini if Cerebras encounters rate limits or formatting issues
+            try:
+                response = gemini_client.generate_content(
+                    model_name="gemini-1.5-flash",
+                    prompt=system_prompt,
+                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.3)
+                )
+
+                text = response.text.strip()
+                json_match = re.search(r'```(?:json)?\s*(\{.*\}|\[.*\])\s*```', text, re.DOTALL)
+                if json_match:
+                    text = json_match.group(1).strip()
+                text = re.sub(r',\s*([}\]])', r'\1', text)
+                data = json_repair.loads(text)
+                
+                if isinstance(data, str):
+                    try:
+                        data = json.loads(data)
+                    except Exception:
+                        pass
+                
+                if isinstance(data, list):
+                    data = {"variants": data, "local_coaching_tips": []}
+                    
+                if isinstance(data, dict) and "variants" in data and len(data.get("variants", [])) > 0:
+                    variants = data.get("variants", [])
+                    coaching_tips = data.get("local_coaching_tips", [])
+                    for v in variants:
+                        if v.get("bullet_text") and v["bullet_text"].endswith("."):
+                            v["bullet_text"] = v["bullet_text"][:-1]
+                        if coaching_tips:
+                            v["coaching_tips"] = coaching_tips
+                    return {
+                        "variants": variants,
+                        "coaching_tips": coaching_tips
+                    }
+                else:
+                    print(f"Gemini fallback returned invalid variants structure: {type(data)} -> {str(data)[:200]}")
+            except Exception as fallback_err:
+                print(f"Gemini fallback for generate_bullet_variants failed: {fallback_err}")
+            return {"variants": [], "coaching_tips": []}
+            
     return {"variants": [], "coaching_tips": []}
 
 def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]], target_role: str, target_company: str = "", num_points: int = 3, benchmark_text: str = "", custom_instructions: str = "") -> Dict[str, Any]:
