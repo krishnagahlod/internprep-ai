@@ -75,8 +75,32 @@ interface GeneratedBullet {
     title?: string;
     parent_experience?: string;
     section_type?: string;
+    timeline?: string;
+    original_description?: string;
   };
 }
+
+// Intelligent helper to resolve section type from bullet metadata or parent title keywords
+const resolveBulletSectionType = (bullet: GeneratedBullet, fallbackAch?: Achievement): string => {
+  const explicit = bullet.achievements?.section_type || fallbackAch?.section_type;
+  if (explicit && explicit !== "General" && explicit !== "Other") {
+    return explicit;
+  }
+  const title = (bullet.achievements?.parent_experience || bullet.achievements?.title || fallbackAch?.parent_experience || fallbackAch?.title || "").toLowerCase();
+  if (/hyperloop|formula|project|b\.tech|btp|ddp|thesis|capstone|simulation|bot|pipeline|detection|system|model|classifier|app\b|platform|tool|engine|autonomous/i.test(title)) {
+    return "Projects";
+  }
+  if (/coordinator|manager|secretary|convenor|lead|head|council|representative|senator|damp|alumni|convenor/i.test(title)) {
+    return "Positions of Responsibility";
+  }
+  if (/olympiad|jee|rank|scholarship|kvpy|ntse|academic|cpi|cgpa|medal|dean/i.test(title)) {
+    return "Scholastic Achievements";
+  }
+  if (/club|sport|football|cricket|basketball|badminton|cultural|music|dance|drama|nss|nso|ncc/i.test(title)) {
+    return "Extracurricular Activities";
+  }
+  return explicit || "Professional Experience";
+};
 
 // Helper to highlight numbers and percentages in text
 const highlightMetrics = (text: string) => {
@@ -738,7 +762,7 @@ function ResumeBuilderPageContent() {
     const sectionsSet = new Set<string>()
     sourceBullets.forEach(b => {
       const ach = achievements.find(a => a.id === b.achievement_id)
-      const sec = ach?.section_type || b.achievements?.section_type || "Professional Experience"
+      const sec = resolveBulletSectionType(b, ach)
       sectionsSet.add(sec)
     })
     
@@ -757,15 +781,16 @@ function ResumeBuilderPageContent() {
       
       sourceBullets.forEach(b => {
         const ach = achievements.find(a => a.id === b.achievement_id)
-        const sec = ach?.section_type || b.achievements?.section_type || "Professional Experience"
-        const parent = ach?.parent_experience || b.achievements?.parent_experience || "General"
+        const sec = resolveBulletSectionType(b, ach)
+        const parent = b.achievements?.parent_experience || b.achievements?.title || ach?.parent_experience || ach?.title || "General"
         if (!grouped[sec]) grouped[sec] = {}
         if (!grouped[sec][parent]) grouped[sec][parent] = []
         grouped[sec][parent].push({
           id: b.id,
           achievement_id: b.achievement_id,
           bullet_text: b.bullet_text,
-          variant_type: b.variant_type
+          variant_type: b.variant_type,
+          achievements: b.achievements || ach
         })
       })
 
@@ -774,17 +799,19 @@ function ResumeBuilderPageContent() {
         // Check if user selected this section
         if (pivotSelectedSections.length === 0 || pivotSelectedSections.includes(sec)) {
           Object.entries(parents).forEach(([parent, bList]) => {
-            const ach = achievements.find(a => a.id === bList[0]?.achievement_id)
+            const firstBullet = bList[0]
+            const ach = achievements.find(a => a.id === firstBullet?.achievement_id)
             rawSections.push({
               section_type: sec,
               parent_experience: parent,
-              timeline: ach?.timeline || "",
-              overview_line: ach?.original_description || "",
+              timeline: firstBullet?.achievements?.timeline || ach?.timeline || "",
+              overview_line: firstBullet?.achievements?.original_description || ach?.original_description || "",
               bullets: bList
             })
           })
         }
       })
+
 
       const res = await fetch(`${apiBase}/builder/convert-domain`, {
         method: "POST",
@@ -2434,12 +2461,13 @@ function ResumeBuilderPageContent() {
                     const grouped: Record<string, Record<string, typeof roleBullets>> = {};
                     roleBullets.forEach(bullet => {
                       const ach = achievements.find(a => a.id === bullet.achievement_id);
-                      const section = ach?.section_type || bullet.achievements?.section_type || "Professional Experience";
-                      const parent = ach?.parent_experience || bullet.achievements?.parent_experience || "General";
+                      const section = resolveBulletSectionType(bullet, ach);
+                      const parent = bullet.achievements?.parent_experience || bullet.achievements?.title || ach?.parent_experience || ach?.title || "General";
                       if (!grouped[section]) grouped[section] = {};
                       if (!grouped[section][parent]) grouped[section][parent] = [];
                       grouped[section][parent].push(bullet);
                     });
+
 
                     return (
                       <div className="space-y-10">
@@ -3219,7 +3247,7 @@ function ResumeBuilderPageContent() {
                       const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole));
                       const allSecs = Array.from(new Set(sourceBullets.map(b => {
                         const ach = achievements.find(a => a.id === b.achievement_id);
-                        return ach?.section_type || b.achievements?.section_type || "Professional Experience";
+                        return resolveBulletSectionType(b, ach);
                       })));
                       setPivotSelectedSections(allSecs);
                     }}
@@ -3242,7 +3270,7 @@ function ResumeBuilderPageContent() {
                 const sourceBullets = pointBank.filter(b => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole));
                 const availableSections = Array.from(new Set(sourceBullets.map(b => {
                   const ach = achievements.find(a => a.id === b.achievement_id);
-                  return ach?.section_type || b.achievements?.section_type || "Professional Experience";
+                  return resolveBulletSectionType(b, ach);
                 })));
 
                 if (availableSections.length === 0) {
@@ -3258,9 +3286,10 @@ function ResumeBuilderPageContent() {
                     {availableSections.map(sec => {
                       const count = sourceBullets.filter(b => {
                         const ach = achievements.find(a => a.id === b.achievement_id);
-                        return (ach?.section_type || b.achievements?.section_type || "Professional Experience") === sec;
+                        return resolveBulletSectionType(b, ach) === sec;
                       }).length;
                       const checked = pivotSelectedSections.includes(sec);
+
 
                       return (
                         <label key={sec} className="flex items-center gap-2 text-xs font-medium cursor-pointer p-1.5 rounded-lg hover:bg-background/80 transition-colors">

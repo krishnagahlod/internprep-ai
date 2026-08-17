@@ -1055,12 +1055,20 @@ def extract_final_resume_bullets(pdf_bytes: bytes = None, raw_text: str = None) 
     Extract the complete, exact structure, parent organizations/projects, italicized overview lines, and bullet points from this finalized resume.
     
     CRITICAL INSTRUCTIONS:
-    1. Identify all major sections (e.g. 'Professional Experience', 'Projects', 'Positions of Responsibility', 'Extracurricular Activities', 'Scholastic Achievements').
+    1. Identify all major sections with high precision. Standard sections include:
+       - 'Professional Experience' / 'Work Experience' / 'Internships'
+       - 'Projects' / 'Academic Projects' / 'Key Projects' / 'Technical Projects'
+       - 'Positions of Responsibility'
+       - 'Scholastic Achievements' / 'Academic Achievements'
+       - 'Extracurricular Activities' / 'Extracurriculars'
+       
+       DO NOT lump all items or projects under 'Professional Experience'. Each section heading in the resume corresponds to its own distinct 'section_type'.
     2. Under each section, extract every parent organization or project:
-       - 'parent_experience': The Company, Organization, or Project title (e.g. 'McKinsey & Company', 'ABB India', 'Hyperloop Pod Competition').
-       - 'role': Designation or role if present (e.g. 'Summer Associate', 'Overall Coordinator').
+       - 'section_type': The exact standard heading of this section (e.g. 'Professional Experience', 'Projects', 'Positions of Responsibility', 'Extracurricular Activities', 'Scholastic Achievements').
+       - 'parent_experience': The Company, Organization, or Project title (e.g. 'McKinsey & Company', 'ABB India', 'Autonomous Underwater Vehicle', 'Web & Coding Club').
+       - 'role': Designation or role if present (e.g. 'Summer Associate', 'Overall Coordinator', 'Team Lead').
        - 'timeline': Dates if present (e.g. 'May 2025 - Jul 2025').
-       - 'overview_line': The top italicized/overview line directly under the title if present (e.g., 'Healthcare Market Entry | Facilitated the entry of a top 10 Indian conglomerate into the USD 630B+ market'). If none, leave as empty string.
+       - 'overview_line': The top italicized/overview line directly under the title if present (e.g., 'Healthcare Market Entry | Facilitated entry of top 10 conglomerate into USD 630B+ market'). If none, leave as empty string.
        - 'bullets': Array of strings containing the EXACT bullet points as written in the resume. Do NOT summarize or shorten them. Keep exact numbers, tools, and phrasing.
     
     Return STRICTLY a JSON array of section objects matching this schema:
@@ -1074,6 +1082,28 @@ def extract_final_resume_bullets(pdf_bytes: bytes = None, raw_text: str = None) 
         "bullets": [
           "Crafted a 14-specialty Centres of Excellence strategy channelising investments of INR 350M",
           "Synthesized 10+ competitor benchmarks and market trends across 15 operational KPIs"
+        ]
+      },
+      {
+        "section_type": "Projects",
+        "parent_experience": "Autonomous Driving Simulation Engine",
+        "role": "Lead Developer",
+        "timeline": "Aug 2024 - Nov 2024",
+        "overview_line": "B.Tech Capstone Project | Advised by Prof. Sharma",
+        "bullets": [
+          "Engineered a real-time SLAM pipeline processing LIDAR point clouds at 45 FPS",
+          "Reduced obstacle detection latency by 35% through custom CUDA kernel optimizations"
+        ]
+      },
+      {
+        "section_type": "Positions of Responsibility",
+        "parent_experience": "Web & Coding Club, IIT Bombay",
+        "role": "Institute Convener",
+        "timeline": "Apr 2024 - Mar 2025",
+        "overview_line": "",
+        "bullets": [
+          "Led a 40-member team organizing annual hackathons with 2,500+ participants across 50 colleges",
+          "Managed annual operational budget of INR 1.2M with zero audit discrepancies"
         ]
       }
     ]

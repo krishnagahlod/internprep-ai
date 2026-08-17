@@ -414,11 +414,12 @@ async def generate_section_bullets_api(request: Request, req: GenerateSectionReq
 def get_point_bank(user_id: str):
     from dependencies import get_supabase; supabase = get_supabase()
     try:
-        # Only return saved bullets
-        res = supabase.table('generated_bullets').select("*, achievements(title, parent_experience)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True).execute()
+        # Only return saved bullets with full achievement metadata including section_type
+        res = supabase.table('generated_bullets').select("*, achievements(id, title, parent_experience, section_type, timeline, original_description)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True).execute()
         return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/save-bullet")
 def save_bullet(req: SaveBulletRequest):
@@ -517,9 +518,12 @@ async def extract_final_resume(
             bullets = sec.get("bullets", [])
             
             # Check if an achievement for this parent_experience exists, else create one
-            ach_res = supabase.table('achievements').select("id").eq('user_id', user_id).eq('parent_experience', parent_experience).execute()
+            ach_res = supabase.table('achievements').select("id, section_type").eq('user_id', user_id).eq('parent_experience', parent_experience).execute()
             if ach_res.data:
                 ach_id = ach_res.data[0]["id"]
+                # If existing achievement has empty or generic section_type, update it with the extracted section_type
+                if not ach_res.data[0].get("section_type") or ach_res.data[0].get("section_type") == "General":
+                    supabase.table('achievements').update({"section_type": section_type}).eq('id', ach_id).execute()
             else:
                 ach_create = supabase.table('achievements').insert({
                     "user_id": user_id,
@@ -532,6 +536,7 @@ async def extract_final_resume(
                     "status": "approved"
                 }).execute()
                 ach_id = ach_create.data[0]["id"] if ach_create.data else None
+
                 
             if not ach_id:
                 continue
