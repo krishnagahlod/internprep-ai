@@ -425,11 +425,31 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
 {formatted_conventions}
     """
 
-    # Setup length constraint
-    if benchmark_text:
-        length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
+    # Setup length constraint with strict template budgeting
+    if benchmark_text and benchmark_text.strip():
+        b_clean = benchmark_text.strip()
+        target_chars = len(b_clean)
+        target_words = len(b_clean.split())
+        min_chars = max(35, target_chars - 12)
+        max_chars = target_chars + 6
+        min_words = max(5, target_words - 2)
+        max_words = target_words + 2
+        
+        length_constraint = f"""
+    CRITICAL BENCHMARK LENGTH & TEMPLATE-FIT CONSTRAINT:
+    The user's resume LaTeX/PDF template has a fixed 1-line horizontal width calibrated to this benchmark point:
+    Benchmark Bullet: "{b_clean}"
+    - Exact Benchmark Length: {target_chars} characters | {target_words} words.
+    - MANDATORY CHARACTER BUDGET: Every generated bullet MUST be between {min_chars} and {max_chars} characters ({min_words} to {max_words} words).
+    - STRICT ENFORCEMENT: DO NOT generate verbose or 2-line bullets (> {max_chars} characters). If a point is even slightly too long, it overflows to a second line and ruins the user's 1-page template layout. Condense, tighten phrasing, and cut fluff so every single variant lands strictly within {min_chars}-{max_chars} characters.
+        """
+        schema_bullet_constraint = f"The generated bullet point (MANDATORY: strictly {min_chars}-{max_chars} characters, matching benchmark length of {target_chars} chars) WITHOUT ANY FULL STOP AT THE END"
     else:
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Match standard 1-line length (approx 13-18 words, ~110-140 characters). NEVER exceed 1 line."
+        min_chars, max_chars, target_chars = 110, 145, 128
+        length_constraint = """
+    CRITICAL LENGTH CONSTRAINT: Match standard 1-line length (approx 13-18 words, 110-145 characters). NEVER exceed 1 line.
+        """
+        schema_bullet_constraint = "The generated bullet point (110-145 characters) WITHOUT ANY FULL STOP AT THE END"
 
     # Setup context awareness
     context_rules = ""
@@ -450,7 +470,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
     
     EXECUTION RULES FOR USER DIRECTIVE:
     - You MUST actively steer, customize, and prioritize the requested technical angle, business theme, or strategic emphasis across all 4 variants.
-    - STRICT GUARDRAILS: The directive shapes *what to emphasize*, but you MUST NEVER violate Day 1 elite formatting rules (Must start with elite action verb, follow Action Verb + What + How + Effect formula, preserve unrounded metrics, and never add a trailing period).
+    - STRICT GUARDRAILS: The directive shapes *what to emphasize*, but you MUST NEVER violate Day 1 elite formatting rules (Must start with elite action verb, follow Action Verb + What + How + Effect formula, preserve unrounded metrics, match the character budget ({min_chars}-{max_chars} chars), and never add a trailing period).
         """
         
     action_verb_dictionary = """
@@ -539,7 +559,7 @@ def generate_bullet_variants(supabase_client, achievement: Dict[str, Any], targe
         "variants": [
             {{
                 "variant_type": {variant_enum},
-                "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
+                "bullet_text": "{schema_bullet_constraint}",
                 "recruiter_notes": "1-2 sentences explaining why this bullet is elite, and actively suggesting exactly which metric could be further quantified to make it even stronger."
             }}
         ],
@@ -667,11 +687,31 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
 {formatted_conventions}
     """
 
-    # Length constraint
-    if benchmark_text:
-        length_constraint = f"CRITICAL LENGTH CONSTRAINT: You MUST strictly match the exact character length and density of this benchmark bullet: '{benchmark_text}'. Do not exceed its length."
+    # Length constraint with strict template budgeting
+    if benchmark_text and benchmark_text.strip():
+        b_clean = benchmark_text.strip()
+        target_chars = len(b_clean)
+        target_words = len(b_clean.split())
+        min_chars = max(35, target_chars - 12)
+        max_chars = target_chars + 6
+        min_words = max(5, target_words - 2)
+        max_words = target_words + 2
+        
+        length_constraint = f"""
+    CRITICAL BENCHMARK LENGTH & TEMPLATE-FIT CONSTRAINT:
+    The user's resume LaTeX/PDF template has a fixed 1-line horizontal width calibrated to this benchmark point:
+    Benchmark Bullet: "{b_clean}"
+    - Exact Benchmark Length: {target_chars} characters | {target_words} words.
+    - MANDATORY CHARACTER BUDGET: Every generated bullet MUST be between {min_chars} and {max_chars} characters ({min_words} to {max_words} words).
+    - STRICT ENFORCEMENT: DO NOT generate verbose or 2-line bullets (> {max_chars} characters). If a point is even slightly too long, it overflows to a second line and ruins the user's 1-page template layout. Condense, tighten phrasing, and cut fluff so every single point lands strictly within {min_chars}-{max_chars} characters.
+        """
+        schema_bullet_constraint = f"The generated bullet point (MANDATORY: strictly {min_chars}-{max_chars} characters, matching benchmark length of {target_chars} chars) WITHOUT ANY FULL STOP AT THE END"
     else:
-        length_constraint = "CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, ~110-140 chars per bullet)."
+        min_chars, max_chars, target_chars = 110, 145, 128
+        length_constraint = """
+    CRITICAL LENGTH CONSTRAINT: Standard 1-line length (approx 13-18 words, 110-145 characters per bullet). NEVER generate 2-line bullets.
+        """
+        schema_bullet_constraint = "The generated bullet point (110-145 characters) WITHOUT ANY FULL STOP AT THE END"
 
     # Setup custom strategic instructions for section composition
     user_instructions_block = ""
@@ -682,7 +722,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
     
     EXECUTION RULES FOR SECTION DIRECTIVE:
     - Use this directive to actively determine which achievements to highlight, how to intelligently merge related points, and how to frame the narrative across the {num_points} bullets in the section.
-    - STRICT GUARDRAILS: All generated points must strictly start with elite action verbs, follow the elite bullet formula, preserve unrounded metrics, and have zero trailing periods.
+    - STRICT GUARDRAILS: All generated points must strictly start with elite action verbs, follow the elite bullet formula, preserve unrounded metrics, match the character budget ({min_chars}-{max_chars} chars), and have zero trailing periods.
         """
 
     action_verb_dictionary = """
@@ -759,13 +799,14 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
 
     CRITICAL SECTION COMPOSITION INSTRUCTIONS:
     1. Output EXACTLY {num_points} bullets per variant set.
-    2. Chronological & Impact Ordering: Order the sub-points strategically—lead with the broadest scope or highest business/technical impact as Bullet #1.
-    3. Intelligent Merging: If multiple raw achievements are related (e.g. built the pipeline AND optimized it), combine them into a single dense bullet.
-    4. Exclusion with Reasoning: If there are more raw achievements than the target {num_points} bullets, exclude the least relevant/weakest achievements. Provide crisp reasoning.
-    5. Generate TWO distinct variant sets:
+    2. STRICT LENGTH CALIBRATION: Every single bullet MUST strictly stay within {min_chars} to {max_chars} characters (target: ~{target_chars} chars). Truncate unnecessary filler words to fit this exact budget.
+    3. Chronological & Impact Ordering: Order the sub-points strategically—lead with the broadest scope or highest business/technical impact as Bullet #1.
+    4. Intelligent Merging: If multiple raw achievements are related (e.g. built the pipeline AND optimized it), combine them into a single dense bullet.
+    5. Exclusion with Reasoning: If there are more raw achievements than the target {num_points} bullets, exclude the least relevant/weakest achievements. Provide crisp reasoning.
+    6. Generate TWO distinct variant sets:
        - Set 1: {set_1['label']} - {set_1['desc']}
        - Set 2: {set_2['label']} - {set_2['desc']}
-    6. Provide 2-3 proactive 'local_coaching_tips' on how this entire section can be presented most effectively in a 1-page resume and in interviews.
+    7. Provide 2-3 proactive 'local_coaching_tips' on how this entire section can be presented most effectively in a 1-page resume and in interviews.
 
     Return strictly a JSON object matching this exact schema:
     {{
@@ -794,7 +835,7 @@ def generate_section_bullets(supabase_client, achievements: List[Dict[str, Any]]
                 "bullets": [
                     {{
                         "variant_type": {variant_enum},
-                        "bullet_text": "The generated bullet point WITHOUT ANY FULL STOP AT THE END",
+                        "bullet_text": "{schema_bullet_constraint}",
                         "source_achievement_ids": ["uuid-1", "uuid-2"],
                         "merge_explanation": "Explain why these were merged or why this was chosen",
                         "recruiter_notes": "1-2 sentences on why this is strong."

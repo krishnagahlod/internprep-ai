@@ -1702,9 +1702,24 @@ function ResumeBuilderPageContent() {
                               </Button>
                             </div>
                           </div>
-                          <div className="pl-6 text-[13px] text-muted-foreground flex items-center gap-2">
-                            <Sparkles className="h-3 w-3 text-primary" />
-                            <span className="italic">{bullet.merge_explanation}</span>
+                          <div className="pl-6 flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                              <span className="italic">{bullet.merge_explanation}</span>
+                            </div>
+                            {benchmarkText && (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div 
+                                    className={`h-full transition-all duration-500 ${bullet.bullet_text.length > benchmarkText.length + 6 ? 'bg-amber-500' : 'bg-primary'}`} 
+                                    style={{ width: `${Math.min((bullet.bullet_text.length / benchmarkText.length) * 100, 100)}%` }}
+                                  />
+                                </div>
+                                <span className={`text-[11.5px] font-mono font-semibold ${bullet.bullet_text.length > benchmarkText.length + 6 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                                  {bullet.bullet_text.length} / {benchmarkText.length} chars
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
