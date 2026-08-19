@@ -195,22 +195,26 @@ def evaluate_ats_parseability(pdf_bytes: Optional[bytes], raw_text: str, parsed_
     github_match = re.search(r"github\.com/[\w\-]+|github", raw_text, re.IGNORECASE)
     
     contact_score = 0
+    missing_contacts = []
     if email_match: contact_score += 25
+    else: missing_contacts.append("Email")
     if phone_match: contact_score += 25
+    else: missing_contacts.append("Phone")
     if linkedin_match: contact_score += 25
+    else: missing_contacts.append("LinkedIn")
     if github_match or "portfolio" in raw_text.lower(): contact_score += 25
     
     if contact_score < 75:
         deduction = (75 - contact_score) // 2
         score -= deduction
-        if not email_match: issues.append("Email address not clearly detected by parser.")
-        if not phone_match: issues.append("Phone number not clearly detected by parser.")
-        if not linkedin_match: issues.append("LinkedIn profile link not found.")
+        if not email_match: issues.append("Email address not clearly parsed from header.")
+        if not phone_match: issues.append("Phone number not clearly parsed from header.")
+        if not linkedin_match: issues.append("Professional profile link (LinkedIn/Portfolio) not found.")
         
     checks.append({
-        "name": "Contact Entities Parsing",
+        "name": "Contact Header Completeness",
         "passed": contact_score >= 75,
-        "detail": f"Email: {'✓' if email_match else '✗'}, Phone: {'✓' if phone_match else '✗'}, LinkedIn: {'✓' if linkedin_match else '✗'}, GitHub/Portfolio: {'✓' if github_match else '✗'}"
+        "detail": "Verified contact details and professional links" if contact_score >= 75 else f"Missing: {', '.join(missing_contacts)}"
     })
     
     # 3. Standard Section Header Recognition
@@ -220,19 +224,20 @@ def evaluate_ats_parseability(pdf_bytes: Optional[bytes], raw_text: str, parsed_
     if len(found_headers) < 3:
         score -= 20
         issues.append("Standard section headings (Experience, Projects, Education, Leadership) are missing or non-standard.")
-        checks.append({"name": "Standard Section Headings", "passed": False, "detail": f"Only found {len(found_headers)} standard section labels"})
+        checks.append({"name": "Standard Section Hierarchy", "passed": False, "detail": "Non-standard section naming may cause parser drops"})
     else:
-        checks.append({"name": "Standard Section Headings", "passed": True, "detail": f"Detected {len(found_headers)} standard section categories"})
+        checks.append({"name": "Standard Section Hierarchy", "passed": True, "detail": f"Recognized standard structure across {len(found_headers)} core categories"})
         
     # 4. Multi-Column / Scrambling Risk Check
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     short_line_ratio = sum(1 for l in lines if len(l) < 20) / max(len(lines), 1)
     if short_line_ratio > 0.45 and len(lines) > 40:
         score -= 15
-        issues.append("High risk of multi-column table scrambling detected. Some text blocks are heavily fragmented.")
-        checks.append({"name": "Single-Stream Layout Integrity", "passed": False, "detail": "Detected table or multi-column fragmentations"})
+        issues.append("High risk of multi-column table scrambling detected. Text blocks appear fragmented.")
+        checks.append({"name": "Single-Column Parsing Flow", "passed": False, "detail": "Multi-column layout or table cells detected"})
     else:
-        checks.append({"name": "Single-Stream Layout Integrity", "passed": True, "detail": "Clean text flow without parser collisions"})
+        checks.append({"name": "Single-Column Parsing Flow", "passed": True, "detail": "Clean single-column parsing stream verified"})
+
         
     final_score = max(0, min(100, score))
     return {
@@ -516,9 +521,9 @@ def evaluate_formatting_and_iitb_rules(
     has_olympiad = bool(re.search(r"\b(?:Olympiad|KVPY|NTSE|Scholarship|Fellowship|Dean's)\b", raw_text, re.IGNORECASE))
     
     layout_checks.append({
-        "name": "Scholastic Highlights (CPI / AP Grades / Scholarships)",
+        "name": "Scholastic Distinction Highlights",
         "passed": has_cpi or has_ap_grades or has_olympiad,
-        "detail": f"CPI: {'✓' if has_cpi else '✗'}, AP Grades: {'✓' if has_ap_grades else '✗'}, Olympiads/Scholarships: {'✓' if has_olympiad else '✗'}"
+        "detail": "Features strong academic differentiators (CPI / AP Grades / Scholarships)" if (has_cpi or has_ap_grades or has_olympiad) else "Include verified academic achievements (CPI, course grades, or scholarships)"
     })
     
     # 3. Word Count & 1-Page Budget Health
@@ -526,12 +531,13 @@ def evaluate_formatting_and_iitb_rules(
     word_count = len(words)
     if word_count > 650:
         score -= 15
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Risk of spilling over 1-page budget)"})
+        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Risk of spilling over 1-page layout margin)"})
     elif word_count < 350:
         score -= 15
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Underfilled, significant empty whitespace)"})
+        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Underfilled, consider expanding project depth)"})
     else:
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": True, "detail": f"{word_count} words (Optimal 400-580 words range)"})
+        layout_checks.append({"name": "1-Page Word Count Density", "passed": True, "detail": f"{word_count} words (Optimal 400–580 words range for 1-page template)"})
+
         
     # 4. Line-Wrap Overflow Hazards (Single vs Two-Line LaTeX/Word budget)
     for sec in parsed_sections:

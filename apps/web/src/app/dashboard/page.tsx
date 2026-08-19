@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
@@ -281,6 +281,10 @@ export default function DashboardPage() {
             <FileText className="mr-3 h-4 w-4" />
             Resume Review
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/ats-checker")}>
+            <Gauge className="mr-3 h-4 w-4 text-primary" />
+            ATS Scorecard
+          </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/resume-builder")}>
             <UploadCloud className="mr-3 h-4 w-4" />
             Resume Builder
@@ -297,6 +301,7 @@ export default function DashboardPage() {
             <Clock className="mr-3 h-4 w-4" />
             History
           </Button>
+
           
           <div className="pt-4 pb-2">
             <div className="h-px bg-border/50 w-full" />
@@ -351,6 +356,10 @@ export default function DashboardPage() {
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume"); setIsMobileMenuOpen(false); }}>
             <FileText className="mr-3 h-4 w-4" />
             Resume Review
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/ats-checker"); setIsMobileMenuOpen(false); }}>
+            <Gauge className="mr-3 h-4 w-4 text-primary" />
+            ATS Scorecard
           </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume-builder"); setIsMobileMenuOpen(false); }}>
             <UploadCloud className="mr-3 h-4 w-4" />
@@ -457,22 +466,40 @@ export default function DashboardPage() {
               </div>
             </motion.div>
 
-            {/* Resume Card (Spans 2 columns, 1 row) */}
+            {/* Resume Diagnostic Card (Spans 2 columns) */}
             <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume")}>
               <div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 dark:from-violet-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
               <div className="flex items-start justify-between relative z-10">
                 <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-violet-100 dark:border-violet-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
                   <FileText className="h-6 w-6 text-violet-600 dark:text-violet-400" />
                 </div>
-                <span className="text-xs font-semibold tracking-wider text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-3 py-1 rounded-full border border-violet-100 dark:border-violet-800/50">MODULE 01</span>
+                <span className="text-xs font-semibold tracking-wider text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-3 py-1 rounded-full border border-violet-100 dark:border-violet-800/50">DIAGNOSTICS</span>
               </div>
               <div className="relative z-10">
                 <h2 className="text-2xl font-bold mb-2 group-hover:text-violet-700 transition-colors font-outfit">Resume Intelligence</h2>
                 <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
-                  Upload your PDF. We'll generate a precise heatmap flagging vague claims and predicting cross-questions.
+                  Deep STAR compliance critiques, competence radar, Day 1 benchmark comparison, and interactive AI workshop.
                 </p>
               </div>
             </motion.div>
+
+            {/* ATS Scorecard Studio Card (Spans 2 columns) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/ats-checker")}>
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100/50 dark:from-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-blue-100 dark:border-blue-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                  <Gauge className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-xs font-semibold tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-800/50">ATS SUITE</span>
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-2xl font-bold mb-2 group-hover:text-blue-700 transition-colors font-outfit">ATS & Placement Score</h2>
+                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
+                  5-Pillar score (0–100), 1-page LaTeX line-wrap auditor, IITB policy compliance check, and custom JD matcher.
+                </p>
+              </div>
+            </motion.div>
+
 
             {/* Resume Builder Card (Spans 2 columns) */}
             <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume-builder")}>
