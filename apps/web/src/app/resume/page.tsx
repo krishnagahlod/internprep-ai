@@ -7,15 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { 
-  UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, 
-  X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, 
-  Brain, Columns, List, Sparkles, FileText, CheckSquare, Zap, ShieldCheck, 
-  Gauge, Layers, SlidersHorizontal, Check
-} from "lucide-react"
+import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
+import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -125,7 +120,7 @@ export default function ResumePage() {
     if (analysisResult?.section_summaries) {
       const initial: Record<string, boolean> = {};
       Object.keys(analysisResult.section_summaries).forEach(sec => {
-        initial[sec] = true;
+        initial[sec] = true; // all expanded by default
       });
       setExpandedSections(initial);
     }
@@ -162,12 +157,14 @@ export default function ResumePage() {
     setError(null)
     setProgress(5)
 
+    // Simulate gradual progress since analysis can take a few minutes
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 95) {
           clearInterval(progressInterval);
           return 95;
         }
+        // slow down as it gets closer to 95
         const increment = prev < 40 ? 5 : prev < 75 ? 2 : 0.5;
         return prev + increment;
       })
@@ -263,7 +260,7 @@ export default function ResumePage() {
       clearInterval(progressInterval)
       setResumeText(data.raw_text)
       setAnalysisResult(data.analysis)
-      setIsSectionOnly(true)
+      setIsSectionOnly(data.is_section_only || false)
       setProgress(100)
       if (isGuest) {
         incrementGuestResume()
@@ -284,76 +281,83 @@ export default function ResumePage() {
     setFinalWorkshopBullet(null)
     setWorkshopInput("")
     
-    const initialPrompt = isOverall 
-      ? "Let's optimize your overall resume. What specific area or target industry would you like to discuss?" 
-      : `Let's optimize this bullet point: "${bullet.original_bullet}". What additional context or metrics can you provide?`;
-    
-    setWorkshopMessages([{ role: "assistant", content: initialPrompt }])
+    if (isOverall) {
+      const overallCtx = JSON.stringify({
+        radar: analysisResult.radar_scores,
+        summaries: analysisResult.section_summaries,
+        day1: analysisResult.day1_comparison
+      });
+      sendWorkshopMessage("Hi, I want a comprehensive review and strategy for my entire resume.", bullet, [], overallCtx)
+    } else {
+      sendWorkshopMessage("Hi, I need help upgrading this bullet point to match Day 1 standards.", bullet, [])
+    }
   }
 
-  const sendWorkshopMessage = async (userMsg: string, bullet: any, currentMessages: any[], overallCtx: any = null) => {
-    if (!userMsg.trim()) return;
+  const sendWorkshopMessage = async (content: string, bullet = activeWorkshopBullet, history = workshopMessages, overallContext: string | null = null) => {
+    if (!content.trim() || !bullet) return
     
-    const newMessages = [...currentMessages, { role: "user", content: userMsg }];
-    setWorkshopMessages(newMessages);
-    setWorkshopInput("");
-    setIsWorkshopLoading(true);
+    const newHistory = [...history, { role: "user", content }]
+    
+    // Only add visible messages to state
+    if (content !== "Hi, I need help upgrading this bullet point to match Day 1 standards." && content !== "Hi, I want a comprehensive review and strategy for my entire resume.") {
+      setWorkshopMessages(newHistory)
+      setWorkshopInput("")
+    }
+    
+    setIsWorkshopLoading(true)
     
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const payload = {
-        original_bullet: bullet.original_bullet,
-        section_type: bullet.section_type || "experience",
-        target_role: targetRole,
-        resume_phase: resumePhase,
-        messages: newMessages,
-        overall_context: overallCtx
-      };
-      
-      const response = await fetch(`${API_URL}/resume/workshop`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/resume/workshop`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
+        body: JSON.stringify({
+          original_bullet: bullet.original_bullet,
+          section_type: bullet.section_type || "experience",
+          target_role: targetRole,
+          resume_phase: resumePhase,
+          messages: newHistory,
+          overall_context: overallContext
+        })
+      })
       
-      if (!response.ok) throw new Error("Workshop turn failed");
+      if (!res.ok) throw new Error("Workshop failed")
       
-      const data = await response.json();
-      setWorkshopMessages([...newMessages, { role: "assistant", content: data.reply }]);
-      if (data.final_bullet) {
-        setFinalWorkshopBullet(data.final_bullet);
+      const data = await res.json()
+      setWorkshopMessages(prev => [...prev, { role: "model", content: data.response }])
+      
+      if (data.is_final_bullet && data.final_bullet) {
+        setFinalWorkshopBullet(data.final_bullet)
       }
     } catch (err) {
-      console.error(err);
-      setWorkshopMessages([...newMessages, { role: "assistant", content: "Sorry, I had trouble connecting to the workshop engine. Please try again." }]);
+      setWorkshopMessages(prev => [...prev, { role: "model", content: "Sorry, I encountered an error. Please try again." }])
     } finally {
-      setIsWorkshopLoading(false);
+      setIsWorkshopLoading(false)
     }
-  };
+  }
+
+  const renderFormattedText = (text: string | null) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  }
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+    const cleanText = text.replace(/\*\*/g, '');
+    navigator.clipboard.writeText(cleanText);
+    // Could add toast here
+  }
 
-  const renderFormattedText = (text: string) => {
-    if (!text) return null;
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-bold text-primary">{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith('*') && part.endsWith('*')) {
-        return <em key={index} className="italic text-foreground/90">{part.slice(1, -1)}</em>;
-      }
-      return part;
-    });
-  };
-
-  const getSeverityColors = (sev: string) => {
-    switch (sev?.toLowerCase()) {
+  const getSeverityColors = (severity: string) => {
+    switch(severity?.toLowerCase()) {
       case 'critical': return { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-800 dark:text-red-400', edge: 'bg-red-500' };
       case 'major': return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-800 dark:text-amber-400', edge: 'bg-amber-500' };
-      case 'minor': return { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
+      case 'minor': return { bg: 'bg-yellow-500/10', border: 'bg-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
       case 'good': 
       default: return { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-800 dark:text-green-400', edge: 'bg-green-500' };
     }
@@ -385,12 +389,13 @@ export default function ResumePage() {
     return acc;
   }, {}) || {};
 
+  // If in severity mode, sort the keys so critical is first
   const severityOrder = ["critical", "major", "minor", "good"];
   const sortedGroupKeys = Object.keys(groupedBullets || {}).sort((a, b) => {
     if (viewMode === "severity") {
       return severityOrder.indexOf(a) - severityOrder.indexOf(b);
     }
-    return 0;
+    return 0; // Keep original section order
   });
 
   return (
@@ -404,183 +409,155 @@ export default function ResumePage() {
             <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="text-muted-foreground hover:text-foreground -ml-4">
               <ArrowLeft className="h-4 w-4 mr-2" /> Command Center
             </Button>
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => router.push("/ats-checker")} 
-                className="hidden sm:flex items-center gap-2 border-primary/30 text-primary hover:bg-primary/5 text-xs font-semibold"
-              >
-                <Gauge className="h-3.5 w-3.5" /> ATS Scorecard Studio
-              </Button>
-              <ThemeToggle />
-            </div>
+            <ThemeToggle />
           </div>
         </header>
 
-        <div className={`container mx-auto px-4 md:px-8 relative z-10 ${!analysisResult ? 'py-12 max-w-3xl' : 'py-6 max-w-[1600px] h-[calc(100vh-56px)] flex flex-col'}`}>
+        <div className={`container mx-auto px-4 md:px-8 relative z-10 ${!analysisResult ? 'py-12 max-w-4xl' : 'py-6 max-w-[1600px] h-[calc(100vh-56px)] flex flex-col'}`}>
           <div className="mb-8 shrink-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-semibold">
-                STAR Framework & Deep Critique
-              </Badge>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Resume Intelligence & Diagnostic</h1>
-            <p className="text-muted-foreground text-sm">
-              Upload your PDF to extract text, benchmark against Day 1 standards, and rewrite bullets in an interactive AI workshop.
+            <h1 className="text-4xl font-extrabold tracking-tight mb-3">Resume Intelligence</h1>
+            <p className="text-muted-foreground text-lg">
+              Upload your PDF. Our engine extracts text, analyzes structuring against Day 1 benchmarks, and helps you rewrite.
             </p>
           </div>
 
           {!analysisResult ? (
-            <div className="glass-panel dark:bg-neutral-900/40 rounded-3xl p-8 max-w-2xl mx-auto border-black/5 dark:border-white/10 shadow-xl space-y-6">
-              <div className="text-center mb-6">
-                <h2 className="text-xl font-bold mb-1">Initialize Resume Diagnostic</h2>
-                <p className="text-muted-foreground text-xs">Calibrated for IIT Bombay placement and internship standards.</p>
+            <div className="glass-panel dark:bg-neutral-900/40 rounded-3xl p-8 max-w-2xl mx-auto border-black/5 dark:border-white/10">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold mb-2">Initialize Analysis</h2>
+                <p className="text-muted-foreground text-sm">Strictly PDF format. Max 5MB.</p>
               </div>
               
-              <div className="space-y-6">
-                {/* Resume Phase Selection */}
+              <div className="mb-8 space-y-6">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Resume Phase</label>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Resume Phase</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-semibold transition-all ${
-                        resumePhase === 'internship' 
-                          ? 'bg-primary/10 border-primary/40 text-primary shadow-sm ring-1 ring-primary/20' 
-                          : 'bg-muted/10 border-input text-muted-foreground hover:bg-muted/20'
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'internship' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
                       onClick={() => setResumePhase('internship')}
                       disabled={isUploading}
                     >
-                      Internship Season
+                      Internship
                     </button>
                     <button
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-semibold transition-all ${
-                        resumePhase === 'placement' 
-                          ? 'bg-primary/10 border-primary/40 text-primary shadow-sm ring-1 ring-primary/20' 
-                          : 'bg-muted/10 border-input text-muted-foreground hover:bg-muted/20'
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'placement' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
                       onClick={() => setResumePhase('placement')}
                       disabled={isUploading}
                     >
-                      Placement Season
+                      Placement
                     </button>
                   </div>
                 </div>
 
-                {/* Target Role Benchmark */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Target Role Benchmark</label>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Benchmark</label>
                   <div className="relative">
                     <select 
-                      className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary outline-none transition-all cursor-pointer text-foreground"
+                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
                       value={targetRole}
                       onChange={(e) => setTargetRole(e.target.value)}
                       disabled={isUploading}
                     >
-                      <option value="consult">Management Consulting (McKinsey, BCG, Bain, Kearney)</option>
-                      <option value="software">Software Engineering / IT (Google, Microsoft, Amazon, Uber)</option>
-                      <option value="product">Product Management (Flipkart, Swiggy, Razorpay, Uber)</option>
-                      <option value="finance">Finance & Quant (Goldman Sachs, Morgan Stanley, Citadel)</option>
-                      <option value="analytics">Data Science & Analytics (Fractal, Tiger, EXL)</option>
-                      <option value="fmcg">FMCG & Operations (HUL, P&G, ITC)</option>
+                      <option value="consult">Management Consulting (McKinsey, BCG, Bain)</option>
+                      <option value="finance">Finance / Private Equity / Investment Banking</option>
+                      <option value="product management">Product Management & Strategy</option>
+                      <option value="analytics">Data Science & Analytics</option>
+                      <option value="it-software">Software Engineering & Systems</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
                       <ChevronDown className="h-5 w-5 opacity-50" />
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Mode Switcher: Full PDF vs Section text */}
-                <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-4">
-                  <div className="flex border-b border-black/5 dark:border-white/5">
-                    <button
-                      className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                        analysisMode === 'full' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                      onClick={() => setAnalysisMode('full')}
-                      disabled={isUploading}
-                    >
-                      Upload 1-Page PDF
-                    </button>
-                    <button
-                      className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                        analysisMode === 'section' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                      }`}
-                      onClick={() => setAnalysisMode('section')}
-                      disabled={isUploading}
-                    >
-                      Paste Text / Single Section
-                    </button>
-                  </div>
+              <div className="mb-6 flex p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'full' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setAnalysisMode('full')}
+                  disabled={isUploading}
+                >
+                  Full Resume (PDF)
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'section' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setAnalysisMode('section')}
+                  disabled={isUploading}
+                >
+                  Section/Bullet (Text)
+                </button>
+              </div>
 
-                  {analysisMode === 'full' ? (
-                    <div className="relative border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 text-center transition-all bg-primary/5 cursor-pointer">
-                      <UploadCloud className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
-                      <p className="font-semibold text-foreground text-sm mb-1">Click or drag & drop your Resume PDF</p>
-                      <p className="text-xs text-muted-foreground">Strictly PDF format. Max 5MB.</p>
-                      <input 
-                        type="file" 
-                        accept="application/pdf" 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={handleFileChange}
-                        disabled={isUploading}
-                      />
-                      {file && (
-                        <div className="mt-4 px-4 py-2 bg-background rounded-full inline-flex items-center gap-2 text-xs font-mono border border-primary/30 shadow-sm text-foreground">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                          <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Section Type</label>
-                        <div className="relative">
-                          <select 
-                            className="appearance-none flex h-11 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-xs font-medium shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary outline-none cursor-pointer text-foreground"
-                            value={sectionType}
-                            onChange={(e) => setSectionType(e.target.value)}
-                            disabled={isUploading}
-                          >
-                            <option value="experience">Experience / Internships</option>
-                            <option value="project">Projects</option>
-                            <option value="por">Positions of Responsibility</option>
-                            <option value="scholastic">Scholastic Achievements</option>
-                            <option value="extracurricular">Extracurriculars</option>
-                            <option value="all">Mixed / Unknown</option>
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Paste Text</label>
-                        <textarea
-                          className="w-full h-36 p-4 rounded-xl border border-input/60 bg-muted/5 text-xs shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
-                          placeholder="Paste a single bullet or an entire section from your resume here..."
-                          value={sectionText}
-                          onChange={(e) => setSectionText(e.target.value)}
-                          disabled={isUploading}
-                        />
-                      </div>
+              {analysisMode === 'full' ? (
+                <div className="relative group mb-8">
+                <div className={`absolute inset-0 bg-primary/20 rounded-2xl blur-xl transition-opacity duration-500 ${isUploading ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-50'}`} />
+                <div className="relative border-2 border-dashed border-black/20 dark:border-white/20 rounded-2xl p-12 text-center flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5">
+                  <UploadCloud className={`h-12 w-12 mb-4 transition-colors ${file ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <p className="text-sm font-medium mb-1">Drag & drop your file here</p>
+                  <p className="text-xs text-muted-foreground mb-4">or click to browse local files</p>
+                  
+                  <input 
+                    type="file" 
+                    accept="application/pdf" 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                  />
+                  
+                  {file && (
+                    <div className="mt-4 px-4 py-2 bg-white/10 rounded-full flex items-center gap-2 text-sm border border-black/10 dark:border-white/10">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+                      <span className="font-mono text-xs">{file.name}</span>
                     </div>
                   )}
                 </div>
               </div>
+              ) : (
+                <div className="mb-8 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Section Type</label>
+                    <div className="relative">
+                      <select 
+                        className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
+                        value={sectionType}
+                        onChange={(e) => setSectionType(e.target.value)}
+                        disabled={isUploading}
+                      >
+                        <option value="experience">Experience / Internships</option>
+                        <option value="project">Projects</option>
+                        <option value="por">Positions of Responsibility</option>
+                        <option value="scholastic">Scholastic Achievements</option>
+                        <option value="extracurricular">Extracurriculars</option>
+                        <option value="all">Mixed / Unknown</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                        <ChevronDown className="h-5 w-5 opacity-50" />
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Paste Text</label>
+                    <textarea
+                      className="w-full h-40 p-4 rounded-xl border border-input/60 bg-muted/5 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
+                      placeholder="Paste a single bullet or an entire section from your resume here..."
+                      value={sectionText}
+                      onChange={(e) => setSectionText(e.target.value)}
+                      disabled={isUploading}
+                    />
+                  </div>
+                </div>
+              )}
 
               {error && (
-                <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+                <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Analysis Error</AlertTitle>
+                  <AlertTitle>Upload Failed</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
               {isUploading && (
-                <div className="space-y-2">
+                <div className="mb-6 space-y-2">
                   <div className="flex justify-between text-xs font-mono text-muted-foreground">
                     <span>Adaptive RAG & Multi-Pass Neural Engine Active...</span>
                     <span>{Math.floor(progress)}%</span>
@@ -590,16 +567,16 @@ export default function ResumePage() {
               )}
 
               <Button 
-                className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all" 
+                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all" 
                 onClick={analysisMode === 'full' ? handleUpload : handleAnalyzeText} 
                 disabled={(analysisMode === 'full' ? !file : !sectionText.trim()) || isUploading}
               >
-                {isUploading ? "Executing Deep Analysis (~2 mins)..." : "Analyze Document & Generate Critiques"}
+                {isUploading ? "Executing Deep Analysis (~2 mins)" : "Analyze Document"}
               </Button>
               
-              <div className="p-3.5 bg-primary/5 border border-primary/15 rounded-xl text-center">
-                <p className="text-[11px] font-medium text-primary">
-                  <ShieldAlert className="inline-block w-4 h-4 mr-1.5 mb-0.5" />
+              <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-xl text-center">
+                <p className="text-sm font-medium text-primary">
+                  <ShieldAlert className="inline-block w-4 h-4 mr-2 mb-0.5" />
                   Privacy First: Your resume is processed in real-time and is never permanently stored or shared.
                 </p>
               </div>
@@ -609,253 +586,299 @@ export default function ResumePage() {
               
               {/* PDF Viewer Panel - Desktop Only */}
               <div className="hidden md:flex w-[40%] flex-col pr-4 border-r border-black/10 dark:border-white/10">
-                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2 flex flex-col">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/5 text-xs text-muted-foreground font-mono">
-                    <span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-primary" /> Source Resume Preview</span>
-                    <Button variant="ghost" size="sm" onClick={() => { setAnalysisResult(null); setFile(null); }} className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground">
-                      Upload New
-                    </Button>
-                  </div>
-                  <div className="flex-1 mt-2 rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center">
-                    {pdfUrl ? (
-                      <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">PDF Preview Unavailable</div>
-                    )}
-                  </div>
+                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2">
+                  {pdfUrl ? (
+                    <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">PDF Preview Unavailable</div>
+                  )}
                 </div>
               </div>
               
               {/* Analysis Content */}
               <div className="flex-1 overflow-y-auto px-2 md:pl-4 custom-scrollbar">
                 <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
-                  {!isSectionOnly ? (
-                    <>
-                      {/* Summary Stats */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
-                          <Activity className="h-5 w-5 mx-auto mb-1 text-primary" />
-                          <p className="text-xl font-bold">{healthScore}%</p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Health Score</p>
-                        </div>
-                        <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
-                          <Target className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                          <p className="text-xl font-bold">{metricsCount} <span className="text-xs font-normal text-muted-foreground">/ {totalBullets}</span></p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Quantified</p>
-                        </div>
-                        <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
-                          <AlertCircle className="h-5 w-5 mx-auto mb-1 text-amber-500" />
-                          <p className="text-xl font-bold text-amber-500">{structuralIssues}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Structural Issues</p>
-                        </div>
-                        <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
-                          <ShieldAlert className="h-5 w-5 mx-auto mb-1 text-rose-500" />
-                          <p className="text-xl font-bold text-rose-500">{ruleViolations}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
-                        </div>
+              {!isSectionOnly ? (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <Activity className="h-6 w-6 mx-auto mb-2 text-primary" />
+                      <p className="text-2xl font-bold">{healthScore}%</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Health Score</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <Target className="h-6 w-6 mx-auto mb-2 text-green-500 dark:text-green-400" />
+                      <p className="text-2xl font-bold">{metricsCount} <span className="text-sm font-normal text-muted-foreground">/ {totalBullets}</span></p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Quantified</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500 dark:text-amber-400" />
+                      <p className="text-2xl font-bold text-amber-400">{structuralIssues}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Structural Issues</p>
+                    </div>
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
+                      <ShieldAlert className="h-6 w-6 mx-auto mb-2 text-red-500 dark:text-red-400" />
+                      <p className="text-2xl font-bold text-red-400">{ruleViolations}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
+                    </div>
+                  </div>
+
+                  {/* Scoring Dashboard */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 flex flex-col items-center justify-center">
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
+                      <RadarChart scores={analysisResult.radar_scores} />
+                      {analysisResult.radar_scores_reasoning && (
+                        <details className="mt-6 w-full p-4 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
+                          <summary className="flex items-center gap-2 outline-none font-semibold text-sm text-primary list-none">
+                            <Brain className="h-4 w-4" />
+                            AI Evaluation Reasoning
+                            <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
+                          </summary>
+                          <ul className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text space-y-2 list-disc pl-4">
+                            {Array.isArray(analysisResult.radar_scores_reasoning) 
+                              ? analysisResult.radar_scores_reasoning.map((reason: string, i: number) => (
+                                  <li key={i}>{reason}</li>
+                                ))
+                              : <li>{analysisResult.radar_scores_reasoning}</li>}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col gap-4">
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1">
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Architecture</h3>
+                        <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_feedback}</p>
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Day 1 Benchmark</h3>
+                        <p className="text-muted-foreground text-sm italic">{analysisResult.day1_comparison}</p>
                       </div>
-
-                      {/* Scoring Dashboard */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-5 flex flex-col items-center justify-center">
-                          <h3 className="text-xs font-bold uppercase tracking-widest text-foreground/70 mb-4">Competency Radar Analysis</h3>
-                          <RadarChart scores={analysisResult.radar_scores} />
-                          {analysisResult.radar_scores_reasoning && (
-                            <details className="mt-4 w-full p-3 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
-                              <summary className="flex items-center gap-2 outline-none font-semibold text-xs text-primary list-none">
-                                <Brain className="h-3.5 w-3.5" />
-                                AI Evaluation Reasoning
-                                <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
-                              </summary>
-                              <ul className="text-xs text-foreground/80 leading-relaxed mt-3 pt-3 border-t border-primary/10 cursor-text space-y-1.5 list-disc pl-4">
-                                {Array.isArray(analysisResult.radar_scores_reasoning) 
-                                  ? analysisResult.radar_scores_reasoning.map((reason: string, i: number) => (
-                                      <li key={i}>{reason}</li>
-                                    ))
-                                  : <li>{analysisResult.radar_scores_reasoning}</li>}
-                              </ul>
-                            </details>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-col gap-4">
-                          <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-5 flex-1 flex flex-col justify-between">
-                            <div>
-                              <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                                  <Sparkles className="h-4 w-4" /> Day 1 Placement Benchmark
-                                </h3>
-                                <span className="text-xs font-bold text-primary font-mono">{analysisResult.day1_comparison?.score || 75}%</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                {analysisResult.day1_comparison?.summary || "Your profile exhibits strong technical fundamentals. Elevating metric quantification and leadership scale will enhance Day 1 shortlisting probability."}
-                              </p>
-                            </div>
-                            <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-muted-foreground">
-                              <span>Target Domain: <strong className="text-foreground">{targetRole.toUpperCase()}</strong></span>
-                              <span>Phase: <strong className="text-foreground">{resumePhase.toUpperCase()}</strong></span>
-                            </div>
-                          </div>
-
-                          {analysisResult.section_summaries && (
-                            <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-5 space-y-2">
-                              <h3 className="text-xs font-bold uppercase tracking-widest text-foreground/70 mb-2">Section Health Overview</h3>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                {Object.entries(analysisResult.section_summaries).map(([sec, sum]: [string, any], i: number) => (
-                                  <div key={i} className="p-2.5 rounded-xl bg-muted/20 border border-black/5 dark:border-white/5">
-                                    <span className="font-bold uppercase text-[10px] text-primary block mb-0.5">{sec}</span>
-                                    <p className="text-[11px] text-muted-foreground line-clamp-2">{sum.overview || sum.summary || "Well structured"}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {/* Bullet Critique List */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Bullet-by-Bullet Deep Critique</h3>
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant={viewMode === "section" ? "default" : "outline"} 
-                          size="sm" 
-                          onClick={() => setViewMode("section")}
-                          className="h-7 text-xs"
-                        >
-                          <Columns className="h-3 w-3 mr-1" /> By Section
-                        </Button>
-                        <Button 
-                          variant={viewMode === "severity" ? "default" : "outline"} 
-                          size="sm" 
-                          onClick={() => setViewMode("severity")}
-                          className="h-7 text-xs"
-                        >
-                          <List className="h-3 w-3 mr-1" /> By Severity
-                        </Button>
+                      
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-amber-500">
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500 mb-2">Section Strategy</h3>
+                        <p className="text-muted-foreground text-sm">{analysisResult.section_ordering_advice}</p>
                       </div>
                     </div>
+                  </div>
+                </>
+              ) : (
+                <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1 mb-8 mt-2">
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Section Feedback</h3>
+                  <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_section_feedback}</p>
+                </div>
+              )}
 
-                    <div className="space-y-4">
-                      {sortedGroupKeys.map((groupKey) => {
-                        const bulletsInGroup = groupedBullets[groupKey] || [];
-                        if (bulletsInGroup.length === 0) return null;
-                        const isExpanded = expandedSections[groupKey] ?? true;
-
-                        return (
-                          <div key={groupKey} className="rounded-2xl border border-black/10 dark:border-white/10 bg-muted/10 overflow-hidden">
-                            <button
-                              onClick={() => toggleSection(groupKey)}
-                              className="w-full flex items-center justify-between p-4 bg-muted/20 text-left hover:bg-muted/30 transition-all"
-                            >
-                              <span className="font-bold text-xs uppercase tracking-wider text-foreground flex items-center gap-2">
-                                {groupKey.toUpperCase()} ({bulletsInGroup.length})
-                              </span>
-                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </button>
-
-                            {isExpanded && (
-                              <div className="p-4 space-y-4">
-                                {bulletsInGroup.map((bullet: any, idx: number) => {
-                                  const colors = getSeverityColors(bullet.severity);
-                                  return (
-                                    <div key={idx} className={`p-4 rounded-xl border ${colors.border} ${colors.bg} space-y-3 relative overflow-hidden`}>
-                                      <div className={`absolute top-0 left-0 bottom-0 w-1 ${colors.edge}`} />
-                                      
-                                      <div className="flex items-start justify-between gap-4">
-                                        <p className="text-xs font-mono text-foreground leading-relaxed flex-1">
-                                          "{bullet.original_bullet}"
-                                        </p>
-                                        <Badge className={`text-[10px] uppercase font-bold shrink-0 ${getVerbColors(bullet.action_verb_rating)}`}>
-                                          Verb: {bullet.action_verb_rating}
-                                        </Badge>
+              <div>
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
+                  <h2 className="text-2xl font-bold">Deep Bullet Analysis</h2>
+                  
+                  {/* View Mode Toggle */}
+                  <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-lg border border-black/10 dark:border-white/10">
+                    <button
+                      onClick={() => setViewMode("section")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "section" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      <Columns className="w-3 h-3" /> Group by Section
+                    </button>
+                    <button
+                      onClick={() => setViewMode("severity")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "severity" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      <List className="w-3 h-3" /> Triage by Severity
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="flex gap-4 text-xs font-mono mb-6">
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Critical</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /> Major</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400" /> Minor</span>
+                </div>
+                
+                <div className="space-y-8">
+                  {Object.entries(groupedBullets || {}).map(([section, bullets]: [string, any]) => {
+                    const isExpanded = expandedSections[section];
+                    const summary = analysisResult.section_summaries?.[section];
+                    
+                    return (
+                      <div key={section} className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-black/5 dark:bg-white/5">
+                        <div 
+                          className="p-4 flex items-center justify-between cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                          onClick={() => toggleSection(section)}
+                        >
+                          <div>
+                            <h3 className="font-bold text-lg uppercase tracking-wider flex items-center gap-2">
+                              {section} 
+                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">{bullets.length}</span>
+                              {summary && (
+                                <span className="text-xs ml-2 text-muted-foreground">Score: {summary.score}/100</span>
+                              )}
+                            </h3>
+                            {summary && <p className="text-sm text-muted-foreground mt-1">{summary.summary}</p>}
+                          </div>
+                          {isExpanded ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="p-4 pt-0 space-y-4">
+                            {bullets.map((bullet: any, idx: number) => {
+                              const sev = getSeverityColors(bullet.severity);
+                              const verbColor = getVerbColors(bullet.action_verb_rating);
+                              
+                              return (
+                                <div key={idx} className="glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all mb-4 border border-black/5 dark:border-white/5 shadow-sm">
+                                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sev.edge}`} />
+                                  
+                                  <div className="p-5 pl-6">
+                                    {/* Original Bullet */}
+                                    <div className="mb-6">
+                                      <div className="flex justify-between items-start mb-3 gap-4">
+                                        <h4 className="text-lg font-semibold leading-relaxed text-foreground/90 flex-1">"{bullet.original_bullet}"</h4>
+                                        <div className="flex flex-col items-end gap-2 shrink-0">
+                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border shadow-sm`}>
+                                            {bullet.severity} Priority
+                                          </span>
+                                          <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
+                                            {Math.round(bullet.confidence > 1 ? bullet.confidence : bullet.confidence * 100)}% Confidence
+                                          </span>
+                                        </div>
                                       </div>
-                                      
-                                      <p className="text-xs text-muted-foreground leading-relaxed">
-                                        <strong className="text-foreground">Critique:</strong> {bullet.critique}
-                                      </p>
-
-                                      {bullet.metrics_hint && (
-                                        <div className="p-2 rounded-lg bg-background/80 border border-primary/20 text-[11px] text-primary flex items-center gap-2">
-                                          <Lightbulb className="h-3.5 w-3.5 shrink-0" />
-                                          <span><strong>Suggested Metric:</strong> {bullet.metrics_hint}</span>
-                                        </div>
-                                      )}
-
-                                      {/* Suggested Rewrite */}
-                                      {bullet.suggested_rewrite && (
-                                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
-                                          <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-bold">
-                                            <span>Recommended Rewrite</span>
-                                            <Button 
-                                              variant="ghost" 
-                                              size="sm" 
-                                              className="h-6 text-[11px] px-2 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
-                                              onClick={() => copyToClipboard(bullet.suggested_rewrite)}
-                                            >
-                                              <Copy className="h-3 w-3 mr-1" /> Copy
-                                            </Button>
+                                    </div>
+                                    
+                                    {/* Analysis Section */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                      {/* Left Column: Issues & Tags */}
+                                      <div className="space-y-3 bg-black/5 dark:bg-white/5 rounded-xl p-4 border border-black/10 dark:border-white/10 shadow-sm">
+                                        <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Detected Issues</h5>
+                                        
+                                        <div className="flex items-start gap-2 mb-3">
+                                          <div className={`mt-0.5 px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor} shadow-sm border border-black/5 dark:border-white/5 shrink-0`}>
+                                            Verb: {bullet.action_verb_rating}
                                           </div>
-                                          <p className="text-xs font-mono text-foreground leading-relaxed">
-                                            {bullet.suggested_rewrite}
-                                          </p>
+                                          {bullet.action_verb_alternatives?.length > 0 && (
+                                            <p className="text-xs text-muted-foreground leading-tight pt-0.5">
+                                              Consider: <span className="font-medium text-foreground">{bullet.action_verb_alternatives.join(", ")}</span>
+                                            </p>
+                                          )}
                                         </div>
-                                      )}
+                                        
+                                        {bullet.best_practice_violations?.map((violation: string, i: number) => (
+                                          <div key={`rule-${i}`} className="flex items-start gap-2 text-red-700 dark:text-red-400">
+                                            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <p className="text-xs font-medium leading-tight">{violation}</p>
+                                          </div>
+                                        ))}
+                                        
+                                        {bullet.structural_issues?.map((issue: string, i: number) => (
+                                          <div key={`struct-${i}`} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <p className="text-xs font-medium leading-tight">{issue}</p>
+                                          </div>
+                                        ))}
+                                        
+                                        {/* Fallback if no issues */}
+                                        {(!bullet.best_practice_violations?.length && !bullet.structural_issues?.length && bullet.action_verb_rating === "strong") && (
+                                          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            <p className="text-xs font-medium">Structurally sound.</p>
+                                          </div>
+                                        )}
+                                      </div>
 
-                                      {/* Benchmark Inspiration */}
-                                      {bullet.golden_comparison && (
-                                        <div className="px-3 py-2 rounded-xl bg-primary/5 border border-primary/10">
-                                          <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1 flex items-center gap-1.5 opacity-80">
-                                            <Target className="h-3 w-3" />
-                                            Day 1 Benchmark Inspiration
-                                          </p>
-                                          <p className="text-[11px] text-primary/80 italic font-mono leading-relaxed">"{bullet.golden_comparison}"</p>
+                                      {/* Right Column: AI Critique */}
+                                      <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between ${sev.bg} ${sev.border} ${sev.text}`}>
+                                        <div className="space-y-3 mb-4">
+                                          <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 opacity-80">
+                                            <Brain className="h-4 w-4" /> AI Critique
+                                          </h5>
+                                          <p className="text-sm leading-relaxed">{bullet.critique}</p>
+                                          
+                                          {bullet.metrics_hint && (
+                                            <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10">
+                                              <p className="text-xs flex items-start gap-2">
+                                                <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
+                                                <span><strong className="opacity-90">Hint:</strong> {bullet.metrics_hint}</span>
+                                              </p>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-
-                                      <div className="flex justify-end gap-2 pt-1">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
+                                        
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline" 
+                                          className="w-full bg-background/50 hover:bg-background border-black/10 dark:border-white/10 shadow-sm transition-all hover:shadow-md"
                                           onClick={() => startWorkshop(bullet)}
-                                          className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10"
                                         >
-                                          <MessageSquare className="h-3 w-3 mr-1" /> Open in Workshop
+                                          <MessageSquare className="h-4 w-4 mr-2" /> Open Workshop
                                         </Button>
                                       </div>
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                                    
+                                    {/* Suggested Rewrite */}
+                                    {bullet.suggested_rewrite && (
+                                      <div className="p-4 md:p-5 rounded-xl mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 shadow-sm relative overflow-hidden">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
+                                        <div className="flex justify-between items-center mb-3">
+                                          <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase">
+                                            <CheckCircle2 className="h-4 w-4" /> Suggested Rewrite
+                                          </div>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-6 text-xs px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400"
+                                            onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
+                                          >
+                                            <Copy className="h-3 w-3 mr-1" /> Copy
+                                          </Button>
+                                        </div>
+                                        <p className="text-base font-medium text-emerald-950 dark:text-emerald-100 leading-relaxed">
+                                          {bullet.suggested_rewrite}
+                                        </p>
+                                      </div>
+                                    )}
 
-                  <div className="flex justify-between pt-4 pb-8">
-                    <Button 
-                      size="lg" 
-                      variant="outline"
-                      className="h-11 px-6 border-primary/20 text-primary hover:bg-primary/5 font-semibold text-xs" 
-                      onClick={() => startWorkshop({original_bullet: "Overall Resume", section_type: "overall"}, true)}
-                    >
-                      <MessageSquare className="mr-2 h-4 w-4" /> Overall Strategy Session
-                    </Button>
-                    <Button size="lg" className="h-11 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs" onClick={() => router.push("/dashboard")}>
-                      Continue to Mock Interview <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex justify-center pb-8">
-                    <CreatorBadge />
-                  </div>
+                                    {/* Benchmark */}
+                                    {bullet.golden_comparison && (
+                                      <div className="px-5 py-4 rounded-xl bg-primary/5 border border-primary/10">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2 opacity-70">
+                                          <Target className="h-3 w-3" />
+                                          Benchmark Inspiration
+                                        </p>
+                                        <p className="text-sm text-primary/80 italic leading-relaxed">"{bullet.golden_comparison}"</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4 pb-12">
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="h-12 px-8 border-primary/20 text-primary hover:bg-primary/5 font-semibold" 
+                  onClick={() => startWorkshop({original_bullet: "Overall Resume", section_type: "overall"}, true)}
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" /> Overall Strategy Session
+                </Button>
+                <Button size="lg" className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold" onClick={() => router.push("/dashboard")}>
+                  Continue to Mock Interview <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+                <div className="flex justify-center pb-8">
+                  <CreatorBadge />
                 </div>
               </div>
             </div>
+          </div>
           )}
         </div>
       </div>
@@ -865,27 +888,27 @@ export default function ResumePage() {
         className={`fixed top-0 right-0 h-screen w-[400px] bg-background border-l border-black/10 dark:border-white/10 shadow-2xl transition-transform duration-500 z-50 flex flex-col ${activeWorkshopBullet ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="h-14 flex items-center justify-between px-6 border-b border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
-          <h3 className="font-bold flex items-center gap-2 text-sm">
+          <h3 className="font-bold flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-primary" />
-            Strategic Bullet Workshop
+            Strategic Workshop
           </h3>
           <Button variant="ghost" size="icon" onClick={() => setActiveWorkshopBullet(null)} className="rounded-full hover:bg-black/10 dark:hover:bg-white/10">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="p-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Focus Bullet</p>
-          <p className="text-xs font-mono text-foreground/80 line-clamp-3">"{activeWorkshopBullet?.original_bullet}"</p>
+        <div className="p-6 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Focus Area</p>
+          <p className="text-sm font-mono text-foreground/80">"{activeWorkshopBullet?.original_bullet}"</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-background">
           {workshopMessages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
                 msg.role === 'user' 
                   ? 'bg-primary text-primary-foreground rounded-tr-sm shadow-md' 
-                  : 'bg-muted/40 border border-black/10 dark:border-white/10 text-foreground rounded-tl-sm shadow-sm'
+                  : 'bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-foreground rounded-tl-sm shadow-sm'
               }`}>
                 {renderFormattedText(msg.content)}
               </div>
@@ -894,7 +917,7 @@ export default function ResumePage() {
           
           {isWorkshopLoading && (
             <div className="flex justify-start">
-              <div className="bg-muted/40 border border-black/10 dark:border-white/10 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1 shadow-sm">
+              <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl rounded-tl-sm px-4 py-4 flex gap-1 shadow-sm">
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce" />
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce delay-75" />
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce delay-150" />
@@ -903,15 +926,17 @@ export default function ResumePage() {
           )}
 
           {finalWorkshopBullet && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mt-2 shadow-sm animate-in fade-in duration-500">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Final Polished Bullet
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 mt-4 shadow-sm animate-in fade-in duration-500">
+              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" /> Final Polished Bullet
               </p>
-              <p className="text-xs font-medium mb-3 text-foreground leading-relaxed">{renderFormattedText(finalWorkshopBullet)}</p>
+              <p className="text-sm font-medium mb-4 text-foreground leading-relaxed">{renderFormattedText(finalWorkshopBullet)}</p>
               <Button 
                 size="sm" 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-xs h-8"
-                onClick={() => copyToClipboard(finalWorkshopBullet)}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
+                onClick={() => {
+                  copyToClipboard(finalWorkshopBullet)
+                }}
               >
                 Copy to Clipboard
               </Button>
@@ -921,11 +946,16 @@ export default function ResumePage() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-3.5 border-t border-black/10 dark:border-white/10 bg-background shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
+        <div className="p-4 border-t border-black/10 dark:border-white/10 bg-background shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
           <form 
             onSubmit={(e) => {
               e.preventDefault();
-              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages);
+              const fullOverallCtx = analysisResult ? JSON.stringify({
+                radar: analysisResult.radar_scores,
+                summaries: analysisResult.section_summaries,
+                day1: analysisResult.day1_comparison
+              }) : null;
+              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages, activeWorkshopBullet?.section_type === "overall" ? fullOverallCtx : null);
             }} 
             className="relative"
           >
@@ -933,17 +963,17 @@ export default function ResumePage() {
               type="text"
               value={workshopInput}
               onChange={(e) => setWorkshopInput(e.target.value)}
-              placeholder="Type your metric or context..."
-              disabled={isWorkshopLoading || !activeWorkshopBullet}
-              className="w-full bg-muted/40 border border-black/10 dark:border-white/10 text-foreground rounded-full pl-4 pr-10 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              placeholder="Type your response..."
+              disabled={isWorkshopLoading || !!finalWorkshopBullet}
+              className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-foreground rounded-full pl-5 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
             <Button 
               type="submit" 
               size="icon" 
-              disabled={!workshopInput.trim() || isWorkshopLoading}
-              className="absolute right-1 top-1 bottom-1 h-auto rounded-full w-8 bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={!workshopInput.trim() || isWorkshopLoading || !!finalWorkshopBullet}
+              className="absolute right-1 top-1 bottom-1 h-auto rounded-full w-10 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-4 w-4" />
             </Button>
           </form>
         </div>
