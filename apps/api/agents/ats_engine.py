@@ -9,52 +9,44 @@ from services.cerebras_client import cerebras_client
 import google.generativeai as genai
 import json_repair
 
-# Rich Domain Competencies & Semantic Synonym Taxonomy
+# ==============================================================================
+# MASSIVE MULTI-DOMAIN COMPETENCY TAXONOMY (25-35 Granular Skills per Domain)
+# ==============================================================================
 DOMAIN_TAXONOMY = {
-    "consulting": {
-        "label": "Management Consulting",
-        "categories": {
-            "Core Methodologies & Frameworks": [
-                {"name": "Market Sizing & Analysis", "synonyms": ["market sizing", "market entry", "market analysis", "tam", "sam", "som", "industry sizing", "competitor analysis", "market dynamics"]},
-                {"name": "Benchmarking & KPI Tracking", "synonyms": ["benchmarking", "benchmarked", "kpis", "kpi", "metrics tracking", "performance metrics", "industry benchmark"]},
-                {"name": "Strategic Roadmapping & Playbooks", "synonyms": ["strategic roadmap", "strategy playbook", "ai strategy", "digital transformation", "operating model", "strategic priorities"]},
-                {"name": "Due Diligence & Risk Assessment", "synonyms": ["due diligence", "risk assessment", "esg risks", "risk mitigation", "regulatory compliance", "feasibility study", "scenario analysis"]},
-                {"name": "Hypothesis-Driven Problem Solving", "synonyms": ["hypothesis-driven", "mece", "issue tree", "root cause", "first-principles", "framework"]}
-            ],
-            "Technical & Analytical Capabilities": [
-                {"name": "Financial & Quantitative Modeling", "synonyms": ["financial model", "financial modeling", "unit economics", "profitability analysis", "cost-benefit", "ebitda", "cash flow", "valuation"]},
-                {"name": "Cost & Operational Optimization", "synonyms": ["cost optimization", "cost reduction", "operational efficiency", "supply chain", "lean", "process improvement", "capex", "opex", "turnaround"]},
-                {"name": "Data-Driven Decision Making", "synonyms": ["data-driven", "statistical analysis", "analytics", "sql", "excel modeling", "quantitative analysis", "dashboard"]}
-            ],
-            "Execution & Leadership Impact": [
-                {"name": "Go-To-Market (GTM) Strategy", "synonyms": ["go-to-market", "gtm", "growth strategy", "revenue growth", "customer acquisition", "product launch", "market launch"]},
-                {"name": "Stakeholder & C-Suite Alignment", "synonyms": ["stakeholder management", "executive presentation", "c-suite", "leadership alignment", "client engagement", "steering committee", "client management"]},
-                {"name": "Cross-Functional Orchestration", "synonyms": ["cross-functional", "orchestrated", "spearheaded", "program management", "change management", "rollout"]}
-            ]
-        },
-        "action_verbs": [
-            "Spearheaded", "Orchestrated", "Formulated", "Synthesized", "Restructured",
-            "Streamlined", "Negotiated", "Pioneered", "Championed", "Accelerated", "Architected"
-        ]
-    },
     "software": {
         "label": "Software Engineering / IT",
         "categories": {
-            "Core Methodologies & Architecture": [
-                {"name": "System Design & Architecture", "synonyms": ["system design", "system architecture", "microservices", "distributed systems", "high availability", "scalability", "fault-tolerant", "clean architecture"]},
-                {"name": "Data Structures & Algorithms", "synonyms": ["data structures", "algorithms", "dynamic programming", "graph algorithms", "complexity analysis", "time complexity"]},
-                {"name": "RESTful APIs & Networking", "synonyms": ["rest api", "restful", "graphql", "grpc", "api design", "endpoints", "webhooks", "socket", "http"]}
+            "Core Languages & Runtimes": [
+                {"name": "Python & Modern Async", "synonyms": ["python", "asyncio", "pydantic", "fastapi", "pytest", "cython", "poetry", "uv"]},
+                {"name": "C++ & Low-Level Systems", "synonyms": ["c++", "cpp", "c++17", "c++20", "pointers", "memory management", "stl", "raii", "valgrind", "cmake"]},
+                {"name": "Java / Spring Ecosystem", "synonyms": ["java", "spring boot", "spring", "jvm", "hibernate", "maven", "gradle", "junit"]},
+                {"name": "TypeScript & Modern JS", "synonyms": ["typescript", "javascript", "ecmascript", "es6", "node.js", "deno", "bun"]},
+                {"name": "Go (Golang) / Rust", "synonyms": ["golang", "go", "goroutines", "rust", "cargo", "rustlang", "actix", "tokio"]}
             ],
-            "Technical & Analytical Stack": [
-                {"name": "Core Languages (Python/C++/Java/TS)", "synonyms": ["python", "c++", "cpp", "java", "typescript", "javascript", "golang", "rust"]},
-                {"name": "Full-Stack Frameworks", "synonyms": ["react", "next.js", "node.js", "fastapi", "django", "spring boot", "flutter", "vue"]},
-                {"name": "Databases & Caching", "synonyms": ["postgresql", "postgres", "mongodb", "mysql", "redis", "dynamodb", "elasticsearch", "sql", "nosql"]},
-                {"name": "Cloud & Containerization (Docker/K8s/AWS)", "synonyms": ["docker", "kubernetes", "k8s", "aws", "gcp", "azure", "cloud", "containerized"]}
+            "Architecture & Distributed Systems": [
+                {"name": "System Design & Microservices", "synonyms": ["system design", "system architecture", "microservices", "service-oriented", "monolith to microservices", "domain driven design", "scalability"]},
+                {"name": "Distributed Concurrency & Messaging", "synonyms": ["distributed systems", "kafka", "rabbitmq", "pub/sub", "message queue", "event-driven", "sqs", "concurrency", "multithreading", "celery"]},
+                {"name": "REST, GraphQL & gRPC APIs", "synonyms": ["rest api", "restful", "graphql", "grpc", "protobuf", "api design", "openapi", "swagger", "webhook"]},
+                {"name": "Caching & High Availability", "synonyms": ["redis", "memcached", "caching", "cache invalidation", "cdn", "load balancing", "failover", "replication", "high availability"]}
             ],
-            "Execution & Production Quality": [
-                {"name": "CI/CD & DevOps Automation", "synonyms": ["ci/cd", "github actions", "devops", "automation", "pipeline", "jenkins", "docker-compose"]},
-                {"name": "Performance & Latency Optimization", "synonyms": ["low latency", "high throughput", "caching", "query optimization", "concurrency", "multithreading", "load balancing"]},
-                {"name": "Code Reliability & Security (OWASP)", "synonyms": ["unit testing", "integration testing", "owasp", "security", "vulnerability", "code review", "debugging"]}
+            "Databases & Storage Architecture": [
+                {"name": "Relational SQL & Query Optimization", "synonyms": ["postgresql", "postgres", "mysql", "sql", "indexing", "query optimization", "explain analyze", "stored procedures", "acid"]},
+                {"name": "NoSQL & Document Stores", "synonyms": ["mongodb", "dynamodb", "cassandra", "couchbase", "nosql", "key-value store"]},
+                {"name": "Vector Databases & Semantic Search", "synonyms": ["pgvector", "pinecone", "qdrant", "milvus", "weaviate", "faiss", "vector search", "embeddings"]}
+            ],
+            "AI/ML Engineering & LLMOps": [
+                {"name": "RAG Pipelines & Agent Orchestration", "synonyms": ["rag", "retrieval augmented", "langchain", "llamaindex", "agent architecture", "ai agents", "multi-agent", "prompt engineering"]},
+                {"name": "Model Serving & Edge Inference", "synonyms": ["onnx", "tensorrt", "vllm", "ollama", "model serving", "huggingface", "transformers", "pytorch", "quantization"]}
+            ],
+            "Cloud, DevOps & Production Infrastructure": [
+                {"name": "Containerization & Kubernetes (K8s)", "synonyms": ["docker", "docker-compose", "kubernetes", "k8s", "helm", "containerized"]},
+                {"name": "Cloud Platforms (AWS/GCP/Azure)", "synonyms": ["aws", "gcp", "azure", "google cloud", "s3", "ec2", "lambda", "cloud run", "cloud functions"]},
+                {"name": "CI/CD & Infrastructure as Code (IaC)", "synonyms": ["ci/cd", "github actions", "gitlab ci", "jenkins", "terraform", "ansible", "automated pipeline"]}
+            ],
+            "Quality, AppSec & Observability": [
+                {"name": "Testing & Test-Driven Development (TDD)", "synonyms": ["unit testing", "integration testing", "e2e testing", "tdd", "mocking", "selenium", "playwright", "cypress"]},
+                {"name": "Application Security (OWASP & Auth)", "synonyms": ["owasp", "vulnerability", "jwt", "oauth2", "authentication", "authorization", "rls", "rate limiting", "csrf", "xss", "cors"]},
+                {"name": "Monitoring & Telemetry (Sentry/Prometheus)", "synonyms": ["sentry", "prometheus", "grafana", "datadog", "telemetry", "tracing", "logging", "apm"]}
             ]
         },
         "action_verbs": [
@@ -62,23 +54,55 @@ DOMAIN_TAXONOMY = {
             "Automated", "Deployed", "Benchmarked", "Containerized", "Integrated", "Pioneered"
         ]
     },
+    "consulting": {
+        "label": "Management Consulting",
+        "categories": {
+            "Core Strategic Frameworks": [
+                {"name": "Market Sizing & TAM/SAM/SOM", "synonyms": ["market sizing", "market entry", "market analysis", "tam", "sam", "som", "industry sizing", "market dynamics"]},
+                {"name": "Competitive Benchmarking & 5 Forces", "synonyms": ["benchmarking", "benchmarked", "competitor analysis", "porter's five forces", "competitive landscape", "swot analysis", "value chain"]},
+                {"name": "Strategic Roadmapping & Playbooks", "synonyms": ["strategic roadmap", "strategy playbook", "ai strategy", "digital transformation", "operating model", "strategic priorities"]},
+                {"name": "Hypothesis-Driven Problem Solving (MECE)", "synonyms": ["hypothesis-driven", "mece", "issue tree", "root cause", "first-principles", "framework"]}
+            ],
+            "Operational & Financial Transformation": [
+                {"name": "Cost & Process Optimization (Lean/Kaizen)", "synonyms": ["cost optimization", "cost reduction", "operational efficiency", "supply chain", "lean", "kaizen", "process re-engineering", "bottlenecks"]},
+                {"name": "Capex/Opex Restructuring & Turnaround", "synonyms": ["capex", "opex", "turnaround", "restructuring", "working capital", "procurement optimization"]},
+                {"name": "EBITDA & Unit Economics Modeling", "synonyms": ["financial model", "unit economics", "profitability analysis", "cost-benefit", "ebitda", "cash flow", "gross margin", "pricing strategy"]}
+            ],
+            "ESG, Risk & Digital Transformation": [
+                {"name": "Sustainability & Net Zero Roadmaps", "synonyms": ["sustainability", "net zero", "esg", "green technologies", "carbon footprint", "circular economy", "energy transition"]},
+                {"name": "Due Diligence & Risk Assessment", "synonyms": ["due diligence", "risk assessment", "esg risks", "risk mitigation", "regulatory compliance", "feasibility study", "scenario analysis"]},
+                {"name": "Digital & AI Transformation Strategy", "synonyms": ["digital transformation", "ai adoption", "automation strategy", "tech modernization", "poc roadmap"]}
+            ],
+            "Executive Leadership & Alignment": [
+                {"name": "Go-To-Market (GTM) Strategy", "synonyms": ["go-to-market", "gtm", "growth strategy", "revenue growth", "customer acquisition", "product launch", "market launch"]},
+                {"name": "Stakeholder & C-Suite Alignment", "synonyms": ["stakeholder management", "executive presentation", "c-suite", "leadership alignment", "client engagement", "steering committee", "client management"]},
+                {"name": "Cross-Functional Program Management", "synonyms": ["cross-functional", "orchestrated", "spearheaded", "program management", "change management", "rollout", "governance"]}
+            ]
+        },
+        "action_verbs": [
+            "Spearheaded", "Orchestrated", "Formulated", "Synthesized", "Restructured",
+            "Streamlined", "Negotiated", "Pioneered", "Championed", "Accelerated", "Architected"
+        ]
+    },
     "product_management": {
         "label": "Product Management",
         "categories": {
-            "Product Strategy & Discovery": [
-                {"name": "Product Roadmapping & PRDs", "synonyms": ["product roadmap", "roadmapping", "prd", "product requirements", "feature specification", "product vision"]},
-                {"name": "User Research & Customer Journey", "synonyms": ["user research", "customer journey", "user interviews", "personas", "empathy mapping", "pain points"]},
-                {"name": "UX Prototyping & Wireframing", "synonyms": ["wireframing", "figma", "prototyping", "ux design", "mockups", "ui/ux"]}
+            "Product Discovery & Strategy": [
+                {"name": "Product Roadmapping & PRDs", "synonyms": ["product roadmap", "roadmapping", "prd", "product requirements", "feature specification", "product vision", "epics"]},
+                {"name": "User Research & Customer Interviews", "synonyms": ["user research", "customer journey", "user interviews", "personas", "empathy mapping", "pain points", "user feedback"]},
+                {"name": "UX Prototyping & Wireframing", "synonyms": ["wireframing", "figma", "prototyping", "ux design", "mockups", "ui/ux", "user testing"]},
+                {"name": "Product-Market Fit (PMF) & Moats", "synonyms": ["product market fit", "pmf", "value proposition", "competitive moat", "mvp", "minimum viable product"]}
             ],
-            "Metrics & Growth Analytics": [
-                {"name": "A/B Testing & Experimentation", "synonyms": ["a/b testing", "experimentation", "hypothesis testing", "split testing", "multivariate"]},
-                {"name": "Retention, DAU/MAU & Funnel Conversion", "synonyms": ["retention rate", "dau/mau", "dau", "mau", "funnel conversion", "churn reduction", "drop-off", "cohort analysis"]},
-                {"name": "Product Analytics & North Star Metrics", "synonyms": ["product analytics", "north star metric", "mixpanel", "amplitude", "google analytics", "telemetry"]}
+            "Metrics, Growth & Experimentation": [
+                {"name": "A/B Testing & Multivariate Experiments", "synonyms": ["a/b testing", "experimentation", "hypothesis testing", "split testing", "multivariate", "statistical significance"]},
+                {"name": "Retention, Cohort & Churn Analytics", "synonyms": ["retention rate", "dau/mau", "dau", "mau", "cohort analysis", "churn reduction", "drop-off", "l14/l28", "user stickiness"]},
+                {"name": "Funnel Optimization & Unit Economics", "synonyms": ["funnel conversion", "cac", "ltv", "onboarding funnel", "activation rate", "paywall optimization"]},
+                {"name": "Product Analytics (Mixpanel/Amplitude)", "synonyms": ["product analytics", "north star metric", "mixpanel", "amplitude", "google analytics", "telemetry", "event tracking"]}
             ],
-            "Execution & GTM Delivery": [
-                {"name": "Feature Prioritization (RICE/MoSCoW)", "synonyms": ["feature prioritization", "rice framework", "moscow", "backlog grooming", "impact vs effort"]},
-                {"name": "Go-To-Market (GTM) & Monetization", "synonyms": ["go-to-market", "gtm", "monetization", "product launch", "pricing strategy", "product market fit", "mvp"]},
-                {"name": "Agile Sprint & Cross-Team Leadership", "synonyms": ["sprint planning", "scrum", "agile", "cross-functional", "stakeholder alignment", "engineering handoff"]}
+            "Agile Execution & GTM Delivery": [
+                {"name": "Feature Prioritization (RICE/MoSCoW)", "synonyms": ["feature prioritization", "rice framework", "moscow", "backlog grooming", "impact vs effort", "kano model"]},
+                {"name": "Go-To-Market (GTM) & Monetization", "synonyms": ["go-to-market", "gtm", "monetization", "product launch", "pricing strategy", "packaging", "upsell"]},
+                {"name": "Agile Sprint & Engineering Alignment", "synonyms": ["sprint planning", "scrum", "agile", "cross-functional", "stakeholder alignment", "engineering handoff", "jira"]}
             ]
         },
         "action_verbs": [
@@ -89,19 +113,19 @@ DOMAIN_TAXONOMY = {
     "finance": {
         "label": "Finance / Investment Banking",
         "categories": {
-            "Financial Valuation & Modeling": [
-                {"name": "DCF & Valuation Methodologies", "synonyms": ["discounted cash flow", "dcf", "valuation", "comparable company analysis", "comps", "precedent transactions", "wacc"]},
-                {"name": "Three-Statement & LBO Modeling", "synonyms": ["financial model", "three-statement", "lbo", "leveraged buyout", "m&a", "merger model", "accretion/dilution"]},
-                {"name": "Capital Structure & Corporate Finance", "synonyms": ["capital structure", "debt/equity", "working capital", "p&l", "balance sheet", "cash flow statement", "ebitda"]}
+            "Financial Valuation & Deal Modeling": [
+                {"name": "DCF & Valuation Methodologies", "synonyms": ["discounted cash flow", "dcf", "valuation", "comparable company analysis", "comps", "precedent transactions", "wacc", "terminal value"]},
+                {"name": "Three-Statement & LBO Modeling", "synonyms": ["financial model", "three-statement", "lbo", "leveraged buyout", "m&a", "merger model", "accretion/dilution", "pro forma"]},
+                {"name": "Capital Structure & Debt/Equity", "synonyms": ["capital structure", "debt/equity", "working capital", "p&l", "balance sheet", "cash flow statement", "ebitda", "leverage ratio"]}
             ],
             "Quantitative & Portfolio Analytics": [
-                {"name": "Portfolio Optimization & Asset Allocation", "synonyms": ["portfolio optimization", "asset allocation", "markowitz", "sharpe ratio", "alpha", "beta", "risk-adjusted return"]},
-                {"name": "Risk Management & Derivatives", "synonyms": ["risk management", "derivatives", "options", "futures", "swaps", "credit risk", "var", "value at risk", "monte carlo"]},
-                {"name": "Financial Data Terminals (Bloomberg/Excel)", "synonyms": ["bloomberg", "excel vba", "financial data", "capiq", "factset", "reuters"]}
+                {"name": "Portfolio Optimization & Sharpe Ratio", "synonyms": ["portfolio optimization", "asset allocation", "markowitz", "sharpe ratio", "alpha", "beta", "risk-adjusted return", "efficient frontier"]},
+                {"name": "Derivatives Pricing & Risk (VaR)", "synonyms": ["risk management", "derivatives", "options", "futures", "swaps", "credit risk", "var", "value at risk", "monte carlo", "black-scholes", "greeks"]},
+                {"name": "Financial Data Terminals & Modeling", "synonyms": ["bloomberg", "excel vba", "financial data", "capiq", "factset", "reuters", "pitchbook"]}
             ],
-            "Transaction & Advisory Execution": [
-                {"name": "Due Diligence & Deal Structuring", "synonyms": ["due diligence", "deal structuring", "underwriting", "cim", "teaser", "pitchbook", "term sheet"]},
-                {"name": "Equity Research & Sector Analysis", "synonyms": ["equity research", "sector analysis", "industry report", "macroeconomic", "earnings analysis"]}
+            "Transaction & Corporate Advisory": [
+                {"name": "Due Diligence & Deal Structuring", "synonyms": ["due diligence", "deal structuring", "underwriting", "cim", "teaser", "pitchbook", "term sheet", "data room"]},
+                {"name": "Equity Research & Sector Deep Dives", "synonyms": ["equity research", "sector analysis", "industry report", "macroeconomic", "earnings analysis", "target price"]}
             ]
         },
         "action_verbs": [
@@ -113,18 +137,18 @@ DOMAIN_TAXONOMY = {
         "label": "Data Science & Analytics",
         "categories": {
             "Machine Learning & Statistical Modeling": [
-                {"name": "Supervised & Unsupervised ML", "synonyms": ["machine learning", "ml", "regression", "classification", "clustering", "random forest", "xgboost", "gradient boosting"]},
-                {"name": "Statistical Analysis & Hypothesis Testing", "synonyms": ["statistical modeling", "hypothesis testing", "p-value", "anova", "bayesian", "probability distribution", "confidence interval"]},
-                {"name": "Deep Learning & NLP / GenAI", "synonyms": ["deep learning", "nlp", "computer vision", "pytorch", "tensorflow", "transformers", "llm", "genai", "embeddings"]}
+                {"name": "Supervised & Unsupervised ML", "synonyms": ["machine learning", "ml", "regression", "classification", "clustering", "random forest", "xgboost", "gradient boosting", "lightgbm", "kmeans"]},
+                {"name": "Statistical Inference & Hypothesis Testing", "synonyms": ["statistical modeling", "hypothesis testing", "p-value", "anova", "bayesian", "probability distribution", "confidence interval", "ab testing"]},
+                {"name": "Deep Learning, NLP & GenAI", "synonyms": ["deep learning", "nlp", "computer vision", "pytorch", "tensorflow", "transformers", "llm", "genai", "embeddings", "bert", "lstm"]}
             ],
-            "Data Engineering & Stack": [
-                {"name": "Python Analytics (Pandas/NumPy/Scikit)", "synonyms": ["python", "pandas", "numpy", "scikit-learn", "scipy"]},
-                {"name": "Advanced SQL & Database Queries", "synonyms": ["sql", "window functions", "joins", "query optimization", "cte", "postgresql", "bigquery", "snowflake"]},
-                {"name": "ETL Pipelines & Big Data (Spark)", "synonyms": ["etl", "etl pipelines", "data pipeline", "spark", "pyspark", "hadoop", "airflow", "data cleaning", "feature engineering"]}
+            "Data Engineering & High-Scale Analytics": [
+                {"name": "Python Analytics (Pandas/NumPy/SciPy)", "synonyms": ["python", "pandas", "numpy", "scikit-learn", "scipy", "polars"]},
+                {"name": "Advanced SQL, Window Functions & CTEs", "synonyms": ["sql", "window functions", "joins", "query optimization", "cte", "postgresql", "bigquery", "snowflake", "redshift"]},
+                {"name": "ETL Pipelines & Big Data (Spark)", "synonyms": ["etl", "etl pipelines", "data pipeline", "spark", "pyspark", "hadoop", "airflow", "dbt", "data cleaning", "feature engineering"]}
             ],
-            "Business Intelligence & Insights": [
-                {"name": "Data Visualization (Tableau/PowerBI)", "synonyms": ["tableau", "powerbi", "power bi", "matplotlib", "seaborn", "dashboard", "data visualization"]},
-                {"name": "Model Evaluation (AUC-ROC/F1-Score)", "synonyms": ["auc-roc", "f1-score", "precision/recall", "rmse", "cross-validation", "model deployment"]}
+            "Business Intelligence & Impact Evaluation": [
+                {"name": "Data Visualization (Tableau/PowerBI)", "synonyms": ["tableau", "powerbi", "power bi", "matplotlib", "seaborn", "dashboard", "data visualization", "looker"]},
+                {"name": "Model Evaluation (AUC-ROC/F1-Score)", "synonyms": ["auc-roc", "f1-score", "precision/recall", "rmse", "cross-validation", "model deployment", "model monitoring"]}
             ]
         },
         "action_verbs": [
@@ -152,6 +176,9 @@ PROHIBITED_RANK_PATTERNS = [
 ]
 
 
+# ==============================================================================
+# SECTION PARSER & HELPERS
+# ==============================================================================
 def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]:
     """Deterministic fallback parser extracting sections and bullets when LLM is offline."""
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
@@ -163,7 +190,8 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
         "project": ["PROJECTS", "KEY PROJECTS", "ACADEMIC PROJECTS", "TECHNICAL PROJECTS"],
         "por": ["POSITIONS OF RESPONSIBILITY", "LEADERSHIP", "RESPONSIBILITIES"],
         "scholastic": ["SCHOLASTIC ACHIEVEMENTS", "ACADEMIC ACHIEVEMENTS", "ACHIEVEMENTS", "HONORS"],
-        "extracurricular": ["EXTRACURRICULAR ACTIVITIES", "EXTRACURRICULARS", "EXTRA CURRICULAR", "ACTIVITIES"]
+        "extracurricular": ["EXTRACURRICULAR ACTIVITIES", "EXTRACURRICULARS", "EXTRA CURRICULAR", "ACTIVITIES"],
+        "skills": ["TECHNICAL SKILLS", "SKILLS", "COURSEWORK", "KEY COURSES"]
     }
     
     for line in lines:
@@ -174,7 +202,7 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
                 matched_type = stype
                 break
         if matched_type:
-            if current_sec["bullets"]:
+            if current_sec["bullets"] or current_sec["overview_line"]:
                 sections.append(current_sec)
             current_sec = {"section_type": matched_type, "bullets": [], "overview_line": ""}
         elif line.startswith("-") or line.startswith("•") or line.startswith("*") or line.startswith("–"):
@@ -187,11 +215,10 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
             else:
                 current_sec["bullets"].append({"bullet_text": line, "original_bullet": line})
                 
-    if current_sec["bullets"]:
+    if current_sec["bullets"] or current_sec["overview_line"]:
         sections.append(current_sec)
         
     return sections
-
 
 
 def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
@@ -204,49 +231,51 @@ def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
             text += page.get_text() + "\n"
         doc.close()
         if text.strip():
-            return text.strip()
-    except Exception as e:
-        print(f"PyMuPDF extraction failed: {e}")
-        
-    try:
-        import pypdf
-        import io
-        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-        text = "\n".join([page.extract_text() or "" for page in reader.pages]).strip()
-        if text:
             return text
-    except Exception as e2:
-        print(f"pypdf fallback failed: {e2}")
+    except Exception as e:
+        print(f"PyMuPDF stream error: {e}")
+
+    try:
+        from pypdf import PdfReader
+        import io
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        text = ""
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                text += t + "\n"
+        if text.strip():
+            return text
+    except Exception as e:
+        print(f"pypdf stream error: {e}")
         
     return ""
 
 
-
+# ==============================================================================
+# PILLAR 1: TECHNICAL & PARSEABILITY
+# ==============================================================================
 def evaluate_ats_parseability(
     pdf_bytes: Optional[bytes], 
     raw_text: str, 
-    parsed_sections: List[Dict[str, Any]], 
+    parsed_sections: List[Dict[str, Any]],
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
-    """
-    Pillar 1: Technical & Parseability Verification (0-100).
-    Clean, calibrated scoring for IIT Bombay placement resumes vs corporate ATS.
-    """
+    """Pillar 1: Technical & Layout Parseability (0-100)."""
     checks = []
     issues = []
     
-    # 1. Text Layer Extractability (30% weight in IITB / 25% in Global)
-    char_count = len(raw_text)
-    text_passed = char_count > 400
-    text_score = 100 if char_count > 600 else 75 if char_count > 300 else 40
+    # 1. OCR / Extractable Text Layer (30%)
+    char_count = len(raw_text.strip())
+    text_score = 100 if char_count > 600 else 80 if char_count > 250 else 40
     checks.append({
         "name": "Extractable Text Layer",
-        "passed": text_passed,
+        "passed": char_count > 300,
         "score": text_score,
-        "status": "Optimal" if text_score == 100 else "Good" if text_score >= 70 else "Low Density"
+        "status": "Optimal" if text_score == 100 else "Partial" if text_score >= 70 else "Warning"
     })
     
-    # 2. Section Hierarchy Integrity (30% in IITB / 25% in Global)
+    # 2. Section Hierarchy Integrity (30%)
     standard_headers = ["experience", "project", "por", "scholastic", "extracurricular", "skills", "education"]
     raw_lower = raw_text.lower()
     found_headers = [h for h in standard_headers if h in raw_lower or any(h in s.get("section_type", "").lower() for s in parsed_sections)]
@@ -258,10 +287,10 @@ def evaluate_ats_parseability(
         "status": "Optimal" if hierarchy_score == 100 else "Acceptable" if hierarchy_score >= 75 else "Needs Structure"
     })
     
-    # 3. Layout Flow & Dual/Single Column Processing (20% in IITB / 25% in Global)
+    # 3. Layout Flow & Dual/Single Column Processing (20%)
     table_indicators = ["|", "\t\t", "Accenture", "Chemical Engineering", "B.Tech", "202"]
     has_structure = any(ind.lower() in raw_text.lower() for ind in table_indicators)
-    flow_score = 100 if has_structure else 80
+    flow_score = 100 if has_structure else 85
     checks.append({
         "name": "Single-Column / LaTeX Parsing Flow",
         "passed": True,
@@ -269,12 +298,11 @@ def evaluate_ats_parseability(
         "status": "Optimal"
     })
     
-    # 4. Mode-Specific Check: Placement Header vs Corporate Contact Header
+    # 4. Mode-Specific Check: Placement Header vs Corporate Contact Header (20%)
     if mode == "iitb_placement":
-        # In IITB mode, verify institute placement header standard
         iitb_header_keywords = ["indian institute of technology", "iit bombay", "chemical engineering", "computer science", "mechanical", "electrical", "b.tech", "dual degree", "m.tech", "cpi", "roll"]
         has_iitb_header = any(kw in raw_lower for kw in iitb_header_keywords)
-        portal_score = 100 if has_iitb_header else 85
+        portal_score = 100 if has_iitb_header else 90
         checks.append({
             "name": "Placement Portal Header Standard",
             "passed": True,
@@ -283,7 +311,6 @@ def evaluate_ats_parseability(
         })
         final_score = int(round((text_score * 0.30) + (hierarchy_score * 0.30) + (flow_score * 0.20) + (portal_score * 0.20)))
     else:
-        # In corporate ATS mode, verify email & phone
         has_email = bool(re.search(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text))
         has_phone = bool(re.search(r"(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}|\b\d{10}\b", raw_text))
         contact_score = 100 if (has_email and has_phone) else 65 if (has_email or has_phone) else 40
@@ -307,6 +334,65 @@ def evaluate_ats_parseability(
     }
 
 
+# ==============================================================================
+# PILLAR 2: DEEP SEMANTIC & IMPLICIT COMPETENCY ENGINE
+# ==============================================================================
+def extract_implicit_competencies_with_ai(
+    resume_text: str,
+    target_role: str,
+    domain_info: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """
+    Deep AI Semantic Analyzer: Discovers implicit competencies embedded in technical & strategic narratives.
+    e.g., 'pgvector + RAG' -> Vector Databases & Semantic Search
+    e.g., 'Supabase RLS' -> Application Security (OWASP & Auth)
+    """
+    prompt = f"""
+    You are an expert technical interviewer and placement auditor.
+    Analyze this resume text and discover implicit or applied competencies that demonstrate domain mastery for '{domain_info['label']}'.
+    
+    RESUME TEXT:
+    \"\"\"{resume_text[:3500]}\"\"\"
+    
+    DOMAIN COMPETENCY LIST:
+    {json.dumps([comp['name'] for cat in domain_info['categories'].values() for comp in cat])}
+    
+    Extract up to 6 implicit competencies proven by real engineering/consulting work in the text.
+    Return JSON format:
+    {{
+      "inferred_competencies": [
+        {{
+          "name": "Exact Competency Name from list",
+          "inferred_from": "Short snippet or evidence from bullet",
+          "confidence": "high"
+        }}
+      ]
+    }}
+    """
+    try:
+        try:
+            response_text = cerebras_client.generate_chat_completion(
+                model="gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=600
+            )
+        except Exception:
+            res = gemini_client.generate_content(
+                model_name="gemini-1.5-flash",
+                prompt=prompt,
+                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
+            )
+            response_text = res.text
+            
+        data = json_repair.loads(response_text)
+        if isinstance(data, dict) and data.get("inferred_competencies"):
+            return data["inferred_competencies"]
+    except Exception as e:
+        print(f"Implicit competency extraction fallback: {e}")
+        
+    return []
+
 
 def evaluate_keyword_match(
     resume_text: str, 
@@ -316,8 +402,8 @@ def evaluate_keyword_match(
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
     """
-    Pillar 2: Multi-Tiered Semantic & Synonym-Aware Competency Matcher (0-100).
-    Categorizes competencies cleanly and matches semantic phrases realistically.
+    Pillar 2: Deep Semantic & Keyword Competency Engine (0-100).
+    Combines deterministic synonym matching with AI implicit competency discovery.
     """
     canonical_role = target_role.lower()
     if "software" in canonical_role or "tech" in canonical_role or "developer" in canonical_role or "sde" in canonical_role:
@@ -334,40 +420,63 @@ def evaluate_keyword_match(
     domain_info = DOMAIN_TAXONOMY.get(role_key, DOMAIN_TAXONOMY["consulting"])
     resume_lower = resume_text.lower()
     
-    categorized_results = []
-    all_found_competencies = []
-    all_missing_competencies = []
-    
+    # 1. Deterministic Multi-Tiered Synonym Match
+    explicit_matches = {}
     total_competencies = 0
-    matched_competencies = 0
+    
+    for category_name, competencies in domain_info["categories"].items():
+        for comp in competencies:
+            total_competencies += 1
+            comp_name = comp["name"]
+            synonyms = comp["synonyms"]
+            
+            for syn in synonyms:
+                pattern = re.escape(syn.lower())
+                if re.search(rf"\b{pattern}\b", resume_lower) or syn.lower() in resume_lower:
+                    explicit_matches[comp_name] = {
+                        "name": comp_name,
+                        "matched_via": syn,
+                        "category": category_name,
+                        "is_implicit": False
+                    }
+                    break
+                    
+    # 2. Deep AI Semantic Extractor for Implicit Competencies
+    implicit_inferred = extract_implicit_competencies_with_ai(resume_text, target_role, domain_info)
+    for imp in implicit_inferred:
+        c_name = imp.get("name")
+        if c_name and c_name not in explicit_matches:
+            # Locate category
+            cat_found = "Core Methodologies"
+            for cat_n, c_list in domain_info["categories"].items():
+                if any(c["name"] == c_name for c in c_list):
+                    cat_found = cat_n
+                    break
+            explicit_matches[c_name] = {
+                "name": c_name,
+                "matched_via": imp.get("inferred_from", "AI Inferred from Technical Stack"),
+                "category": cat_found,
+                "is_implicit": True
+            }
+            
+    # 3. Categorized Results
+    categorized_results = []
+    all_found = []
+    all_missing = []
     
     for category_name, competencies in domain_info["categories"].items():
         cat_matched = []
         cat_missing = []
         
         for comp in competencies:
-            total_competencies += 1
             comp_name = comp["name"]
-            synonyms = comp["synonyms"]
-            
-            # Semantic / Synonym match
-            is_matched = False
-            matched_term = ""
-            
-            for syn in synonyms:
-                pattern = re.escape(syn.lower())
-                if re.search(rf"\b{pattern}\b", resume_lower) or syn.lower() in resume_lower:
-                    is_matched = True
-                    matched_term = syn
-                    break
-                    
-            if is_matched:
-                matched_competencies += 1
-                cat_matched.append({"name": comp_name, "matched_via": matched_term})
-                all_found_competencies.append(comp_name)
+            if comp_name in explicit_matches:
+                m_info = explicit_matches[comp_name]
+                cat_matched.append(m_info)
+                all_found.append(comp_name)
             else:
                 cat_missing.append(comp_name)
-                all_missing_competencies.append(comp_name)
+                all_missing.append(comp_name)
                 
         categorized_results.append({
             "category": category_name,
@@ -375,25 +484,23 @@ def evaluate_keyword_match(
             "missing": cat_missing
         })
         
-    # If custom Job Description is provided, calculate JD keyword match %
+    # 4. Custom Job Description Matching if provided
     jd_match_info = None
     if job_description and len(job_description.strip()) > 50:
         try:
             jd_prompt = f"""
-            Extract the top 10 mandatory technical/domain skills and 5 secondary skills from this JD:
+            Extract top 10 mandatory technical/domain skills from this JD:
             {job_description[:3000]}
-            
-            Return JSON:
-            {{ "critical_skills": ["Skill1", "Skill2", ...], "secondary_skills": ["SkillA", ...] }}
+            Return JSON: {{ "critical_skills": ["Skill1", "Skill2", ...] }}
             """
             try:
                 response_text = cerebras_client.generate_chat_completion(
                     model="gpt-oss-120b",
                     messages=[{"role": "user", "content": jd_prompt}],
                     temperature=0.1,
-                    max_tokens=500
+                    max_tokens=400
                 )
-            except Exception as e_cer:
+            except Exception:
                 res = gemini_client.generate_content(
                     model_name="gemini-1.5-flash",
                     prompt=jd_prompt,
@@ -413,41 +520,71 @@ def evaluate_keyword_match(
                     "missing_skills": [s for s in jd_skills if s not in jd_found]
                 }
         except Exception as e:
-            print(f"Custom JD analysis error: {e}")
+            print(f"Custom JD matching error: {e}")
             
-    # Calculate weighted match score (Scale 30 to 100)
-    match_ratio = matched_competencies / max(total_competencies, 1)
+    # Calculate Score
+    matched_count = len(all_found)
+    match_ratio = matched_count / max(total_competencies, 1)
     
-    # Baseline curve for IITB multi-faceted resumes:
-    # 0 matches = 30%, 50% matches = 75%, 80%+ matches = 95-100%
-    if match_ratio >= 0.75:
-        match_score = int(round(85 + (match_ratio - 0.75) * 60))
-    elif match_ratio >= 0.4:
-        match_score = int(round(65 + (match_ratio - 0.4) * 57))
+    if match_ratio >= 0.65:
+        match_score = int(round(85 + (match_ratio - 0.65) * 42))
+    elif match_ratio >= 0.35:
+        match_score = int(round(65 + (match_ratio - 0.35) * 66))
     else:
-        match_score = int(round(35 + (match_ratio) * 75))
+        match_score = int(round(35 + (match_ratio) * 85))
         
     match_score = max(35, min(100, match_score))
     
-    # Actionable suggestions
     suggestions = []
-    if all_missing_competencies:
-        for kw in all_missing_competencies[:3]:
+    if all_missing:
+        for kw in all_missing[:3]:
             suggestions.append(f"Weave in '{kw}' in relevant experience or project points to strengthen {domain_info['label']} shortlisting.")
             
     return {
         "score": match_score,
         "target_role_label": domain_info["label"],
         "is_custom_jd": bool(job_description and len(job_description.strip()) > 50),
-        "found_critical_count": matched_competencies,
+        "found_critical_count": matched_count,
         "total_critical_count": total_competencies,
         "categorized_matrix": categorized_results,
-        "found_keywords": all_found_competencies,
-        "missing_critical": all_missing_competencies,
+        "found_keywords": all_found,
+        "missing_critical": all_missing,
         "jd_match_info": jd_match_info,
         "suggestions": suggestions
     }
 
+
+# ==============================================================================
+# PILLAR 3: GOOGLE X-Y-Z QUANTIFICATION & BULLET ANATOMY
+# ==============================================================================
+def deconstruct_bullet_xyz_anatomy(bullets: List[str]) -> List[Dict[str, Any]]:
+    """
+    Deconstructs bullets into Google X-Y-Z components:
+    Accomplished [X] as measured by [Y], by doing [Z].
+    """
+    results = []
+    metric_regex = re.compile(r"((?:[\$€£₹]\s*)?\d+(?:,\d+)*(?:\.\d+)?(?:[kKmMbB]|k\+|M\+|\+|Cr|L|s|ms|x|X)?(?:%|x|X)?|\b(?:first|1st|2nd|3rd|top\s*\d+%?|rank\s*\d+|bronze|silver|gold)\b)", re.IGNORECASE)
+    
+    for b in bullets:
+        has_metric = bool(metric_regex.search(b))
+        words = b.split()
+        first_word = words[0] if words else ""
+        has_power_verb = len(first_word) > 3 and not any(first_word.lower().startswith(w) for w in WEAK_VERBS)
+        
+        # Check mechanism indicators (by doing Z, using, via, through, leveraging)
+        has_mechanism = any(k in b.lower() for k in ["using", "via", "through", "leveraging", "by ", "with ", "implementing", "architecting"])
+        
+        xyz_score = 100 if (has_metric and has_power_verb and has_mechanism) else 80 if (has_metric and has_power_verb) else 60 if has_metric else 45
+        
+        results.append({
+            "bullet_text": b,
+            "has_metric_y": has_metric,
+            "has_action_verb": has_power_verb,
+            "has_mechanism_z": has_mechanism,
+            "xyz_score": xyz_score
+        })
+        
+    return results
 
 
 def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -486,9 +623,9 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
                 metric_types["Percentages (%)"] += 1
             if any(c in b for c in ["₹", "$", "€", "£", "rs.", "inr", "cr", "lakh"]):
                 metric_types["Currencies (₹/$)"] += 1
-            if any(w in b_lower for w in ["k+", "m+", "users", "residents", "students", "members", "conglomerates", "runs", "features", "teams", "100+", "500+", "10k", "100k"]):
+            if any(w in b_lower for w in ["k+", "m+", "users", "residents", "students", "members", "conglomerates", "runs", "features", "teams", "100+", "500+", "10k", "100k", "sources", "cases"]):
                 metric_types["Scale & Volume"] += 1
-            if any(w in b_lower for w in ["s", "ms", "latency", "faster", "hours", "days", "turnaround", "0.8s"]):
+            if any(w in b_lower for w in ["s", "ms", "latency", "faster", "hours", "days", "turnaround", "0.8s", "0.4s"]):
                 metric_types["Time & Latency"] += 1
             if any(w in b_lower for w in ["top", "rank", "bronze", "silver", "gold", "winner", "selected"]):
                 metric_types["Rankings & Honors"] += 1
@@ -497,15 +634,16 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
             
     quant_ratio = (len(quantified_bullets) / max(len(all_bullets), 1)) * 100
     
-    # Target benchmark: >75% bullets quantified
     if quant_ratio >= 75:
         score = int(round(85 + (quant_ratio - 75) * 0.6))
     else:
         score = int(round(50 + (quant_ratio / 75) * 35))
         
     score = max(30, min(100, score))
-    
     types_found = [k for k, v in metric_types.items() if v > 0]
+    
+    # Deconstruct sample bullets
+    xyz_deconstruction = deconstruct_bullet_xyz_anatomy(all_bullets[:8])
     
     return {
         "score": score,
@@ -514,11 +652,14 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
         "quantification_ratio": int(round(quant_ratio)),
         "metric_types_found": types_found,
         "weak_unquantified_bullets": unquantified_bullets[:4],
+        "xyz_deconstruction": xyz_deconstruction,
         "feedback": f"{len(quantified_bullets)} of {len(all_bullets)} ({int(round(quant_ratio))}%) bullets contain hard quantitative metrics."
     }
 
 
-
+# ==============================================================================
+# PILLAR 4: EXECUTIVE ACTION VERBS & VOICE DYNAMICS
+# ==============================================================================
 def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], target_role: str = "consulting") -> Dict[str, Any]:
     """Pillar 4: Action Verbs & Active Voice (0-100)."""
     all_bullets = []
@@ -553,7 +694,6 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
                 weak_bullets.append({"bullet_text": b, "weak_phrase": wv})
                 break
                 
-    # Detect repetitive first verbs (>2 uses)
     from collections import Counter
     counts = Counter(first_words)
     repetitive = [word for word, count in counts.items() if count >= 3 and len(word) > 3]
@@ -574,29 +714,27 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
     }
 
 
-
+# ==============================================================================
+# PILLAR 5: VISUAL GEOMETRY & LINE BUDGET
+# ==============================================================================
 def is_header_or_non_bullet_metadata(text: str) -> bool:
     """Detects and filters out header tables, dates, and non-bullet metadata."""
     t = text.strip()
     t_lower = t.lower()
     if len(t) < 20:
         return True
-    # Identity & academic table headers
     if any(k in t_lower for k in [
         'dob:', 'gender:', 'cpi:', 'cpi /', 'credits', 'roll no', 'examination', 
         'passing year', 'board', 'b.tech', 'm.tech', 'dual degree', 'gender: male', 'gender: female'
     ]):
         return True
-    # Section titles
     if t_lower in [
         'key projects', 'professional experience', 'extracurriculars', 
         'positions of responsibility', 'scholastic achievements', 'education', 'technical skills'
     ]:
         return True
-    # Pure date tags
     if re.match(r"^\[?[a-z]{3}[\'\’]\d{2}\s*-\s*(?:present|[a-z]{3}[\'\’]\d{2})\]?$", t_lower):
         return True
-    # Left-column project labels
     if t_lower in [
         "self project (deployed)", "self project", "course project", "b.tech. project", "renewathon"
     ]:
@@ -635,7 +773,6 @@ def inspect_pdf_visual_geometry_and_hazards(
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             page_count = len(doc)
             
-            # Map of bullet text normalized to section
             bullet_section_map = {}
             for sec in parsed_sections:
                 stype = sec.get("section_type", "Experience")
@@ -656,17 +793,14 @@ def inspect_pdf_visual_geometry_and_hazards(
                     if not lines:
                         continue
                     
-                    # Collect content lines (right column, x0 > 110 or width > 200)
                     content_lines = []
                     for l in lines:
                         l_text = "".join([s.get("text", "") for s in l.get("spans", [])]).strip()
                         bbox = l.get("bbox", (0, 0, 0, 0))
                         
-                        # Skip if header or metadata
                         if is_header_or_non_bullet_metadata(l_text):
                             continue
                             
-                        # Must be in right-hand content column
                         if bbox[0] >= 110 or (bbox[2] - bbox[0]) >= 220:
                             content_lines.append({
                                 "text": l_text,
@@ -679,7 +813,6 @@ def inspect_pdf_visual_geometry_and_hazards(
                     if not content_lines:
                         continue
                         
-                    # Group lines into individual bullet units / overview lines
                     bullet_units = []
                     curr_unit = []
                     
@@ -704,11 +837,9 @@ def inspect_pdf_visual_geometry_and_hazards(
                         if is_header_or_non_bullet_metadata(clean_bullet_text) or len(clean_bullet_text) < 35:
                             continue
                             
-                        # 1 Visual line on PDF -> 100% Safe (0 Overflow)
                         if len(bu) == 1:
                             continue
                             
-                        # Multi-line bullet: check fill ratio of the last line
                         widths = [l["width"] for l in bu]
                         max_w = max(widths) if widths else 1
                         last_w = widths[-1]
@@ -716,8 +847,6 @@ def inspect_pdf_visual_geometry_and_hazards(
                         last_words = last_text.split()
                         
                         width_ratio = last_w / max(max_w, 1)
-                        
-                        # Flag ONLY true orphan wrap: last line is < 25% width AND has <= 3 trailing words
                         is_orphan = (width_ratio < 0.25 and len(last_words) <= 3) or (len(last_words) <= 2 and len(last_text) < 16)
                         
                         if is_orphan:
@@ -761,14 +890,11 @@ def evaluate_formatting_and_iitb_rules(
     words = raw_text.split()
     word_count = len(words)
     
-    # Visual geometry & page count analysis
     visual_analysis = inspect_pdf_visual_geometry_and_hazards(pdf_bytes, raw_text, parsed_sections)
     page_count = visual_analysis["page_count"]
     hazards = visual_analysis["hazards"]
     
-    # Calibrated Word Budget based on Auto-Detected Page Count
     if page_count == 1:
-        # 1-Page Placement Resume Optimal Word Budget: 400–650 words.
         if 380 <= word_count <= 650:
             word_density_score = 100
             density_status = f"Optimal for 1-Page ({word_count} words)"
@@ -779,7 +905,6 @@ def evaluate_formatting_and_iitb_rules(
             word_density_score = 70
             density_status = f"Very Dense ({word_count} words)"
     else:
-        # 2-Page Master Resume Optimal Word Budget: 850–1650 words.
         if 850 <= word_count <= 1650:
             word_density_score = 100
             density_status = f"Optimal for 2-Page Master ({word_count} words)"
@@ -790,10 +915,8 @@ def evaluate_formatting_and_iitb_rules(
             word_density_score = 75
             density_status = f"Very Dense ({word_count} words)"
             
-    # Line wrap score based on REAL visual orphan spills (not normal single lines!)
     wrap_score = max(50, 100 - (len(hazards) * 8))
     
-    # Prohibited Rank Mentions Inspection
     policy_alerts = []
     if mode == "iitb_placement":
         for pattern, violation_title in PROHIBITED_RANK_PATTERNS:
@@ -841,8 +964,93 @@ def evaluate_formatting_and_iitb_rules(
     }
 
 
+# ==============================================================================
+# SECTION-BY-SECTION HEALTH DIAGNOSTICS
+# ==============================================================================
+def evaluate_section_wise_health(
+    parsed_sections: List[Dict[str, Any]], 
+    raw_text: str
+) -> Dict[str, Any]:
+    """
+    Computes individual quality health scores (0-100) and diagnostics for each key resume section.
+    """
+    raw_lower = raw_text.lower()
+    
+    # 1. Experience Section
+    exp_bullets = []
+    for s in parsed_sections:
+        if s.get("section_type", "").lower() in ["experience", "work experience", "internship"]:
+            for b in s.get("bullets", []):
+                t = b if isinstance(b, str) else b.get("bullet_text", "")
+                if t: exp_bullets.append(t)
+                
+    exp_metric_count = sum(1 for b in exp_bullets if re.search(r"\d+%|\d+x|\$[\d,]+|₹[\d,]+|\b\d+\b", b))
+    exp_score = min(100, max(45, int(round((exp_metric_count / max(len(exp_bullets), 1)) * 60 + (min(len(exp_bullets), 8) / 8) * 40))))
+    
+    # 2. Projects Section
+    proj_bullets = []
+    for s in parsed_sections:
+        if s.get("section_type", "").lower() in ["project", "projects", "key projects", "technical projects"]:
+            for b in s.get("bullets", []):
+                t = b if isinstance(b, str) else b.get("bullet_text", "")
+                if t: proj_bullets.append(t)
+                
+    proj_has_deployed = any(k in raw_lower for k in ["deployed", "live", "active users", "github", "production", "hosted", "users"])
+    proj_score = min(100, max(50, int(round(50 + (25 if proj_has_deployed else 10) + min(len(proj_bullets), 6) * 4))))
+    
+    # 3. Education & Scholastic Section
+    has_cpi = bool(re.search(r"\bcpi\b|\bgpa\b|\bcredits\b|\bcredits completed\b", raw_lower))
+    has_honors = any(k in raw_lower for k in ["ap grade", "scholar", "kvpy", "olympiad", "top", "medal", "fellowship", "merit"])
+    edu_score = 100 if (has_cpi and has_honors) else 85 if has_cpi else 70
+    
+    # 4. Technical / Domain Skills Section
+    has_skills_table = any(k in raw_lower for k in ["languages:", "frameworks:", "databases:", "tools:", "libraries:"])
+    skills_score = 95 if has_skills_table else 80 if ("skills" in raw_lower or "coursework" in raw_lower) else 65
+    
+    # 5. Leadership & PoR
+    por_present = any(k in raw_lower for k in ["position of responsibility", "positions of responsibility", "convenor", "head", "manager", "lead", "coordinator", "secretary"])
+    por_score = 90 if por_present else 75
+    
+    return {
+        "experience": {
+            "name": "Work Experience & Internships",
+            "score": exp_score,
+            "bullets_count": len(exp_bullets),
+            "quantified_ratio": int(round((exp_metric_count / max(len(exp_bullets), 1)) * 100)),
+            "status": "Elite Impact" if exp_score >= 85 else "Strong" if exp_score >= 70 else "Needs Metrics"
+        },
+        "projects": {
+            "name": "Key Technical / Domain Projects",
+            "score": proj_score,
+            "bullets_count": len(proj_bullets),
+            "has_production_proof": proj_has_deployed,
+            "status": "Production Caliber" if proj_score >= 85 else "Good Depth" if proj_score >= 70 else "Needs Polish"
+        },
+        "education": {
+            "name": "Scholastic & Academic Achievements",
+            "score": edu_score,
+            "has_cpi": has_cpi,
+            "has_honors": has_honors,
+            "status": "Placement Compliant" if edu_score >= 85 else "Acceptable"
+        },
+        "skills": {
+            "name": "Technical & Domain Skills Matrix",
+            "score": skills_score,
+            "is_categorized": has_skills_table,
+            "status": "Structured Stack" if skills_score >= 85 else "Uncategorized"
+        },
+        "leadership": {
+            "name": "Leadership & Extracurriculars",
+            "score": por_score,
+            "present": por_present,
+            "status": "Verified Leadership" if por_present else "Standard Profile"
+        }
+    }
 
 
+# ==============================================================================
+# MASTER ATS EVALUATION ENGINE
+# ==============================================================================
 def compute_full_ats_report(
     pdf_bytes: Optional[bytes] = None,
     raw_text: Optional[str] = None,
@@ -851,7 +1059,7 @@ def compute_full_ats_report(
     job_description: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Computes Master 5-Pillar ATS & Placement Scorecard with Quick Wins Roadmap.
+    Computes Master 5-Pillar ATS & Placement Scorecard with Deep Semantic Intelligence and Section Diagnostics.
     """
     if pdf_bytes and not raw_text:
         raw_text = extract_text_from_pdf_stream(pdf_bytes)
@@ -859,7 +1067,6 @@ def compute_full_ats_report(
     if not raw_text or not raw_text.strip():
         raw_text = "No extractable text found in resume."
         
-    # Extract structured sections
     parsed_sections = []
     try:
         from agents.achievement_engine import extract_final_resume_bullets
@@ -877,8 +1084,10 @@ def compute_full_ats_report(
     p4 = evaluate_action_verbs_and_voice(parsed_sections, target_role=target_role)
     p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, pdf_bytes=pdf_bytes, mode=mode)
     
+    # Section-Wise Health Diagnostics
+    section_health = evaluate_section_wise_health(parsed_sections, raw_text)
+    
     # Master Weighted Score (0-100)
-    # Skill Alignment: 30%, Quantification: 25%, Parseability: 15%, Action Verbs: 15%, Formatting/Budget: 15%
     overall_score = int(round(
         (p1["score"] * 0.15) +
         (p2["score"] * 0.30) +
@@ -890,7 +1099,7 @@ def compute_full_ats_report(
     
     tier = "Placement Ready" if overall_score >= 85 else "Strong Shortlist" if overall_score >= 72 else "Needs Polish" if overall_score >= 58 else "Critical Gaps"
     
-    # Generate Top 3 Actionable Quick Wins (+Points Roadmap)
+    # Top 3 Actionable Quick Wins
     quick_wins = []
     
     if p2.get("missing_critical") and len(p2["missing_critical"]) > 0:
@@ -900,7 +1109,7 @@ def compute_full_ats_report(
             "impact_pts": "+12 pts",
             "category": "Keyword Match",
             "action_type": "inject_keyword",
-            "hint": f"Add {', '.join(missing_top)} into your experience or project bullets."
+            "hint": f"Add {', '.join(missing_top)} into your experience or project points."
         })
         
     if p3.get("weak_unquantified_bullets") and len(p3["weak_unquantified_bullets"]) > 0:
@@ -916,7 +1125,7 @@ def compute_full_ats_report(
         quick_wins.append({
             "title": f"Trim {len(p5['line_wrap_hazards'])} Orphan Line-Wrap Hazards",
             "impact_pts": "+5 pts",
-            "category": "1-Page Budget",
+            "category": "Line Budget",
             "action_type": "trim_line_wrap",
             "hint": "Tighten 5–15 characters to prevent single words spilling onto a second line."
         })
@@ -947,6 +1156,7 @@ def compute_full_ats_report(
         "is_custom_jd": p2.get("is_custom_jd", False),
         "raw_text": raw_text,
         "quick_wins": quick_wins,
+        "section_health": section_health,
         "pillars": {
             "parseability": p1,
             "keyword_match": p2,
@@ -959,7 +1169,9 @@ def compute_full_ats_report(
     }
 
 
-
+# ==============================================================================
+# CONTEXT-AWARE MULTI-OPTION AI BULLET REFINER (3 Strategic Options)
+# ==============================================================================
 def refine_ats_bullet(
     bullet_text: str,
     fix_type: str,
@@ -968,82 +1180,84 @@ def refine_ats_bullet(
     missing_keyword: Optional[str] = None,
     target_length: Optional[int] = None
 ) -> Dict[str, Any]:
-    """1-Click AI Bullet Refiner for ATS & Line-Wrap fixes."""
-    length_instruction = f"Strictly constrain output to approximately {target_length or len(bullet_text)} characters." if target_length else "Keep length tight for a 1-line placement resume bullet."
-    
+    """1-Click AI Bullet Refiner offering 3 distinct strategic rewrite options."""
     prompt = f"""
-    You are an elite IIT Bombay placement resume editor.
-    Refine this single resume bullet point according to the specified fix type.
+    You are an elite IIT Bombay Placement Coach and Technical Resume Architect.
+    Refine this single resume bullet point into 3 distinct, high-impact variations for target domain '{target_role}'.
     
     ORIGINAL BULLET:
     "{bullet_text}"
     
     FIX TYPE: {fix_type}
-    TARGET DOMAIN: {target_role}
     MISSING KEYWORD TO INJECT (if applicable): {missing_keyword or "None"}
     
-    INSTRUCTIONS:
-    - If fix_type is 'trim_line_wrap': Trim 5-15 characters to prevent awkward 1-2 word line wrapping while preserving all metrics, tools, and impact.
-    - If fix_type is 'inject_keyword': Naturally weave in the missing keyword '{missing_keyword}' while keeping the point factual.
-    - If fix_type is 'power_verb': Replace weak/passive opening with a punchy, non-repetitive power action verb (e.g., Spearheaded, Architected, Formulated).
-    - If fix_type is 'quantify': Suggest realistic metric brackets or strengthen impact positioning.
-    - {length_instruction}
-    - Do NOT end with a period.
+    Generate 3 distinct options:
+    1. "executive_impact": Google X-Y-Z framework with strong action verb, clear mechanism, and quantifiable business outcome.
+    2. "competency_weave": High-density competency injection naturally weaving in relevant frameworks, tools, or '{missing_keyword}'.
+    3. "line_budget_trim": Concise, tight phrasing optimized to eliminate orphan line wrap (1-line fit).
+    
+    RULES:
+    - Never invent fictitious degrees or false facts; enhance the phrasing of the existing accomplishment.
+    - No period at the end.
     
     Return JSON format:
     {{
-      "refined_bullet": "string",
-      "char_diff": integer,
-      "explanation": "string explaining what was improved"
+      "refined_bullet": "Best overall primary recommendation",
+      "new_length": 120,
+      "char_diff": -10,
+      "explanation": "Summary of strategic improvements made",
+      "options": [
+        {{
+          "title": "Google X-Y-Z Executive Impact",
+          "text": "Rewritten bullet string",
+          "length": 125,
+          "focus": "Quantified Business Outcome & Mechanism"
+        }},
+        {{
+          "title": "Competency & Tech Stack Weave",
+          "text": "Rewritten bullet string",
+          "length": 130,
+          "focus": "Keywords & Architecture Depth"
+        }},
+        {{
+          "title": "Concise 1-Line Fit",
+          "text": "Rewritten bullet string",
+          "length": 110,
+          "focus": "Line Budget & Zero Margin Spill"
+        }}
+      ]
     }}
     """
     try:
-        response_text = cerebras_client.generate_chat_completion(
-            model="gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=400
-        )
-        data = json_repair.loads(response_text)
-        if isinstance(data, dict) and data.get("refined_bullet"):
-            refined = data["refined_bullet"].strip()
-            if refined.endswith("."): refined = refined[:-1]
-            return {
-                "original_bullet": bullet_text,
-                "refined_bullet": refined,
-                "original_length": len(bullet_text),
-                "new_length": len(refined),
-                "char_diff": len(refined) - len(bullet_text),
-                "explanation": data.get("explanation", "Refined for placement impact and ATS alignment.")
-            }
-    except Exception as e:
-        print(f"Cerebras refine failed, falling back to Gemini: {e}")
         try:
+            response_text = cerebras_client.generate_chat_completion(
+                model="gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=700
+            )
+        except Exception:
             res = gemini_client.generate_content(
                 model_name="gemini-1.5-flash",
                 prompt=prompt,
                 generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
             )
-            data = json_repair.loads(res.text)
-            if isinstance(data, dict) and data.get("refined_bullet"):
-                refined = data["refined_bullet"].strip()
-                if refined.endswith("."): refined = refined[:-1]
-                return {
-                    "original_bullet": bullet_text,
-                    "refined_bullet": refined,
-                    "original_length": len(bullet_text),
-                    "new_length": len(refined),
-                    "char_diff": len(refined) - len(bullet_text),
-                    "explanation": data.get("explanation", "Refined for placement impact and ATS alignment.")
-                }
-        except Exception as e2:
-            print(f"Gemini fallback refine failed: {e2}")
+            response_text = res.text
+            
+        data = json_repair.loads(response_text)
+        if isinstance(data, dict) and data.get("refined_bullet"):
+            orig_len = len(bullet_text)
+            new_len = len(data["refined_bullet"])
+            data["new_length"] = new_len
+            data["char_diff"] = new_len - orig_len
+            return data
+    except Exception as e:
+        print(f"Refinement error: {e}")
         
     return {
-        "original_bullet": bullet_text,
         "refined_bullet": bullet_text,
-        "original_length": len(bullet_text),
         "new_length": len(bullet_text),
         "char_diff": 0,
-        "explanation": "Could not generate refinement at this time."
+        "explanation": "Preserved original point.",
+        "options": []
     }

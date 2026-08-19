@@ -12,7 +12,8 @@ import {
   Target, Copy, Lightbulb, ChevronDown, 
   Brain, FileText, Zap, AlertTriangle, ShieldCheck, 
   Search, Check, GraduationCap, Building2, SlidersHorizontal, 
-  TrendingUp, Cpu, Sparkles, X, Info, HelpCircle, ArrowUpRight
+  TrendingUp, Cpu, Sparkles, X, Info, HelpCircle, ArrowUpRight,
+  Briefcase, FolderGit2, Award, Wrench, Users
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
@@ -88,7 +89,7 @@ const MasterScoreGauge = ({ score, tier, mode, roleLabel }: { score: number, tie
         </h3>
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
           {mode === "iitb_placement" 
-            ? `Calibrated for ${roleLabel} campus shortlisting: 1-page LaTeX line budget, scholastic CPI highlights, and domain competency density.`
+            ? `Calibrated for ${roleLabel} campus shortlisting: multi-tiered semantic competency density, line budget, and scholastic highlights.`
             : `Calibrated for corporate enterprise ATS systems (Workday, Greenhouse, Eightfold): OCR extractability and semantic skill match for ${roleLabel}.`}
         </p>
       </div>
@@ -135,7 +136,7 @@ export default function ATSCheckerPage() {
   const [inputMode, setInputMode] = useState<"file" | "text">("file")
   
   // ATS Config
-  const [targetRole, setTargetRole] = useState("consulting")
+  const [targetRole, setTargetRole] = useState("software")
   const [atsMode, setAtsMode] = useState<"iitb_placement" | "global_ats">("iitb_placement")
   const [customJD, setCustomJD] = useState("")
   const [showJDInput, setShowJDInput] = useState(false)
@@ -146,15 +147,15 @@ export default function ATSCheckerPage() {
   const [scanProgress, setScanProgress] = useState(0)
   const [atsReport, setAtsReport] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [activeSubTab, setActiveSubTab] = useState<"overview" | "keywords" | "line_wrap" | "raw_stream">("overview")
+  const [activeSubTab, setActiveSubTab] = useState<"overview" | "sections" | "keywords" | "line_wrap" | "raw_stream">("overview")
   
   // 1-Click Bullet Fix State
   const [bulletToFix, setBulletToFix] = useState<any | null>(null)
-  const [fixType, setFixType] = useState<string>("trim_line_wrap")
+  const [fixType, setFixType] = useState<string>("power_verb")
   const [missingKeywordToInject, setMissingKeywordToInject] = useState<string>("")
   const [isFixingBullet, setIsFixingBullet] = useState(false)
   const [fixedBulletResult, setFixedBulletResult] = useState<any | null>(null)
-  const [copiedBullet, setCopiedBullet] = useState(false)
+  const [copiedBullet, setCopiedBullet] = useState<string | null>(null)
 
   const { isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
   const router = useRouter()
@@ -241,7 +242,7 @@ export default function ATSCheckerPage() {
     if (!bulletToFix) return
     setIsFixingBullet(true)
     setFixedBulletResult(null)
-    setCopiedBullet(false)
+    setCopiedBullet(null)
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
@@ -271,8 +272,10 @@ export default function ATSCheckerPage() {
     }
   }
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
+    setCopiedBullet(id);
+    setTimeout(() => setCopiedBullet(null), 2000);
   };
 
   return (
@@ -307,13 +310,13 @@ export default function ATSCheckerPage() {
         <div className="mb-6 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-semibold">
-                Dual-Calibrated Neural Scoring Engine
+              <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-semibold flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-primary" /> Dual-Calibrated Neural Scoring & Placement Engine
               </Badge>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">ATS & Placement Score Studio</h1>
             <p className="text-muted-foreground text-sm">
-              Comprehensive applicant tracking evaluation calibrated for IIT Bombay placement season and global enterprise ATS platforms.
+              Comprehensive evaluation calibrated for IIT Bombay placement season and global enterprise ATS platforms.
             </p>
           </div>
 
@@ -365,7 +368,7 @@ export default function ATSCheckerPage() {
                     IIT Bombay Placement Standard
                   </div>
                   <p className="text-[11px] opacity-80 mt-1.5 leading-relaxed">
-                    1-Page LaTeX line budget, CPI & AP grade notice, overview lines, Day-1 shortlisting rules.
+                    1-Page & 2-Page Master line budget, CPI & AP grade notice, overview lines, Day-1 shortlisting rules.
                   </p>
                 </button>
                 <button
@@ -399,8 +402,8 @@ export default function ATSCheckerPage() {
                   onChange={(e) => setTargetRole(e.target.value)}
                   disabled={isScanning}
                 >
-                  <option value="consulting">Management Consulting (McKinsey, BCG, Bain, Kearney)</option>
                   <option value="software">Software Engineering / IT (Google, Microsoft, Amazon, Uber)</option>
+                  <option value="consulting">Management Consulting (McKinsey, BCG, Bain, Kearney)</option>
                   <option value="product_management">Product Management (Flipkart, Swiggy, Razorpay, Uber)</option>
                   <option value="finance">Finance & Quant (Goldman Sachs, Morgan Stanley, Citadel)</option>
                   <option value="analytics">Data Science & Analytics (Fractal, Tiger, EXL)</option>
@@ -454,7 +457,7 @@ export default function ATSCheckerPage() {
                   onClick={() => setInputMode('file')}
                   disabled={isScanning}
                 >
-                  Upload 1-Page PDF
+                  Upload PDF Resume
                 </button>
                 <button
                   type="button"
@@ -472,7 +475,7 @@ export default function ATSCheckerPage() {
                 <div className="relative border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 text-center transition-all bg-primary/5 cursor-pointer">
                   <UploadCloud className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
                   <p className="font-semibold text-foreground text-sm mb-1">Click or drag & drop your Resume PDF</p>
-                  <p className="text-xs text-muted-foreground">Supports LaTeX & Word-generated PDFs (Max 5MB)</p>
+                  <p className="text-xs text-muted-foreground">Supports LaTeX & Word-generated PDFs (1-Page & 2-Page Master Resumes)</p>
                   <input 
                     type="file" 
                     accept="application/pdf" 
@@ -511,7 +514,7 @@ export default function ATSCheckerPage() {
             {isScanning && (
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-mono text-muted-foreground">
-                  <span>Evaluating 5 Pillars across {targetRole.toUpperCase()} benchmarks...</span>
+                  <span>Evaluating 5 Pillars & Semantic Intelligence for {targetRole.toUpperCase()}...</span>
                   <span>{Math.floor(scanProgress)}%</span>
                 </div>
                 <Progress value={scanProgress} className="h-2 bg-black/10 dark:bg-white/10" />
@@ -545,6 +548,9 @@ export default function ATSCheckerPage() {
               <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2 flex flex-col">
                 <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/5 text-xs text-muted-foreground font-mono">
                   <span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-primary" /> Source Resume Preview</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {atsReport.pillars?.formatting_layout?.page_count || 1}-Page Resume
+                  </Badge>
                 </div>
                 <div className="flex-1 mt-2 rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center">
                   {pdfUrl ? (
@@ -586,8 +592,8 @@ export default function ATSCheckerPage() {
                     value={targetRole}
                     onChange={(e) => { setTargetRole(e.target.value); handleRunATS(e.target.value, atsMode); }}
                   >
-                    <option value="consulting">Management Consulting</option>
                     <option value="software">Software Engineering / IT</option>
+                    <option value="consulting">Management Consulting</option>
                     <option value="product_management">Product Management</option>
                     <option value="finance">Finance / Quant</option>
                     <option value="analytics">Data Science & Analytics</option>
@@ -758,7 +764,7 @@ export default function ATSCheckerPage() {
                     </div>
                     <Progress value={atsReport.pillars?.keyword_match?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
-                      {atsReport.pillars?.keyword_match?.found_critical_count} of {atsReport.pillars?.keyword_match?.total_critical_count} core competencies matched.
+                      {atsReport.pillars?.keyword_match?.found_critical_count} of {atsReport.pillars?.keyword_match?.total_critical_count} competencies matched.
                     </p>
                   </div>
                   <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
@@ -825,13 +831,20 @@ export default function ATSCheckerPage() {
               </div>
 
               {/* Sub-view Navigation Tabs */}
-              <div className="border-b border-black/5 dark:border-white/5 flex gap-4">
+              <div className="border-b border-black/5 dark:border-white/5 flex flex-wrap gap-4">
                 <button
                   onClick={() => setActiveSubTab("overview")}
                   className={`pb-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${activeSubTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                 >
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Pillar Health & Checks
+                </button>
+                <button
+                  onClick={() => setActiveSubTab("sections")}
+                  className={`pb-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${activeSubTab === "sections" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Briefcase className="h-3.5 w-3.5" />
+                  Section Quality Diagnostics
                 </button>
                 <button
                   onClick={() => setActiveSubTab("keywords")}
@@ -942,24 +955,154 @@ export default function ATSCheckerPage() {
                       </div>
                     )}
 
-                    {atsReport.pillars?.quantification?.weak_unquantified_bullets?.length > 0 && (
+                    {/* Google X-Y-Z Anatomy Inspector */}
+                    {atsReport.pillars?.quantification?.xyz_deconstruction?.length > 0 && (
                       <div className="space-y-2 pt-1">
-                        <span className="text-xs font-semibold text-muted-foreground">Unquantified Points Needing Metrics:</span>
-                        {atsReport.pillars?.quantification?.weak_unquantified_bullets.slice(0, 2).map((b: string, i: number) => (
-                          <div key={i} className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-center justify-between gap-3">
-                            <p className="text-xs text-foreground/80 line-clamp-1 italic font-mono">"{b}"</p>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => { setBulletToFix({ bullet_text: b }); setFixType("quantify"); }}
-                              className="h-7 px-2.5 text-xs text-primary border-primary/30 shrink-0"
-                            >
-                              <Sparkles className="h-3 w-3 mr-1" /> Add Metrics
-                            </Button>
+                        <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" /> Google X-Y-Z Bullet Quality Sample:
+                        </span>
+                        {atsReport.pillars?.quantification?.xyz_deconstruction.slice(0, 2).map((xyz: any, i: number) => (
+                          <div key={i} className="p-3 rounded-xl bg-background/90 border border-black/5 dark:border-white/5 space-y-1.5">
+                            <p className="text-xs font-mono text-foreground line-clamp-1 italic">"{xyz.bullet_text}"</p>
+                            <div className="flex flex-wrap gap-1 text-[9px] font-mono">
+                              <Badge className={`px-1.5 py-0 ${xyz.has_action_verb ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                                {xyz.has_action_verb ? "Action: Strong" : "Action: Weak"}
+                              </Badge>
+                              <Badge className={`px-1.5 py-0 ${xyz.has_metric_y ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
+                                {xyz.has_metric_y ? "Metric (Y): Quantified" : "Metric (Y): Missing"}
+                              </Badge>
+                              <Badge className={`px-1.5 py-0 ${xyz.has_mechanism_z ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                                {xyz.has_mechanism_z ? "Mechanism (Z): Clear" : "Mechanism (Z): Add Context"}
+                              </Badge>
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-view: Section Quality Diagnostics */}
+              {activeSubTab === "sections" && (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  <div className="p-4 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                      Section-by-Section Quality & Depth Diagnostics
+                    </h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Evaluates content depth, role ownership, quantifiable business outcomes, and formatting structure across each key section of your placement profile.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Experience Section Card */}
+                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <Briefcase className="h-4 w-4 text-primary" /> Work Experience
+                          </span>
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
+                            {atsReport.section_health?.experience?.score}%
+                          </Badge>
+                        </div>
+                        <Progress value={atsReport.section_health?.experience?.score} className="h-1.5 mb-2" />
+                        <div className="space-y-1 text-[11px] text-muted-foreground">
+                          <p>• {atsReport.section_health?.experience?.bullets_count} Experience points detected.</p>
+                          <p>• {atsReport.section_health?.experience?.quantified_ratio}% of experience points contain metrics.</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
+                        Status: {atsReport.section_health?.experience?.status}
+                      </Badge>
+                    </div>
+
+                    {/* Projects Section Card */}
+                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <FolderGit2 className="h-4 w-4 text-primary" /> Technical Projects
+                          </span>
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
+                            {atsReport.section_health?.projects?.score}%
+                          </Badge>
+                        </div>
+                        <Progress value={atsReport.section_health?.projects?.score} className="h-1.5 mb-2" />
+                        <div className="space-y-1 text-[11px] text-muted-foreground">
+                          <p>• {atsReport.section_health?.projects?.bullets_count} Project points detected.</p>
+                          <p>• Production & Deployment Proof: {atsReport.section_health?.projects?.has_production_proof ? "Verified (Live / Active)" : "Academic / Prototype"}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
+                        Status: {atsReport.section_health?.projects?.status}
+                      </Badge>
+                    </div>
+
+                    {/* Education & Scholastic Card */}
+                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <GraduationCap className="h-4 w-4 text-primary" /> Scholastic & Education
+                          </span>
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
+                            {atsReport.section_health?.education?.score}%
+                          </Badge>
+                        </div>
+                        <Progress value={atsReport.section_health?.education?.score} className="h-1.5 mb-2" />
+                        <div className="space-y-1 text-[11px] text-muted-foreground">
+                          <p>• CPI/GPA Header Status: {atsReport.section_health?.education?.has_cpi ? "Verified" : "Missing"}</p>
+                          <p>• Honors / AP Grades: {atsReport.section_health?.education?.has_honors ? "Recognized" : "Standard"}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
+                        Status: {atsReport.section_health?.education?.status}
+                      </Badge>
+                    </div>
+
+                    {/* Technical Skills Card */}
+                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <Wrench className="h-4 w-4 text-primary" /> Skills Categorization
+                          </span>
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
+                            {atsReport.section_health?.skills?.score}%
+                          </Badge>
+                        </div>
+                        <Progress value={atsReport.section_health?.skills?.score} className="h-1.5 mb-2" />
+                        <div className="space-y-1 text-[11px] text-muted-foreground">
+                          <p>• Table Categories: {atsReport.section_health?.skills?.is_categorized ? "Structured (Languages/Frameworks/Tools)" : "Uncategorized Block"}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
+                        Status: {atsReport.section_health?.skills?.status}
+                      </Badge>
+                    </div>
+
+                    {/* Leadership & PoR Card */}
+                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                            <Users className="h-4 w-4 text-primary" /> Positions of Responsibility
+                          </span>
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
+                            {atsReport.section_health?.leadership?.score}%
+                          </Badge>
+                        </div>
+                        <Progress value={atsReport.section_health?.leadership?.score} className="h-1.5 mb-2" />
+                        <div className="space-y-1 text-[11px] text-muted-foreground">
+                          <p>• Leadership Proof: {atsReport.section_health?.leadership?.present ? "Detected (Lead/Manager/Secretary)" : "Optional"}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
+                        Status: {atsReport.section_health?.leadership?.status}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1008,7 +1151,7 @@ export default function ATSCheckerPage() {
 
                   {/* Categorized Matrix Breakdown */}
                   {atsReport.pillars?.keyword_match?.categorized_matrix ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {atsReport.pillars?.keyword_match?.categorized_matrix.map((cat: any, idx: number) => (
                         <div key={idx} className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
                           <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2">
@@ -1020,13 +1163,19 @@ export default function ATSCheckerPage() {
 
                           <div className="space-y-2">
                             {cat.matched?.map((m: any, mi: number) => (
-                              <div key={mi} className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between">
-                                <span className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                                  <Check className="h-3 w-3" /> {m.name}
+                              <div key={mi} className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between gap-2">
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 truncate">
+                                  <Check className="h-3 w-3 shrink-0" /> {m.name}
                                 </span>
-                                <span className="text-[9px] font-mono text-muted-foreground opacity-70 truncate max-w-[90px]">
-                                  via "{m.matched_via}"
-                                </span>
+                                {m.is_implicit ? (
+                                  <Badge className="text-[9px] bg-primary/10 text-primary border-primary/20 shrink-0 font-mono flex items-center gap-1">
+                                    <Sparkles className="h-2.5 w-2.5" /> AI Inferred
+                                  </Badge>
+                                ) : (
+                                  <span className="text-[9px] font-mono text-muted-foreground opacity-70 truncate max-w-[90px] shrink-0">
+                                    via "{m.matched_via}"
+                                  </span>
+                                )}
                               </div>
                             ))}
 
@@ -1045,35 +1194,7 @@ export default function ATSCheckerPage() {
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    /* Fallback Flat List */
-                    <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4" /> Detected Competencies ({atsReport.pillars?.keyword_match?.found_keywords?.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {atsReport.pillars?.keyword_match?.found_keywords?.map((kw: string, i: number) => (
-                          <Badge key={i} className="px-3 py-1 rounded-xl text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                            <Check className="h-3 w-3 mr-1 inline" /> {kw}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recommendations */}
-                  {atsReport.pillars?.keyword_match?.suggestions?.length > 0 && (
-                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
-                      <span className="text-xs font-bold text-primary flex items-center gap-1.5">
-                        <Lightbulb className="h-4 w-4" /> Placement Optimization Suggestions:
-                      </span>
-                      <ul className="text-xs text-foreground/80 space-y-1.5 list-disc pl-4">
-                        {atsReport.pillars?.keyword_match?.suggestions.map((s: string, i: number) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
@@ -1143,8 +1264,9 @@ export default function ATSCheckerPage() {
                 <div className="space-y-3 animate-in fade-in duration-300">
                   <div className="p-3.5 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10 flex items-center justify-between text-xs text-muted-foreground">
                     <span>Plain Text Stream parsed by automated ATS scrapers (Workday, Greenhouse, Portal Bots)</span>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(atsReport.pillars?.parseability?.raw_text_preview || "")} className="h-6 text-xs text-primary">
-                      <Copy className="h-3 w-3 mr-1" /> Copy Text
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(atsReport.pillars?.parseability?.raw_text_preview || "", "raw")} className="h-6 text-xs text-primary">
+                      {copiedBullet === "raw" ? <Check className="h-3 w-3 mr-1 text-emerald-500" /> : <Copy className="h-3 w-3 mr-1" />}
+                      {copiedBullet === "raw" ? "Copied!" : "Copy Text"}
                     </Button>
                   </div>
                   <div className="p-4 rounded-2xl bg-neutral-900 text-neutral-200 font-mono text-xs leading-relaxed max-h-96 overflow-y-auto custom-scrollbar border border-neutral-800">
@@ -1221,7 +1343,7 @@ export default function ATSCheckerPage() {
                     <Target className="h-3.5 w-3.5 text-primary" /> Role & Skill Alignment (30%)
                   </strong>
                   <p className="text-muted-foreground leading-relaxed">
-                    Compares bullet text against top domain taxonomies ({atsReport.target_role_label}) and custom Job Descriptions. High-priority missing skills reduce shortlist density.
+                    Compares bullet text against comprehensive domain taxonomies ({atsReport.target_role_label}) and custom Job Descriptions using deterministic synonym mapping combined with deep AI semantic inference.
                   </p>
                 </div>
 
@@ -1245,10 +1367,10 @@ export default function ATSCheckerPage() {
 
                 <div className="p-3.5 rounded-xl bg-background border border-black/5 dark:border-white/5 space-y-1">
                   <strong className="text-foreground flex items-center gap-1.5">
-                    <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> 1-Page Layout & Line Budget (15%)
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Visual Line Budget & Margins (15%)
                   </strong>
                   <p className="text-muted-foreground leading-relaxed">
-                    Scans LaTeX/Word single-page margins. Flags bullets between 115–140 characters that spill orphan words onto new lines and monitors prohibited rank mentions.
+                    Uses PyMuPDF visual bounding box analysis on rendered PDF pages. Only flags genuine orphan lines that leave excessive empty margins.
                   </p>
                 </div>
               </div>
@@ -1263,43 +1385,43 @@ export default function ATSCheckerPage() {
         </div>
       )}
 
-      {/* 1-Click Bullet Fix Modal */}
+      {/* Enhanced 1-Click AI Bullet Optimizer Modal with 3 Strategic Options */}
       {bulletToFix && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="glass-panel dark:bg-neutral-900 rounded-3xl p-6 max-w-xl w-full border border-black/10 dark:border-white/10 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="glass-panel dark:bg-neutral-900 rounded-3xl p-6 md:p-8 max-w-2xl w-full border border-black/10 dark:border-white/10 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-black/5 dark:border-white/10 pb-3">
               <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
                 <Sparkles className="h-4 w-4 text-primary" />
-                1-Click AI Bullet Optimizer
+                Context-Aware AI Bullet Optimizer
               </h3>
               <Button variant="ghost" size="icon" onClick={() => { setBulletToFix(null); setFixedBulletResult(null); }} className="rounded-full h-8 w-8">
                 <X className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Original Bullet</span>
-                <p className="text-xs font-mono p-3 rounded-xl bg-muted/40 text-foreground border border-black/5 dark:border-white/5 mt-1">
+                <p className="text-xs font-mono p-3 rounded-xl bg-muted/40 text-foreground border border-black/5 dark:border-white/5 mt-1 leading-relaxed">
                   "{bulletToFix.bullet_text || bulletToFix.original_bullet}"
                 </p>
                 <span className="text-[10px] text-muted-foreground block mt-1">Length: {(bulletToFix.bullet_text || bulletToFix.original_bullet || "").length} characters</span>
               </div>
 
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Optimization Strategy</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setFixType("trim_line_wrap")}
-                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "trim_line_wrap" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
-                  >
-                    Trim Line-Wrap Overflow
-                  </button>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Optimization Goal</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     onClick={() => setFixType("power_verb")}
                     className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "power_verb" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
                   >
-                    Strong Action Verb
+                    Action Verb Upgrade
+                  </button>
+                  <button
+                    onClick={() => setFixType("quantify")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "quantify" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                  >
+                    Metric Brackets
                   </button>
                   <button
                     onClick={() => setFixType("inject_keyword")}
@@ -1308,10 +1430,10 @@ export default function ATSCheckerPage() {
                     Inject Keyword
                   </button>
                   <button
-                    onClick={() => setFixType("quantify")}
-                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "quantify" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                    onClick={() => setFixType("trim_line_wrap")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "trim_line_wrap" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
                   >
-                    Add Metric Brackets
+                    Line-Wrap Trim
                   </button>
                 </div>
               </div>
@@ -1329,54 +1451,63 @@ export default function ATSCheckerPage() {
                 </div>
               )}
 
+              {/* 3 Strategic Options Display */}
               {fixedBulletResult && (
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2 animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <span>AI Refined Output</span>
-                    <span className="font-mono text-[11px]">{fixedBulletResult.new_length} chars ({fixedBulletResult.char_diff > 0 ? `+${fixedBulletResult.char_diff}` : fixedBulletResult.char_diff})</span>
-                  </div>
-                  <p className="text-xs font-mono font-medium text-foreground leading-relaxed bg-background/80 p-3 rounded-xl border border-emerald-500/20">
-                    {fixedBulletResult.refined_bullet}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{fixedBulletResult.explanation}</p>
+                <div className="space-y-3 pt-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> 3 AI Strategic Rewrite Options
+                  </span>
+
+                  {fixedBulletResult.options?.map((opt: any, optIdx: number) => (
+                    <div key={optIdx} className="p-3.5 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 space-y-2 hover:border-primary/30 transition-all">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-semibold">
+                            {opt.title}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-mono">{opt.focus}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-muted-foreground">{opt.length} chars</span>
+                      </div>
+
+                      <p className="text-xs font-mono font-medium text-foreground leading-relaxed bg-background/80 p-3 rounded-xl border border-black/5 dark:border-white/5">
+                        {opt.text}
+                      </p>
+
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyToClipboard(opt.text, `opt-${optIdx}`)}
+                          className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/5 font-semibold"
+                        >
+                          {copiedBullet === `opt-${optIdx}` ? <Check className="h-3 w-3 mr-1 text-emerald-500" /> : <Copy className="h-3 w-3 mr-1" />}
+                          {copiedBullet === `opt-${optIdx}` ? "Copied to Clipboard!" : "Copy This Option"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/10">
-              {fixedBulletResult ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      copyToClipboard(fixedBulletResult.refined_bullet);
-                      setCopiedBullet(true);
-                      setTimeout(() => setCopiedBullet(false), 2000);
-                    }}
-                    className="text-xs font-semibold"
-                  >
-                    {copiedBullet ? <Check className="h-3.5 w-3.5 mr-1 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
-                    {copiedBullet ? "Copied!" : "Copy Refined Point"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => { setBulletToFix(null); setFixedBulletResult(null); }}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
-                  >
-                    Done
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={handleExecuteBulletFix}
-                  disabled={isFixingBullet}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold w-full"
-                >
-                  {isFixingBullet ? "Optimizing..." : "Execute AI Fix"}
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setBulletToFix(null); setFixedBulletResult(null); }}
+                className="text-xs font-semibold"
+              >
+                Close
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleExecuteBulletFix}
+                disabled={isFixingBullet}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
+              >
+                {isFixingBullet ? "Generating 3 AI Options..." : fixedBulletResult ? "Regenerate Options" : "Generate 3 AI Options"}
+              </Button>
             </div>
           </div>
         </div>
