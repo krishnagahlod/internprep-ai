@@ -169,13 +169,14 @@ async def analyze_resume(
         
     try:
         pdf_bytes = await file.read()
-        text = extract_text(io.BytesIO(pdf_bytes))
+        text = extract_pdf_raw_text(pdf_bytes)
         
         if not text.strip():
-            print("pdfminer found no text. Falling back to Gemini structural parsing.")
+            print("PDF text extraction found no text. Falling back to Gemini structural parsing.")
             text = await asyncio.to_thread(parse_resume_structural, pdf_bytes)
             if not text.strip():
                 raise HTTPException(status_code=400, detail="Could not extract text from the PDF even with AI fallback.")
+
             
         # Check Cache for authenticated users
         from agents.resume_analyzer import supabase
