@@ -1,15 +1,19 @@
 import os
 from supabase import create_client, Client
+from typing import Optional
 from .embeddings import get_query_embedding
 
-url: str = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
-key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-supabase: Client = create_client(url, key)
+url: str = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "") or os.environ.get("SUPABASE_URL", "")
+key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or os.environ.get("SUPABASE_ANON_KEY", "")
+supabase: Optional[Client] = create_client(url, key) if url and key else None
 
 def retrieve_context(query: str, source: str = None, top_k: int = 5) -> str:
     """
     Retrieves relevant knowledge base chunks using metadata-filtered vector search.
     """
+    if not supabase:
+        return ""
+        
     query_embedding = get_query_embedding(query)
     
     rpc_params = {

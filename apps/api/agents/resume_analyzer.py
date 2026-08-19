@@ -14,7 +14,7 @@ import base64
 # Configure Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Optional[Client] = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 # Load Best Practices Rules globally
 RULES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/resumes/best_practices_rules.json"))
