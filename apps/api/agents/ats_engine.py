@@ -173,7 +173,12 @@ def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
             return ""
 
 
-def evaluate_ats_parseability(pdf_bytes: Optional[bytes], raw_text: str, parsed_sections: List[Dict[str, Any]]) -> Dict[str, Any]:
+def evaluate_ats_parseability(
+    pdf_bytes: Optional[bytes], 
+    raw_text: str, 
+    parsed_sections: List[Dict[str, Any]], 
+    mode: str = "iitb_placement"
+) -> Dict[str, Any]:
     """Pillar 1: ATS Parseability & Technical Hygiene (0-100)."""
     score = 100
     issues = []
@@ -184,69 +189,103 @@ def evaluate_ats_parseability(pdf_bytes: Optional[bytes], raw_text: str, parsed_
     if char_count < 300:
         score -= 40
         issues.append("Resume appears to be scanned or contains very little extractable text. ATS parsers cannot read images.")
-        checks.append({"name": "Extractable Text Layer", "passed": False, "detail": "Less than 300 characters detected"})
+        checks.append({
+            "name": "Extractable Text Layer",
+            "passed": False,
+            "score": 40,
+            "status": "Critical"
+        })
     else:
-        checks.append({"name": "Extractable Text Layer", "passed": True, "detail": f"{char_count} characters cleanly extracted"})
+        checks.append({
+            "name": "Extractable Text Layer",
+            "passed": True,
+            "score": 100,
+            "status": "Optimal"
+        })
         
-    # 2. Contact Information Detection
-    email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text)
-    phone_match = re.search(r"(?:\+91[\-\s]?)?[6-9]\d{9}|\b\d{10}\b", raw_text)
-    linkedin_match = re.search(r"linkedin\.com/in/[\w\-]+|linkedin", raw_text, re.IGNORECASE)
-    github_match = re.search(r"github\.com/[\w\-]+|github", raw_text, re.IGNORECASE)
-    
-    contact_score = 0
-    missing_contacts = []
-    if email_match: contact_score += 25
-    else: missing_contacts.append("Email")
-    if phone_match: contact_score += 25
-    else: missing_contacts.append("Phone")
-    if linkedin_match: contact_score += 25
-    else: missing_contacts.append("LinkedIn")
-    if github_match or "portfolio" in raw_text.lower(): contact_score += 25
-    
-    if contact_score < 75:
-        deduction = (75 - contact_score) // 2
-        score -= deduction
-        if not email_match: issues.append("Email address not clearly parsed from header.")
-        if not phone_match: issues.append("Phone number not clearly parsed from header.")
-        if not linkedin_match: issues.append("Professional profile link (LinkedIn/Portfolio) not found.")
-        
-    checks.append({
-        "name": "Contact Header Completeness",
-        "passed": contact_score >= 75,
-        "detail": "Verified contact details and professional links" if contact_score >= 75 else f"Missing: {', '.join(missing_contacts)}"
-    })
-    
-    # 3. Standard Section Header Recognition
+    # 2. Section Header Recognition
     std_headers = ["experience", "project", "education", "responsibility", "leadership", "scholastic", "skill", "achievement", "extracurricular"]
     found_headers = [h for h in std_headers if re.search(rf"\b{h}\b", raw_text, re.IGNORECASE)]
     
     if len(found_headers) < 3:
         score -= 20
         issues.append("Standard section headings (Experience, Projects, Education, Leadership) are missing or non-standard.")
-        checks.append({"name": "Standard Section Hierarchy", "passed": False, "detail": "Non-standard section naming may cause parser drops"})
+        checks.append({
+            "name": "Standard Section Hierarchy",
+            "passed": False,
+            "score": 60,
+            "status": "Needs Polish"
+        })
     else:
-        checks.append({"name": "Standard Section Hierarchy", "passed": True, "detail": f"Recognized standard structure across {len(found_headers)} core categories"})
+        checks.append({
+            "name": "Standard Section Hierarchy",
+            "passed": True,
+            "score": 100,
+            "status": "Optimal"
+        })
         
-    # 4. Multi-Column / Scrambling Risk Check
+    # 3. Multi-Column / Scrambling Risk Check
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     short_line_ratio = sum(1 for l in lines if len(l) < 20) / max(len(lines), 1)
     if short_line_ratio > 0.45 and len(lines) > 40:
         score -= 15
         issues.append("High risk of multi-column table scrambling detected. Text blocks appear fragmented.")
-        checks.append({"name": "Single-Column Parsing Flow", "passed": False, "detail": "Multi-column layout or table cells detected"})
+        checks.append({
+            "name": "Single-Column Parsing Flow",
+            "passed": False,
+            "score": 65,
+            "status": "Caution"
+        })
     else:
-        checks.append({"name": "Single-Column Parsing Flow", "passed": True, "detail": "Clean single-column parsing stream verified"})
+        checks.append({
+            "name": "Single-Column Parsing Flow",
+            "passed": True,
+            "score": 100,
+            "status": "Optimal"
+        })
 
+    # 4. Mode-Specific Check
+    if mode == "iitb_placement":
+        # In IITB placement resumes, contact details are automatically handled by the placement portal
+        checks.append({
+            "name": "Placement Portal Header Standard",
+            "passed": True,
+            "score": 100,
+            "status": "Verified"
+        })
+    else:
+        # Global Corporate ATS: Check contact information detection
+        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text)
+        phone_match = re.search(r"(?:\+91[\-\s]?)?[6-9]\d{9}|\b\d{10}\b", raw_text)
+        linkedin_match = re.search(r"linkedin\.com/in/[\w\-]+|linkedin", raw_text, re.IGNORECASE)
+        github_match = re.search(r"github\.com/[\w\-]+|github", raw_text, re.IGNORECASE)
+        
+        contact_score = 0
+        if email_match: contact_score += 30
+        if phone_match: contact_score += 30
+        if linkedin_match: contact_score += 25
+        if github_match or "portfolio" in raw_text.lower(): contact_score += 15
+        
+        if contact_score < 75:
+            score -= (75 - contact_score) // 2
+            
+        checks.append({
+            "name": "Contact Header Completeness",
+            "passed": contact_score >= 75,
+            "score": contact_score,
+            "status": "Optimal" if contact_score >= 85 else "Pass" if contact_score >= 70 else "Incomplete"
+        })
         
     final_score = max(0, min(100, score))
     return {
         "score": final_score,
-        "status": "Excellent" if final_score >= 85 else "Good" if final_score >= 70 else "Needs Fix",
+        "status": "Optimal" if final_score >= 85 else "Strong" if final_score >= 70 else "Needs Polish",
+        "reasoning": f"Evaluates extractable text layer integrity, standard category naming ({len(found_headers)} identified), and single-column layout parsing hygiene.",
         "checks": checks,
         "issues": issues,
         "raw_text_preview": raw_text[:1200] + ("..." if len(raw_text) > 1200 else "")
     }
+
 
 
 def evaluate_keyword_match(
@@ -520,10 +559,12 @@ def evaluate_formatting_and_iitb_rules(
     has_ap_grades = bool(re.search(r"\b(?:AP\s*grade|10/10|Grade\s*10|AP\b)", raw_text, re.IGNORECASE))
     has_olympiad = bool(re.search(r"\b(?:Olympiad|KVPY|NTSE|Scholarship|Fellowship|Dean's)\b", raw_text, re.IGNORECASE))
     
+    scholastic_passed = has_cpi or has_ap_grades or has_olympiad
     layout_checks.append({
-        "name": "Scholastic Distinction Highlights",
-        "passed": has_cpi or has_ap_grades or has_olympiad,
-        "detail": "Features strong academic differentiators (CPI / AP Grades / Scholarships)" if (has_cpi or has_ap_grades or has_olympiad) else "Include verified academic achievements (CPI, course grades, or scholarships)"
+        "name": "Scholastic Highlights (CPI / AP Grades)",
+        "passed": scholastic_passed,
+        "score": 100 if scholastic_passed else 70,
+        "status": "Optimal" if scholastic_passed else "Advisory"
     })
     
     # 3. Word Count & 1-Page Budget Health
@@ -531,13 +572,27 @@ def evaluate_formatting_and_iitb_rules(
     word_count = len(words)
     if word_count > 650:
         score -= 15
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Risk of spilling over 1-page layout margin)"})
+        layout_checks.append({
+            "name": "1-Page Word Count Density",
+            "passed": False,
+            "score": 60,
+            "status": "Overflow Risk"
+        })
     elif word_count < 350:
         score -= 15
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": False, "detail": f"{word_count} words (Underfilled, consider expanding project depth)"})
+        layout_checks.append({
+            "name": "1-Page Word Count Density",
+            "passed": False,
+            "score": 60,
+            "status": "Underfilled"
+        })
     else:
-        layout_checks.append({"name": "1-Page Word Count Density", "passed": True, "detail": f"{word_count} words (Optimal 400–580 words range for 1-page template)"})
-
+        layout_checks.append({
+            "name": "1-Page Word Count Density",
+            "passed": True,
+            "score": 100,
+            "status": "Optimal"
+        })
         
     # 4. Line-Wrap Overflow Hazards (Single vs Two-Line LaTeX/Word budget)
     for sec in parsed_sections:
@@ -555,35 +610,40 @@ def evaluate_formatting_and_iitb_rules(
                     "char_length": char_len,
                     "target_trim_chars": 110 if char_len <= 140 else 215,
                     "chars_to_trim": char_len - (110 if char_len <= 140 else 215),
-                    "reason": f"{char_len} characters: High risk of spilling 1–3 words onto a new line, wasting vertical margin budget."
+                    "reason": f"{char_len} chars: Risks spilling 1–3 orphan words onto an extra line."
                 })
                 
     if line_wrap_hazards:
         deduction = min(20, len(line_wrap_hazards) * 5)
         score -= deduction
         layout_checks.append({
-            "name": "Line-Wrap Budget (No Orphan Overflows)",
+            "name": "Line Budget (No Orphan Overflows)",
             "passed": False,
-            "detail": f"{len(line_wrap_hazards)} bullets risk spilling 1–3 words onto an extra line"
+            "score": max(50, 100 - (len(line_wrap_hazards) * 10)),
+            "status": f"{len(line_wrap_hazards)} Hazards"
         })
     else:
         layout_checks.append({
-            "name": "Line-Wrap Budget (No Orphan Overflows)",
+            "name": "Line Budget (No Orphan Overflows)",
             "passed": True,
-            "detail": "All bullets comfortably fit within single or dual line budgets"
+            "score": 100,
+            "status": "Optimal"
         })
         
     # 5. Italicized Overview 1-Liners (IITB Standard Convention)
     has_overview_lines = any(bool(sec.get("overview_line")) for sec in parsed_sections)
     layout_checks.append({
-        "name": "Italicized Overview 1-Liners",
+        "name": "Role Overview 1-Liners",
         "passed": has_overview_lines,
-        "detail": "Present beneath key company/project headings" if has_overview_lines else "Recommended for top placement experiences"
+        "score": 100 if has_overview_lines else 80,
+        "status": "Verified" if has_overview_lines else "Recommended"
     })
     
     final_score = max(20, min(100, score))
     return {
         "score": final_score,
+        "status": "Optimal" if final_score >= 85 else "Strong" if final_score >= 70 else "Needs Polish",
+        "reasoning": f"Evaluates 1-page line budget, LaTeX character overflow hazards ({len(line_wrap_hazards)} detected), and placement guidelines.",
         "word_count": word_count,
         "policy_alerts": policy_alerts,
         "layout_checks": layout_checks,
@@ -617,10 +677,9 @@ def compute_full_ats_report(
             
         if not parsed_sections and raw_text:
             parsed_sections = fallback_extract_sections_and_bullets(raw_text)
-
             
     # 3. Compute 5 Pillars
-    p1 = evaluate_ats_parseability(pdf_bytes, raw_text, parsed_sections)
+    p1 = evaluate_ats_parseability(pdf_bytes, raw_text, parsed_sections, mode=mode)
     p2 = evaluate_keyword_match(raw_text, parsed_sections, target_role, job_description, mode)
     p3 = evaluate_quantification_impact(parsed_sections)
     p4 = evaluate_action_verbs_language(parsed_sections)
@@ -638,6 +697,7 @@ def compute_full_ats_report(
     overall_score = max(0, min(100, overall_score))
     
     tier = "Placement Ready" if overall_score >= 85 else "Strong Shortlist" if overall_score >= 72 else "Needs Polish" if overall_score >= 58 else "Critical Gaps"
+
     
     return {
         "overall_score": overall_score,
