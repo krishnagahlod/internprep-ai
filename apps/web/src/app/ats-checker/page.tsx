@@ -175,17 +175,13 @@ export default function ATSCheckerPage() {
   }
 
   const handleRunATS = async (overrideRole?: string, overrideMode?: "iitb_placement" | "global_ats", overrideJD?: string) => {
-    if (inputMode === "file" && !file) return
-    if (inputMode === "text" && !rawText.trim()) return
+    const textAvailable = rawText.trim() || atsReport?.raw_text || atsReport?.pillars?.parseability?.raw_text_preview;
+    if (inputMode === "file" && !file && !textAvailable) return;
+    if (inputMode === "text" && !textAvailable) return;
 
-    if (isGuest && guestResumeCount >= 2) {
-      setError("You've reached your free guest limit (2 resumes). Please sign up to continue using InternPrep AI.")
-      return
-    }
-
-    setIsScanning(true)
-    setError(null)
-    setScanProgress(10)
+    setIsScanning(true);
+    setError(null);
+    setScanProgress(10);
 
     const progressInterval = setInterval(() => {
       setScanProgress(prev => {
@@ -194,52 +190,53 @@ export default function ATSCheckerPage() {
           return 95;
         }
         return prev + (prev < 50 ? 12 : 3);
-      })
-    }, 800)
+      });
+    }, 600);
 
     try {
-      const formData = new FormData()
-      if (inputMode === "file" && file) {
-        formData.append("file", file)
-      } else {
-        formData.append("raw_text", rawText)
+      const formData = new FormData();
+      if (file) {
+        formData.append("file", file);
+      } else if (textAvailable) {
+        formData.append("raw_text", textAvailable);
       }
 
-      formData.append("target_role", overrideRole || targetRole)
-      formData.append("mode", overrideMode || atsMode)
+      formData.append("target_role", overrideRole || targetRole);
+      formData.append("mode", overrideMode || atsMode);
       
-      const jdToSend = overrideJD !== undefined ? overrideJD : customJD
-      if (jdToSend.trim()) {
-        formData.append("job_description", jdToSend.trim())
+      const jdToSend = overrideJD !== undefined ? overrideJD : customJD;
+      if (jdToSend && jdToSend.trim()) {
+        formData.append("job_description", jdToSend.trim());
       }
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(`${API_URL}/resume/ats-check`, {
         method: "POST",
         body: formData,
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to evaluate ATS score")
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to evaluate ATS score");
       }
 
-      const data = await response.json()
-      clearInterval(progressInterval)
-      setAtsReport(data)
-      setScanProgress(100)
-      if (isGuest) {
-        incrementGuestResume()
+      const data = await response.json();
+      clearInterval(progressInterval);
+      setAtsReport(data);
+      setScanProgress(100);
+      if (isGuest && !atsReport) {
+        incrementGuestResume();
       }
     } catch (err: any) {
-      clearInterval(progressInterval)
-      setError(err.message || "An unexpected error occurred during ATS evaluation.")
-      setScanProgress(0)
+      clearInterval(progressInterval);
+      setError(err.message || "An unexpected error occurred during ATS evaluation.");
+      setScanProgress(0);
     } finally {
-      clearInterval(progressInterval)
-      setIsScanning(false)
+      clearInterval(progressInterval);
+      setIsScanning(false);
     }
-  }
+  };
+
 
   const handleExecuteBulletFix = async () => {
     if (!bulletToFix) return

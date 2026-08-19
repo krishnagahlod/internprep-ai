@@ -153,7 +153,7 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
 
 
 def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
-    """Extract raw text from PDF bytes using PyMuPDF / pdfminer."""
+    """Extract raw text from PDF bytes using PyMuPDF / pypdf."""
     try:
         import fitz
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -161,16 +161,23 @@ def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
         for page in doc:
             text += page.get_text() + "\n"
         doc.close()
-        return text.strip()
+        if text.strip():
+            return text.strip()
     except Exception as e:
-        print(f"PyMuPDF extraction fallback: {e}")
-        try:
-            from pdfminer.high_level import extract_text
-            import io
-            return extract_text(io.BytesIO(pdf_bytes)).strip()
-        except Exception as e2:
-            print(f"pdfminer fallback failed: {e2}")
-            return ""
+        print(f"PyMuPDF extraction failed: {e}")
+        
+    try:
+        import pypdf
+        import io
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        text = "\n".join([page.extract_text() or "" for page in reader.pages]).strip()
+        if text:
+            return text
+    except Exception as e2:
+        print(f"pypdf fallback failed: {e2}")
+        
+    return ""
+
 
 
 def evaluate_ats_parseability(
@@ -327,12 +334,22 @@ def evaluate_keyword_match(
             Job Description:
             {job_description[:3000]}
             """
-            response_text = cerebras_client.generate_chat_completion(
-                model="gpt-oss-120b",
-                messages=[{"role": "user", "content": jd_prompt}],
-                temperature=0.1,
-                max_tokens=600
-            )
+            try:
+                response_text = cerebras_client.generate_chat_completion(
+                    model="gpt-oss-120b",
+                    messages=[{"role": "user", "content": jd_prompt}],
+                    temperature=0.1,
+                    max_tokens=600
+                )
+            except Exception as e_cer:
+                print(f"Cerebras JD extraction failed, falling back to Gemini: {e_cer}")
+                res = gemini_client.generate_content(
+                    model_name="gemini-1.5-flash",
+                    prompt=jd_prompt,
+                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
+                )
+                response_text = res.text
+
             parsed_jd = json_repair.loads(response_text)
             if isinstance(parsed_jd, dict) and parsed_jd.get("critical_keywords"):
                 target_critical = parsed_jd.get("critical_keywords", [])
@@ -347,6 +364,7 @@ def evaluate_keyword_match(
     else:
         target_critical = domain_info["critical_keywords"]
         target_important = domain_info["important_keywords"]
+
         
     # Match analysis against resume text
     resume_lower = resume_text.lower()
@@ -706,6 +724,7 @@ def compute_full_ats_report(
         "target_role": target_role,
         "target_role_label": p2.get("target_role_label", target_role.capitalize()),
         "is_custom_jd": p2.get("is_custom_jd", False),
+        "raw_text": raw_text,
         "pillars": {
             "parseability": p1,
             "keyword_match": p2,
@@ -775,7 +794,27 @@ def refine_ats_bullet(
                 "explanation": data.get("explanation", "Refined for placement impact and ATS alignment.")
             }
     except Exception as e:
-        print(f"Error in refine_ats_bullet: {e}")
+        print(f"Cerebras refine failed, falling back to Gemini: {e}")
+        try:
+            res = gemini_client.generate_content(
+                model_name="gemini-1.5-flash",
+                prompt=prompt,
+                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
+            )
+            data = json_repair.loads(res.text)
+            if isinstance(data, dict) and data.get("refined_bullet"):
+                refined = data["refined_bullet"].strip()
+                if refined.endswith("."): refined = refined[:-1]
+                return {
+                    "original_bullet": bullet_text,
+                    "refined_bullet": refined,
+                    "original_length": len(bullet_text),
+                    "new_length": len(refined),
+                    "char_diff": len(refined) - len(bullet_text),
+                    "explanation": data.get("explanation", "Refined for placement impact and ATS alignment.")
+                }
+        except Exception as e2:
+            print(f"Gemini fallback refine failed: {e2}")
         
     return {
         "original_bullet": bullet_text,
@@ -785,3 +824,4 @@ def refine_ats_bullet(
         "char_diff": 0,
         "explanation": "Could not generate refinement at this time."
     }
+

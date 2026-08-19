@@ -2,12 +2,33 @@ import io
 import json
 import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request
-from pdfminer.high_level import extract_text
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
 from dependencies import limiter, posthog_client
 from agents.resume_analyzer import analyze_resume_text, run_workshop_turn, parse_resume_structural
+
+def extract_pdf_raw_text(pdf_bytes: bytes) -> str:
+    """Safely extracts raw text from PDF bytes using PyMuPDF (fitz) or pypdf."""
+    try:
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text = "\n".join([page.get_text() for page in doc]).strip()
+        if text:
+            return text
+    except Exception as e:
+        print(f"fitz extraction failed: {e}")
+        
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        text = "\n".join([page.extract_text() or "" for page in reader.pages]).strip()
+        if text:
+            return text
+    except Exception as e2:
+        print(f"pypdf extraction failed: {e2}")
+        
+    return ""
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -32,10 +53,18 @@ class WorkshopResponse(BaseModel):
     is_final_bullet: bool
     final_bullet: Optional[str] = None
 
+class SectionAnalysisRequest(BaseModel):
+    text: str
+    target_role: Optional[str] = "consult"
+    resume_phase: Optional[str] = "placement"
+    section_type: Optional[str] = "experience"
+    user_id: Optional[str] = None
+
 class UploadResponse(BaseModel):
     id: str
     file_name: str
-    message: str
+    raw_text: str
+    file_url: str
 
 @router.post("/upload", response_model=UploadResponse)
 @limiter.limit("10/hour")
@@ -82,7 +111,7 @@ async def upload_resume(
         )
         
         # 3. Extract raw text for fallback or basic analytics
-        raw_text = extract_text(io.BytesIO(pdf_bytes))
+        raw_text = extract_pdf_raw_text(pdf_bytes)
         
         db_user_id = None if user_id == "guest" else user_id
         
