@@ -575,14 +575,56 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
 
 
 
+def is_header_or_non_bullet_metadata(text: str) -> bool:
+    """Detects and filters out header tables, dates, and non-bullet metadata."""
+    t = text.strip()
+    t_lower = t.lower()
+    if len(t) < 20:
+        return True
+    # Identity & academic table headers
+    if any(k in t_lower for k in [
+        'dob:', 'gender:', 'cpi:', 'cpi /', 'credits', 'roll no', 'examination', 
+        'passing year', 'board', 'b.tech', 'm.tech', 'dual degree', 'gender: male', 'gender: female'
+    ]):
+        return True
+    # Section titles
+    if t_lower in [
+        'key projects', 'professional experience', 'extracurriculars', 
+        'positions of responsibility', 'scholastic achievements', 'education', 'technical skills'
+    ]:
+        return True
+    # Pure date tags
+    if re.match(r"^\[?[a-z]{3}[\'\’]\d{2}\s*-\s*(?:present|[a-z]{3}[\'\’]\d{2})\]?$", t_lower):
+        return True
+    # Left-column project labels
+    if t_lower in [
+        "self project (deployed)", "self project", "course project", "b.tech. project", "renewathon"
+    ]:
+        return True
+    return False
+
+
+def is_bullet_unit_start(text: str) -> bool:
+    """Checks if a text line starts a bullet point."""
+    t = text.strip()
+    if not t:
+        return False
+    if t[0] in ["•", "-", "*", "–", "—", "▪", "▫", "‣", "·", "\u2022", "\u2013", "\u2014"]:
+        return True
+    if re.match(r"^(\d+[\.\)]|\([a-z\d]\))\s+", t):
+        return True
+    return False
+
+
 def inspect_pdf_visual_geometry_and_hazards(
     pdf_bytes: Optional[bytes], 
     raw_text: str, 
     parsed_sections: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Visual OCR & Bounding Box Layout Analyzer using PyMuPDF.
-    Accurately detects page count and true visual orphan word spills on rendered PDF lines.
+    Visual OCR & Column-Aware Layout Analyzer using PyMuPDF.
+    Accurately detects page count and true visual orphan word spills on rendered PDF lines
+    while strictly filtering out headers, roll numbers, left-column dates, and labels.
     """
     page_count = 1
     hazards = []
@@ -599,7 +641,7 @@ def inspect_pdf_visual_geometry_and_hazards(
                 stype = sec.get("section_type", "Experience")
                 for b in sec.get("bullets", []):
                     bt = b if isinstance(b, str) else b.get("bullet_text", "")
-                    if bt:
+                    if bt and not is_header_or_non_bullet_metadata(bt):
                         bullet_section_map[re.sub(r"\s+", " ", bt.strip()).lower()] = (stype, bt)
 
             for page in doc:
@@ -614,44 +656,76 @@ def inspect_pdf_visual_geometry_and_hazards(
                     if not lines:
                         continue
                     
-                    # Group spans in this block
-                    block_line_texts = []
-                    block_line_widths = []
+                    # Collect content lines (right column, x0 > 110 or width > 200)
+                    content_lines = []
                     for l in lines:
                         l_text = "".join([s.get("text", "") for s in l.get("spans", [])]).strip()
                         bbox = l.get("bbox", (0, 0, 0, 0))
-                        width = bbox[2] - bbox[0]
-                        if l_text:
-                            block_line_texts.append(l_text)
-                            block_line_widths.append(width)
+                        
+                        # Skip if header or metadata
+                        if is_header_or_non_bullet_metadata(l_text):
+                            continue
                             
-                    if not block_line_texts:
+                        # Must be in right-hand content column
+                        if bbox[0] >= 110 or (bbox[2] - bbox[0]) >= 220:
+                            content_lines.append({
+                                "text": l_text,
+                                "bbox": bbox,
+                                "width": bbox[2] - bbox[0],
+                                "y0": bbox[1],
+                                "y1": bbox[3]
+                            })
+                            
+                    if not content_lines:
                         continue
                         
-                    full_block_text = " ".join(block_line_texts)
-                    clean_block_text = re.sub(r"\s+", " ", full_block_text).strip()
+                    # Group lines into individual bullet units / overview lines
+                    bullet_units = []
+                    curr_unit = []
                     
-                    # Check if this block is a multi-line bullet with an orphan spill
-                    # e.g., if block has 2+ visual lines and the last line width is < 25% of the max width in block
-                    # or last line has <= 3 short words (< 20 chars)
-                    if len(block_line_texts) >= 2:
-                        max_w = max(block_line_widths) if block_line_widths else 1
-                        last_w = block_line_widths[-1]
-                        last_text = block_line_texts[-1].strip()
+                    for cl in content_lines:
+                        txt = cl["text"]
+                        if is_bullet_unit_start(txt) and curr_unit:
+                            bullet_units.append(curr_unit)
+                            curr_unit = [cl]
+                        elif curr_unit and (cl["y0"] - curr_unit[-1]["y1"] > 3.5):
+                            bullet_units.append(curr_unit)
+                            curr_unit = [cl]
+                        else:
+                            curr_unit.append(cl)
+                            
+                    if curr_unit:
+                        bullet_units.append(curr_unit)
+                        
+                    for bu in bullet_units:
+                        full_bullet_text = " ".join([l["text"] for l in bu])
+                        clean_bullet_text = re.sub(r"\s+", " ", full_bullet_text).strip()
+                        
+                        if is_header_or_non_bullet_metadata(clean_bullet_text) or len(clean_bullet_text) < 35:
+                            continue
+                            
+                        # 1 Visual line on PDF -> 100% Safe (0 Overflow)
+                        if len(bu) == 1:
+                            continue
+                            
+                        # Multi-line bullet: check fill ratio of the last line
+                        widths = [l["width"] for l in bu]
+                        max_w = max(widths) if widths else 1
+                        last_w = widths[-1]
+                        last_text = bu[-1]["text"].strip()
                         last_words = last_text.split()
                         
                         width_ratio = last_w / max(max_w, 1)
                         
-                        # True orphan hazard: last line takes < 25% width and has only 1-3 words (<20 chars)
-                        is_orphan = (width_ratio < 0.25 and len(last_words) <= 3) or (len(last_words) <= 2 and len(last_text) < 18)
+                        # Flag ONLY true orphan wrap: last line is < 25% width AND has <= 3 trailing words
+                        is_orphan = (width_ratio < 0.25 and len(last_words) <= 3) or (len(last_words) <= 2 and len(last_text) < 16)
                         
-                        if is_orphan and len(clean_block_text) > 35:
-                            # Match with a bullet in parsed_sections
+                        if is_orphan:
                             matched_stype = "Experience"
-                            matched_bullet_full = clean_block_text
+                            matched_bullet_full = clean_bullet_text
                             
                             for b_key, (st, orig_b) in bullet_section_map.items():
-                                if b_key in clean_block_text.lower() or clean_block_text.lower() in b_key:
+                                if b_key in clean_bullet_text.lower() or clean_bullet_text.lower() in b_key:
                                     matched_stype = st
                                     matched_bullet_full = orig_b
                                     break
@@ -660,36 +734,17 @@ def inspect_pdf_visual_geometry_and_hazards(
                                 "section": matched_stype,
                                 "bullet_text": matched_bullet_full,
                                 "char_length": len(matched_bullet_full),
-                                "visual_lines": len(block_line_texts),
+                                "visual_lines": len(bu),
                                 "orphan_words": last_text,
                                 "target_trim_chars": len(last_text) + 2,
                                 "chars_to_trim": len(last_text) + 2,
-                                "reason": f"Visual 2-line wrap: '{last_text}' spilled as an orphan on the last line."
+                                "reason": f"Visual {len(bu)}-line wrap: '{last_text}' spilled as an orphan on the last line."
                             })
+                            
             doc.close()
         except Exception as e:
             print(f"Visual geometry analysis error: {e}")
 
-    # If no pdf_bytes (pasted plain text), fallback to natural line breaks & high threshold (>165 chars)
-    if not pdf_bytes or len(hazards) == 0:
-        if not pdf_bytes:
-            for sec in parsed_sections:
-                stype = sec.get("section_type", "Experience")
-                for b in sec.get("bullets", []):
-                    b_text = b if isinstance(b, str) else b.get("bullet_text", "")
-                    length = len(b_text)
-                    if 165 <= length <= 190:
-                        hazards.append({
-                            "section": stype,
-                            "bullet_text": b_text,
-                            "char_length": length,
-                            "visual_lines": 2,
-                            "orphan_words": "Trailing 1-2 words",
-                            "target_trim_chars": length - 150,
-                            "chars_to_trim": length - 150,
-                            "reason": f"{length} chars exceeds standard single line capacity by ~10-15 chars."
-                        })
-                    
     return {
         "page_count": page_count,
         "hazards": hazards
