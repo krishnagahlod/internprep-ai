@@ -7,10 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { 
+  UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, 
+  X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, 
+  Brain, Columns, List, Sparkles, FileText, CheckSquare, Zap, AlertTriangle, 
+  ShieldCheck, Gauge, Layers, Info, ExternalLink, RefreshCw, Check, Code, Search
+} from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
-import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -82,9 +87,84 @@ const RadarChart = ({ scores }: { scores: any }) => {
   );
 }
 
+// Master Radial Gauge Component for ATS Score
+const MasterScoreGauge = ({ score, tier, mode }: { score: number, tier: string, mode: string }) => {
+  const radius = 64;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+
+  const getColor = () => {
+    if (score >= 85) return { stroke: "stroke-emerald-500", text: "text-emerald-500", badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" };
+    if (score >= 72) return { stroke: "stroke-blue-500", text: "text-blue-500", badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" };
+    if (score >= 58) return { stroke: "stroke-amber-500", text: "text-amber-500", badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" };
+    return { stroke: "stroke-rose-500", text: "text-rose-500", badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30" };
+  };
+
+  const colors = getColor();
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-2xl bg-gradient-to-br from-primary/5 via-background to-primary/10 border border-primary/20 shadow-sm">
+      <div className="relative flex items-center justify-center">
+        <svg className="w-36 h-36 transform -rotate-90">
+          <circle
+            cx="72"
+            cy="72"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="10"
+            className="text-black/5 dark:text-white/10"
+            fill="transparent"
+          />
+          <circle
+            cx="72"
+            cy="72"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="10"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            className={`${colors.stroke} transition-all duration-1000 ease-out`}
+            fill="transparent"
+          />
+        </svg>
+        <div className="absolute flex flex-col items-center justify-center">
+          <span className={`text-4xl font-extrabold tracking-tight ${colors.text}`}>{score}</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">OUT OF 100</span>
+        </div>
+      </div>
+
+      <div className="flex-1 text-center sm:text-left space-y-2">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+          <Badge className={`px-3 py-1 font-semibold text-xs border ${colors.badge}`}>
+            {tier}
+          </Badge>
+          <span className="text-xs font-mono text-muted-foreground uppercase">
+            {mode === "iitb_placement" ? "🎓 IITB Placement Day 1 Standard" : "🏢 Global Corporate ATS Standard"}
+          </span>
+        </div>
+        <h3 className="text-xl font-bold tracking-tight text-foreground">
+          {score >= 85 
+            ? "Exceptional Resume Profile — High Shortlist Potential" 
+            : score >= 72 
+            ? "Solid Foundation — Target Polish Recommended" 
+            : score >= 58 
+            ? "Moderate Alignment — Key Fixes Needed" 
+            : "Significant Formatting & Metric Gaps Detected"}
+        </h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          {mode === "iitb_placement" 
+            ? "Calibrated for IIT Bombay placement shortlisting: evaluating 1-page line budget, CPI & scholastic spikes, metric density, and domain-specific section weighting."
+            : "Calibrated for Enterprise ATS systems (Workday, Greenhouse, Eightfold): evaluating text extractability, keyword semantic match, power verbs, and structural hygiene."}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export default function ResumePage() {
   const [file, setFile] = useState<File | null>(null)
-  const [targetRole, setTargetRole] = useState("consult")
+  const [targetRole, setTargetRole] = useState("consulting")
   const [resumePhase, setResumePhase] = useState<"internship" | "placement">("placement")
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -100,6 +180,23 @@ export default function ResumePage() {
   const [sectionType, setSectionType] = useState("experience")
   const [isSectionOnly, setIsSectionOnly] = useState(false)
 
+  // ATS Studio State
+  const [activeTab, setActiveTab] = useState<"ats" | "diagnostic">("ats")
+  const [atsMode, setAtsMode] = useState<"iitb_placement" | "global_ats">("iitb_placement")
+  const [atsReport, setAtsReport] = useState<any | null>(null)
+  const [isATSLoading, setIsATSLoading] = useState(false)
+  const [customJD, setCustomJD] = useState("")
+  const [showJDInput, setShowJDInput] = useState(false)
+  const [atsSubView, setAtsSubView] = useState<"overview" | "keywords" | "line_wrap" | "raw_text">("overview")
+  
+  // 1-Click Bullet Fix State
+  const [bulletToFix, setBulletToFix] = useState<any | null>(null)
+  const [fixType, setFixType] = useState<string>("trim_line_wrap")
+  const [missingKeywordToInject, setMissingKeywordToInject] = useState<string>("")
+  const [isFixingBullet, setIsFixingBullet] = useState(false)
+  const [fixedBulletResult, setFixedBulletResult] = useState<any | null>(null)
+  const [copiedBullet, setCopiedBullet] = useState<boolean>(false)
+
   // Workshop State
   const [activeWorkshopBullet, setActiveWorkshopBullet] = useState<any | null>(null)
   const [workshopMessages, setWorkshopMessages] = useState<{role: string, content: string}[]>([])
@@ -108,7 +205,7 @@ export default function ResumePage() {
   const [finalWorkshopBullet, setFinalWorkshopBullet] = useState<string | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
+  const { resumeText, setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
   const router = useRouter()
 
   useEffect(() => {
@@ -120,7 +217,7 @@ export default function ResumePage() {
     if (analysisResult?.section_summaries) {
       const initial: Record<string, boolean> = {};
       Object.keys(analysisResult.section_summaries).forEach(sec => {
-        initial[sec] = true; // all expanded by default
+        initial[sec] = true;
       });
       setExpandedSections(initial);
     }
@@ -145,6 +242,7 @@ export default function ResumePage() {
     }
   }
 
+  // Unified Analysis & ATS Checker Runner
   const handleUpload = async () => {
     if (!file) return
 
@@ -157,14 +255,12 @@ export default function ResumePage() {
     setError(null)
     setProgress(5)
 
-    // Simulate gradual progress since analysis can take a few minutes
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 95) {
           clearInterval(progressInterval);
           return 95;
         }
-        // slow down as it gets closer to 95
         const increment = prev < 40 ? 5 : prev < 75 ? 2 : 0.5;
         return prev + increment;
       })
@@ -178,23 +274,39 @@ export default function ResumePage() {
       if (user?.id) {
         formData.append("user_id", user.id)
       }
+
+      const atsFormData = new FormData()
+      atsFormData.append("file", file)
+      atsFormData.append("target_role", targetRole)
+      atsFormData.append("mode", atsMode)
+      if (customJD.trim()) {
+        atsFormData.append("job_description", customJD.trim())
+      }
       
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const response = await fetch(`${API_URL}/resume/analyze`, {
-        method: "POST",
-        body: formData,
-      })
+      
+      // Run Deep Diagnostic & ATS Check in parallel
+      const [diagRes, atsRes] = await Promise.allSettled([
+        fetch(`${API_URL}/resume/analyze`, { method: "POST", body: formData }),
+        fetch(`${API_URL}/resume/ats-check`, { method: "POST", body: atsFormData })
+      ])
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to analyze resume")
+      clearInterval(progressInterval)
+
+      if (diagRes.status === "fulfilled" && diagRes.value.ok) {
+        const data = await diagRes.value.json()
+        setResumeText(data.raw_text)
+        setAnalysisResult(data.analysis)
+        setIsSectionOnly(data.is_section_only || false)
       }
 
-      const data = await response.json()
-      clearInterval(progressInterval)
-      setResumeText(data.raw_text)
-      setAnalysisResult(data.analysis)
-      setIsSectionOnly(data.is_section_only || false)
+      if (atsRes.status === "fulfilled" && atsRes.value.ok) {
+        const atsData = await atsRes.value.json()
+        setAtsReport(atsData)
+      } else if (diagRes.status === "rejected" || !diagRes.value.ok) {
+        throw new Error("Failed to process resume. Please try again.")
+      }
+
       setProgress(100)
       if (isGuest) {
         incrementGuestResume()
@@ -206,6 +318,78 @@ export default function ResumePage() {
     } finally {
       clearInterval(progressInterval)
       setIsUploading(false)
+    }
+  }
+
+  // Standalone ATS Re-Checker (for Mode Switch or JD Match)
+  const handleRerunATS = async (newRole?: string, newMode?: "iitb_placement" | "global_ats", newJD?: string) => {
+    setIsATSLoading(true)
+    try {
+      const formData = new FormData()
+      if (file) {
+        formData.append("file", file)
+      } else if (resumeText) {
+        formData.append("raw_text", resumeText)
+      } else {
+        return
+      }
+
+      formData.append("target_role", newRole || targetRole)
+      formData.append("mode", newMode || atsMode)
+      const jdToSend = newJD !== undefined ? newJD : customJD
+      if (jdToSend.trim()) {
+        formData.append("job_description", jdToSend.trim())
+      }
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/resume/ats-check`, {
+        method: "POST",
+        body: formData
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setAtsReport(data)
+      }
+    } catch (e) {
+      console.error("Error re-running ATS check:", e)
+    } finally {
+      setIsATSLoading(false)
+    }
+  }
+
+  // 1-Click AI Bullet Refiner Handler
+  const handleExecuteBulletFix = async () => {
+    if (!bulletToFix) return
+    setIsFixingBullet(true)
+    setFixedBulletResult(null)
+    setCopiedBullet(false)
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const payload = {
+        bullet_text: bulletToFix.bullet_text || bulletToFix,
+        fix_type: fixType,
+        target_role: targetRole,
+        mode: atsMode,
+        missing_keyword: missingKeywordToInject || undefined,
+        target_length: bulletToFix.target_trim_chars || undefined
+      }
+
+      const res = await fetch(`${API_URL}/resume/ats-fix-bullet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setFixedBulletResult(data)
+      }
+    } catch (e) {
+      console.error("Error refining bullet:", e)
+    } finally {
+      setIsFixingBullet(false)
     }
   }
 
@@ -260,7 +444,18 @@ export default function ResumePage() {
       clearInterval(progressInterval)
       setResumeText(data.raw_text)
       setAnalysisResult(data.analysis)
-      setIsSectionOnly(data.is_section_only || false)
+      setIsSectionOnly(true)
+
+      // Also generate ATS report for this section
+      const atsFormData = new FormData()
+      atsFormData.append("raw_text", sectionText)
+      atsFormData.append("target_role", targetRole)
+      atsFormData.append("mode", atsMode)
+      
+      fetch(`${API_URL}/resume/ats-check`, { method: "POST", body: atsFormData })
+        .then(r => r.ok ? r.json() : null)
+        .then(atsData => { if (atsData) setAtsReport(atsData) })
+
       setProgress(100)
       if (isGuest) {
         incrementGuestResume()
@@ -281,83 +476,76 @@ export default function ResumePage() {
     setFinalWorkshopBullet(null)
     setWorkshopInput("")
     
-    if (isOverall) {
-      const overallCtx = JSON.stringify({
-        radar: analysisResult.radar_scores,
-        summaries: analysisResult.section_summaries,
-        day1: analysisResult.day1_comparison
-      });
-      sendWorkshopMessage("Hi, I want a comprehensive review and strategy for my entire resume.", bullet, [], overallCtx)
-    } else {
-      sendWorkshopMessage("Hi, I need help upgrading this bullet point to match Day 1 standards.", bullet, [])
-    }
+    const initialPrompt = isOverall 
+      ? "Let's optimize your overall resume. What specific area or target industry would you like to discuss?" 
+      : `Let's optimize this bullet point: "${bullet.original_bullet}". What additional context or metrics can you provide?`;
+    
+    setWorkshopMessages([{ role: "assistant", content: initialPrompt }])
   }
 
-  const sendWorkshopMessage = async (content: string, bullet = activeWorkshopBullet, history = workshopMessages, overallContext: string | null = null) => {
-    if (!content.trim() || !bullet) return
+  const sendWorkshopMessage = async (userMsg: string, bullet: any, currentMessages: any[], overallCtx: any = null) => {
+    if (!userMsg.trim()) return;
     
-    const newHistory = [...history, { role: "user", content }]
-    
-    // Only add visible messages to state
-    if (content !== "Hi, I need help upgrading this bullet point to match Day 1 standards." && content !== "Hi, I want a comprehensive review and strategy for my entire resume.") {
-      setWorkshopMessages(newHistory)
-      setWorkshopInput("")
-    }
-    
-    setIsWorkshopLoading(true)
+    const newMessages = [...currentMessages, { role: "user", content: userMsg }];
+    setWorkshopMessages(newMessages);
+    setWorkshopInput("");
+    setIsWorkshopLoading(true);
     
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const res = await fetch(`${API_URL}/resume/workshop`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const payload = {
+        original_bullet: bullet.original_bullet,
+        section_type: bullet.section_type || "experience",
+        target_role: targetRole,
+        resume_phase: resumePhase,
+        messages: newMessages,
+        overall_context: overallCtx
+      };
+      
+      const response = await fetch(`${API_URL}/resume/workshop`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          original_bullet: bullet.original_bullet,
-          section_type: bullet.section_type || "experience",
-          target_role: targetRole,
-          resume_phase: resumePhase,
-          messages: newHistory,
-          overall_context: overallContext
-        })
-      })
+        body: JSON.stringify(payload)
+      });
       
-      if (!res.ok) throw new Error("Workshop failed")
+      if (!response.ok) throw new Error("Workshop turn failed");
       
-      const data = await res.json()
-      setWorkshopMessages(prev => [...prev, { role: "model", content: data.response }])
-      
-      if (data.is_final_bullet && data.final_bullet) {
-        setFinalWorkshopBullet(data.final_bullet)
+      const data = await response.json();
+      setWorkshopMessages([...newMessages, { role: "assistant", content: data.reply }]);
+      if (data.final_bullet) {
+        setFinalWorkshopBullet(data.final_bullet);
       }
     } catch (err) {
-      setWorkshopMessages(prev => [...prev, { role: "model", content: "Sorry, I encountered an error. Please try again." }])
+      console.error(err);
+      setWorkshopMessages([...newMessages, { role: "assistant", content: "Sorry, I had trouble connecting to the workshop engine. Please try again." }]);
     } finally {
-      setIsWorkshopLoading(false)
+      setIsWorkshopLoading(false);
     }
-  }
-
-  const renderFormattedText = (text: string | null) => {
-    if (!text) return null;
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
-      }
-      return <span key={i}>{part}</span>;
-    });
-  }
+  };
 
   const copyToClipboard = (text: string) => {
-    const cleanText = text.replace(/\*\*/g, '');
-    navigator.clipboard.writeText(cleanText);
-    // Could add toast here
-  }
+    navigator.clipboard.writeText(text);
+  };
 
-  const getSeverityColors = (severity: string) => {
-    switch(severity?.toLowerCase()) {
+  const renderFormattedText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-bold text-primary">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={index} className="italic text-foreground/90">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
+  };
+
+  const getSeverityColors = (sev: string) => {
+    switch (sev?.toLowerCase()) {
       case 'critical': return { bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-800 dark:text-red-400', edge: 'bg-red-500' };
       case 'major': return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-800 dark:text-amber-400', edge: 'bg-amber-500' };
-      case 'minor': return { bg: 'bg-yellow-500/10', border: 'bg-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
+      case 'minor': return { bg: 'bg-yellow-500/10', border: 'border-yellow-500/20', text: 'text-yellow-800 dark:text-yellow-400', edge: 'bg-yellow-400' };
       case 'good': 
       default: return { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-800 dark:text-green-400', edge: 'bg-green-500' };
     }
@@ -372,14 +560,14 @@ export default function ResumePage() {
     }
   }
 
-  // Calculate stats
+  // Calculate stats for Diagnostic
   const totalBullets = analysisResult?.bullets?.length || 0
   const metricsCount = analysisResult?.bullets?.filter((b: any) => b.severity === 'good' || !b.metrics_hint).length || 0
   const structuralIssues = analysisResult?.bullets?.reduce((acc: number, b: any) => acc + (b.structural_issues?.length || 0), 0) || 0
   const ruleViolations = analysisResult?.bullets?.reduce((acc: number, b: any) => acc + (b.best_practice_violations?.length || 0), 0) || 0
   const healthScore = analysisResult?.radar_scores ? Math.round(Object.values(analysisResult.radar_scores as Record<string, number>).reduce((a: any, b: any) => a + b, 0) / 6) : 0
 
-  // Group bullets
+  // Group bullets for Diagnostic
   const groupedBullets = analysisResult?.bullets?.reduce((acc: any, bullet: any) => {
     const key = viewMode === "section" 
       ? (bullet.section_type || "other") 
@@ -389,13 +577,12 @@ export default function ResumePage() {
     return acc;
   }, {}) || {};
 
-  // If in severity mode, sort the keys so critical is first
   const severityOrder = ["critical", "major", "minor", "good"];
   const sortedGroupKeys = Object.keys(groupedBullets || {}).sort((a, b) => {
     if (viewMode === "severity") {
       return severityOrder.indexOf(a) - severityOrder.indexOf(b);
     }
-    return 0; // Keep original section order
+    return 0;
   });
 
   return (
@@ -409,149 +596,204 @@ export default function ResumePage() {
             <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="text-muted-foreground hover:text-foreground -ml-4">
               <ArrowLeft className="h-4 w-4 mr-2" /> Command Center
             </Button>
-            <ThemeToggle />
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => router.push("/resume-builder")} 
+                className="hidden sm:flex items-center gap-2 border-primary/30 text-primary hover:bg-primary/5"
+              >
+                <Sparkles className="h-4 w-4" /> Point Bank & Studio
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
-        <div className={`container mx-auto px-4 md:px-8 relative z-10 ${!analysisResult ? 'py-12 max-w-4xl' : 'py-6 max-w-[1600px] h-[calc(100vh-56px)] flex flex-col'}`}>
-          <div className="mb-8 shrink-0">
-            <h1 className="text-4xl font-extrabold tracking-tight mb-3">Resume Intelligence</h1>
-            <p className="text-muted-foreground text-lg">
-              Upload your PDF. Our engine extracts text, analyzes structuring against Day 1 benchmarks, and helps you rewrite.
-            </p>
+        <div className={`container mx-auto px-4 md:px-8 relative z-10 ${!analysisResult && !atsReport ? 'py-12 max-w-4xl' : 'py-6 max-w-[1600px] h-[calc(100vh-56px)] flex flex-col'}`}>
+          <div className="mb-6 shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 px-2.5 py-0.5 text-xs font-semibold">
+                  Dual-Calibrated AI Suite
+                </Badge>
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight">Resume Intelligence & ATS Studio</h1>
+              <p className="text-muted-foreground text-sm">
+                Dual-mode evaluation: Benchmark against strict IIT Bombay Placement standards & Enterprise ATS algorithms.
+              </p>
+            </div>
+
+            {(analysisResult || atsReport) && (
+              <div className="flex items-center gap-2 bg-muted/40 p-1.5 rounded-2xl border border-black/5 dark:border-white/10">
+                <button
+                  onClick={() => setActiveTab("ats")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === "ats" 
+                      ? "bg-primary text-primary-foreground shadow-md" 
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Gauge className="h-4 w-4" />
+                  🎯 ATS & Placement Scorecard
+                </button>
+                <button
+                  onClick={() => setActiveTab("diagnostic")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    activeTab === "diagnostic" 
+                      ? "bg-primary text-primary-foreground shadow-md" 
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Activity className="h-4 w-4" />
+                  🔍 Deep Diagnostic & Workshop
+                </button>
+              </div>
+            )}
           </div>
 
-          {!analysisResult ? (
-            <div className="glass-panel dark:bg-neutral-900/40 rounded-3xl p-8 max-w-2xl mx-auto border-black/5 dark:border-white/10">
+          {!analysisResult && !atsReport ? (
+            <div className="glass-panel dark:bg-neutral-900/40 rounded-3xl p-8 max-w-2xl mx-auto border-black/5 dark:border-white/10 shadow-xl">
               <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold mb-2">Initialize Analysis</h2>
-                <p className="text-muted-foreground text-sm">Strictly PDF format. Max 5MB.</p>
+                <h2 className="text-2xl font-bold mb-2">Initialize Intelligent Resume Scan</h2>
+                <p className="text-muted-foreground text-sm">Upload your 1-page PDF or paste text. Evaluates formatting, metrics, keywords & placement rules.</p>
               </div>
               
               <div className="mb-8 space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Resume Phase</label>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Evaluation Benchmark Standard</label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'internship' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
-                      onClick={() => setResumePhase('internship')}
+                      className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${atsMode === 'iitb_placement' ? 'bg-primary/10 border-primary/40 text-primary shadow-sm ring-1 ring-primary/20' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10'}`}
+                      onClick={() => setAtsMode('iitb_placement')}
                       disabled={isUploading}
                     >
-                      Internship
+                      <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        🎓 IITB Placement Standard
+                      </span>
+                      <span className="text-[11px] opacity-80 mt-1">1-Page LaTeX budget, CPI notice, overview lines & Day 1 rules</span>
                     </button>
                     <button
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${resumePhase === 'placement' ? 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'}`}
-                      onClick={() => setResumePhase('placement')}
+                      className={`flex flex-col items-start p-3.5 rounded-xl border text-left transition-all ${atsMode === 'global_ats' ? 'bg-primary/10 border-primary/40 text-primary shadow-sm ring-1 ring-primary/20' : 'bg-black/5 dark:bg-white/5 border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/10'}`}
+                      onClick={() => setAtsMode('global_ats')}
                       disabled={isUploading}
                     >
-                      Placement
+                      <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        🏢 Corporate ATS & JD Match
+                      </span>
+                      <span className="text-[11px] opacity-80 mt-1">Workday/Eightfold parser hygiene, exact skill match & custom JD</span>
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Benchmark</label>
+                  <label className="block text-sm font-medium mb-2 text-muted-foreground">Target Role Domain</label>
                   <div className="relative">
                     <select 
-                      className="appearance-none flex h-14 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
+                      className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
                       value={targetRole}
                       onChange={(e) => setTargetRole(e.target.value)}
                       disabled={isUploading}
                     >
-                      <option value="consult">Management Consulting (McKinsey, BCG, Bain)</option>
-                      <option value="finance">Finance / Private Equity / Investment Banking</option>
-                      <option value="product management">Product Management & Strategy</option>
-                      <option value="analytics">Data Science & Analytics</option>
-                      <option value="it-software">Software Engineering & Systems</option>
+                      <option value="consulting">Management Consulting (McKinsey, BCG, Bain, AT Kearney)</option>
+                      <option value="software">Software Engineering / IT (Google, Microsoft, Amazon, Uber)</option>
+                      <option value="product_management">Product Management (Flipkart, Swiggy, Razorpay, Uber)</option>
+                      <option value="finance">Finance & Quant (Goldman Sachs, Morgan Stanley, Citadel, JP Morgan)</option>
+                      <option value="analytics">Data Science & Analytics (Fractal, Tiger, EXL, American Express)</option>
                     </select>
                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
                       <ChevronDown className="h-5 w-5 opacity-50" />
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mb-6 flex p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/10 dark:border-white/10">
-                <button
-                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'full' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setAnalysisMode('full')}
-                  disabled={isUploading}
-                >
-                  Full Resume (PDF)
-                </button>
-                <button
-                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${analysisMode === 'section' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setAnalysisMode('section')}
-                  disabled={isUploading}
-                >
-                  Section/Bullet (Text)
-                </button>
-              </div>
-
-              {analysisMode === 'full' ? (
-                <div className="relative group mb-8">
-                <div className={`absolute inset-0 bg-primary/20 rounded-2xl blur-xl transition-opacity duration-500 ${isUploading ? 'opacity-100 animate-pulse' : 'opacity-0 group-hover:opacity-50'}`} />
-                <div className="relative border-2 border-dashed border-black/20 dark:border-white/20 rounded-2xl p-12 text-center flex flex-col items-center justify-center bg-background/50 backdrop-blur-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-                  <UploadCloud className={`h-12 w-12 mb-4 transition-colors ${file ? 'text-primary' : 'text-muted-foreground'}`} />
-                  <p className="text-sm font-medium mb-1">Drag & drop your file here</p>
-                  <p className="text-xs text-muted-foreground mb-4">or click to browse local files</p>
-                  
-                  <input 
-                    type="file" 
-                    accept="application/pdf" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={handleFileChange}
-                    disabled={isUploading}
-                  />
-                  
-                  {file && (
-                    <div className="mt-4 px-4 py-2 bg-white/10 rounded-full flex items-center gap-2 text-sm border border-black/10 dark:border-white/10">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-                      <span className="font-mono text-xs">{file.name}</span>
+                {/* Optional Custom Job Description Drawer */}
+                <div className="rounded-xl border border-black/5 dark:border-white/10 p-4 bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground">Target Company Job Description (Optional)</span>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowJDInput(!showJDInput)} 
+                      className="text-xs text-primary hover:bg-primary/10 h-7"
+                    >
+                      {showJDInput ? "Hide JD Box" : "+ Paste Target JD"}
+                    </Button>
+                  </div>
+                  {showJDInput && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Paste the full JD to get exact keyword match percentage, missing required tools, and JD-specific keyword recommendations.
+                      </p>
+                      <textarea
+                        className="w-full h-28 p-3 rounded-xl border border-input/60 bg-background text-xs shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none text-foreground custom-scrollbar"
+                        placeholder="Paste Job Description requirements, qualifications, and role responsibilities here..."
+                        value={customJD}
+                        onChange={(e) => setCustomJD(e.target.value)}
+                        disabled={isUploading}
+                      />
                     </div>
                   )}
                 </div>
-              </div>
-              ) : (
-                <div className="mb-8 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Section Type</label>
-                    <div className="relative">
-                      <select 
-                        className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-[15px] font-medium shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all cursor-pointer text-foreground"
-                        value={sectionType}
-                        onChange={(e) => setSectionType(e.target.value)}
-                        disabled={isUploading}
-                      >
-                        <option value="experience">Experience / Internships</option>
-                        <option value="project">Projects</option>
-                        <option value="por">Positions of Responsibility</option>
-                        <option value="scholastic">Scholastic Achievements</option>
-                        <option value="extracurricular">Extracurriculars</option>
-                        <option value="all">Mixed / Unknown</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                        <ChevronDown className="h-5 w-5 opacity-50" />
+
+                {/* Switch between Full PDF & Section text */}
+                <div className="flex border-b border-black/5 dark:border-white/10">
+                  <button
+                    className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${analysisMode === 'full' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setAnalysisMode('full')}
+                    disabled={isUploading}
+                  >
+                    Upload 1-Page PDF
+                  </button>
+                  <button
+                    className={`flex-1 pb-3 text-sm font-semibold border-b-2 transition-all ${analysisMode === 'section' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                    onClick={() => setAnalysisMode('section')}
+                    disabled={isUploading}
+                  >
+                    Paste Text / Section
+                  </button>
+                </div>
+
+                {analysisMode === 'full' ? (
+                  <div className="relative border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 text-center transition-all bg-primary/5 cursor-pointer">
+                    <UploadCloud className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
+                    <p className="font-semibold text-foreground text-sm mb-1">Click or drag & drop your Resume PDF</p>
+                    <p className="text-xs text-muted-foreground">Supports LaTeX & Word-generated PDFs (Max 5MB)</p>
+                    <input 
+                      type="file" 
+                      accept="application/pdf" 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleFileChange}
+                      disabled={isUploading}
+                    />
+                    {file && (
+                      <div className="mt-4 px-4 py-2 bg-background rounded-full inline-flex items-center gap-2 text-xs font-mono border border-primary/30 shadow-sm text-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
                       </div>
-                    </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2 text-muted-foreground">Paste Text</label>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="block text-xs font-medium text-muted-foreground">Paste Resume Text</label>
                     <textarea
-                      className="w-full h-40 p-4 rounded-xl border border-input/60 bg-muted/5 text-[15px] shadow-sm hover:bg-muted/20 hover:border-primary/40 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
-                      placeholder="Paste a single bullet or an entire section from your resume here..."
+                      className="w-full h-40 p-4 rounded-xl border border-input/60 bg-muted/5 text-[14px] shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
+                      placeholder="Paste your resume text here to run comprehensive ATS checks..."
                       value={sectionText}
                       onChange={(e) => setSectionText(e.target.value)}
                       disabled={isUploading}
                     />
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {error && (
                 <Alert variant="destructive" className="mb-6 bg-destructive/10 border-destructive/20 text-destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Upload Failed</AlertTitle>
+                  <AlertTitle>Analysis Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
@@ -559,7 +801,7 @@ export default function ResumePage() {
               {isUploading && (
                 <div className="mb-6 space-y-2">
                   <div className="flex justify-between text-xs font-mono text-muted-foreground">
-                    <span>Adaptive RAG & Multi-Pass Neural Engine Active...</span>
+                    <span>Evaluating 5 ATS Pillars & Placement Benchmarks...</span>
                     <span>{Math.floor(progress)}%</span>
                   </div>
                   <Progress value={progress} className="h-2 bg-black/10 dark:bg-white/10" />
@@ -567,348 +809,809 @@ export default function ResumePage() {
               )}
 
               <Button 
-                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all" 
+                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_25px_rgba(59,130,246,0.35)] transition-all" 
                 onClick={analysisMode === 'full' ? handleUpload : handleAnalyzeText} 
                 disabled={(analysisMode === 'full' ? !file : !sectionText.trim()) || isUploading}
               >
-                {isUploading ? "Executing Deep Analysis (~2 mins)" : "Analyze Document"}
+                {isUploading ? "Running Multi-Pass Neural Engine..." : "Analyze Resume & Generate ATS Score"}
               </Button>
               
-              <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-xl text-center">
-                <p className="text-sm font-medium text-primary">
-                  <ShieldAlert className="inline-block w-4 h-4 mr-2 mb-0.5" />
-                  Privacy First: Your resume is processed in real-time and is never permanently stored or shared.
+              <div className="mt-6 p-4 bg-primary/5 border border-primary/15 rounded-xl text-center">
+                <p className="text-xs font-medium text-primary">
+                  <ShieldCheck className="inline-block w-4 h-4 mr-2 mb-0.5" />
+                  Privacy Guaranteed: Your resume is processed strictly in-memory and never stored permanently or shared with third parties.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 min-h-0 border-t border-black/10 dark:border-white/10 mt-2 pt-6">
+            <div className="flex flex-1 min-h-0 border-t border-black/10 dark:border-white/10 mt-2 pt-4">
               
               {/* PDF Viewer Panel - Desktop Only */}
-              <div className="hidden md:flex w-[40%] flex-col pr-4 border-r border-black/10 dark:border-white/10">
-                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2">
-                  {pdfUrl ? (
-                    <iframe src={pdfUrl} className="w-full h-full rounded-xl border border-black/10 dark:border-white/10" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">PDF Preview Unavailable</div>
-                  )}
+              <div className="hidden lg:flex w-[35%] flex-col pr-4 border-r border-black/10 dark:border-white/10">
+                <div className="w-full h-full glass-card dark:bg-neutral-900/40 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 p-2 flex flex-col">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-black/5 dark:border-white/5 text-xs text-muted-foreground font-mono">
+                    <span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5 text-primary" /> Source Document Preview</span>
+                    <Button variant="ghost" size="sm" onClick={() => { setAnalysisResult(null); setAtsReport(null); setFile(null); }} className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                      Upload New
+                    </Button>
+                  </div>
+                  <div className="flex-1 mt-2 rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-950 flex items-center justify-center">
+                    {pdfUrl ? (
+                      <iframe src={pdfUrl} className="w-full h-full rounded-xl border-none" />
+                    ) : (
+                      <div className="p-6 text-center text-xs text-muted-foreground">
+                        <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        Text analysis mode active. PDF visual preview unavailable.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
-              {/* Analysis Content */}
-              <div className="flex-1 overflow-y-auto px-2 md:pl-4 custom-scrollbar">
-                <div className="space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
-              {!isSectionOnly ? (
-                <>
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                      <Activity className="h-6 w-6 mx-auto mb-2 text-primary" />
-                      <p className="text-2xl font-bold">{healthScore}%</p>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Health Score</p>
-                    </div>
-                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                      <Target className="h-6 w-6 mx-auto mb-2 text-green-500 dark:text-green-400" />
-                      <p className="text-2xl font-bold">{metricsCount} <span className="text-sm font-normal text-muted-foreground">/ {totalBullets}</span></p>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Quantified</p>
-                    </div>
-                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                      <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500 dark:text-amber-400" />
-                      <p className="text-2xl font-bold text-amber-400">{structuralIssues}</p>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Structural Issues</p>
-                    </div>
-                    <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-5 text-center">
-                      <ShieldAlert className="h-6 w-6 mx-auto mb-2 text-red-500 dark:text-red-400" />
-                      <p className="text-2xl font-bold text-red-400">{ruleViolations}</p>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
-                    </div>
-                  </div>
-
-                  {/* Scoring Dashboard */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 flex flex-col items-center justify-center">
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-foreground/70 mb-6">Radar Analysis</h3>
-                      <RadarChart scores={analysisResult.radar_scores} />
-                      {analysisResult.radar_scores_reasoning && (
-                        <details className="mt-6 w-full p-4 bg-primary/5 rounded-lg border border-primary/10 group cursor-pointer">
-                          <summary className="flex items-center gap-2 outline-none font-semibold text-sm text-primary list-none">
-                            <Brain className="h-4 w-4" />
-                            AI Evaluation Reasoning
-                            <span className="ml-auto transform transition-transform group-open:rotate-180">▼</span>
-                          </summary>
-                          <ul className="text-sm text-foreground/80 leading-relaxed mt-4 pt-4 border-t border-primary/10 cursor-text space-y-2 list-disc pl-4">
-                            {Array.isArray(analysisResult.radar_scores_reasoning) 
-                              ? analysisResult.radar_scores_reasoning.map((reason: string, i: number) => (
-                                  <li key={i}>{reason}</li>
-                                ))
-                              : <li>{analysisResult.radar_scores_reasoning}</li>}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-col gap-4">
-                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Architecture</h3>
-                        <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_feedback}</p>
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Day 1 Benchmark</h3>
-                        <p className="text-muted-foreground text-sm italic">{analysisResult.day1_comparison}</p>
-                      </div>
-                      
-                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-amber-500">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500 mb-2">Section Strategy</h3>
-                        <p className="text-muted-foreground text-sm">{analysisResult.section_ordering_advice}</p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-6 border-l-4 border-l-primary flex-1 mb-8 mt-2">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-3">Overall Section Feedback</h3>
-                  <p className="text-muted-foreground leading-relaxed text-sm mb-4">{analysisResult.overall_section_feedback}</p>
-                </div>
-              )}
-
-              <div>
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
-                  <h2 className="text-2xl font-bold">Deep Bullet Analysis</h2>
-                  
-                  {/* View Mode Toggle */}
-                  <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-lg border border-black/10 dark:border-white/10">
-                    <button
-                      onClick={() => setViewMode("section")}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "section" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      <Columns className="w-3 h-3" /> Group by Section
-                    </button>
-                    <button
-                      onClick={() => setViewMode("severity")}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-2 ${viewMode === "severity" ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      <List className="w-3 h-3" /> Triage by Severity
-                    </button>
-                  </div>
-                </div>
+              {/* Main Analysis / ATS Content Panel */}
+              <div className="flex-1 overflow-y-auto px-2 lg:pl-6 custom-scrollbar pb-20">
                 
-                <div className="flex gap-4 text-xs font-mono mb-6">
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500" /> Critical</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-amber-500" /> Major</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-yellow-400" /> Minor</span>
-                </div>
-                
-                <div className="space-y-8">
-                  {Object.entries(groupedBullets || {}).map(([section, bullets]: [string, any]) => {
-                    const isExpanded = expandedSections[section];
-                    const summary = analysisResult.section_summaries?.[section];
+                {/* TAB 1: ATS & PLACEMENT SCORECARD */}
+                {activeTab === "ats" && atsReport && (
+                  <div className="space-y-8 animate-in fade-in duration-500">
                     
-                    return (
-                      <div key={section} className="border border-black/10 dark:border-white/10 rounded-2xl overflow-hidden bg-black/5 dark:bg-white/5">
-                        <div 
-                          className="p-4 flex items-center justify-between cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-                          onClick={() => toggleSection(section)}
+                    {/* Mode Switcher & Re-score Control Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-muted/25 border border-black/5 dark:border-white/10">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">Standard:</span>
+                        <button
+                          onClick={() => { setAtsMode("iitb_placement"); handleRerunATS(targetRole, "iitb_placement"); }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${atsMode === "iitb_placement" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"}`}
                         >
-                          <div>
-                            <h3 className="font-bold text-lg uppercase tracking-wider flex items-center gap-2">
-                              {section} 
-                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">{bullets.length}</span>
-                              {summary && (
-                                <span className="text-xs ml-2 text-muted-foreground">Score: {summary.score}/100</span>
-                              )}
-                            </h3>
-                            {summary && <p className="text-sm text-muted-foreground mt-1">{summary.summary}</p>}
-                          </div>
-                          {isExpanded ? <ChevronUp className="text-muted-foreground" /> : <ChevronDown className="text-muted-foreground" />}
+                          🎓 IITB Placement Day 1
+                        </button>
+                        <button
+                          onClick={() => { setAtsMode("global_ats"); handleRerunATS(targetRole, "global_ats"); }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${atsMode === "global_ats" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                        >
+                          🏢 Corporate ATS Engine
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <select 
+                          className="h-8 rounded-lg border border-input bg-background px-2 text-xs font-semibold text-foreground outline-none cursor-pointer"
+                          value={targetRole}
+                          onChange={(e) => { setTargetRole(e.target.value); handleRerunATS(e.target.value, atsMode); }}
+                        >
+                          <option value="consulting">Management Consulting</option>
+                          <option value="software">Software Engineering / IT</option>
+                          <option value="product_management">Product Management</option>
+                          <option value="finance">Finance / Quant</option>
+                          <option value="analytics">Data Science & Analytics</option>
+                        </select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowJDInput(!showJDInput)}
+                          className="h-8 px-2.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
+                        >
+                          <Search className="h-3.5 w-3.5 mr-1" />
+                          {atsReport.is_custom_jd ? "Edit Custom JD" : "Match JD"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Custom JD Match Drawer */}
+                    {showJDInput && (
+                      <div className="p-5 rounded-2xl bg-primary/5 border border-primary/20 space-y-3 animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5" /> Target Job Description Matcher
+                          </h4>
+                          <span className="text-[11px] text-muted-foreground">Extracts required tools & computes exact skill match %</span>
                         </div>
-                        
-                        {isExpanded && (
-                          <div className="p-4 pt-0 space-y-4">
-                            {bullets.map((bullet: any, idx: number) => {
-                              const sev = getSeverityColors(bullet.severity);
-                              const verbColor = getVerbColors(bullet.action_verb_rating);
-                              
-                              return (
-                                <div key={idx} className="glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all mb-4 border border-black/5 dark:border-white/5 shadow-sm">
-                                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sev.edge}`} />
-                                  
-                                  <div className="p-5 pl-6">
-                                    {/* Original Bullet */}
-                                    <div className="mb-6">
-                                      <div className="flex justify-between items-start mb-3 gap-4">
-                                        <h4 className="text-lg font-semibold leading-relaxed text-foreground/90 flex-1">"{bullet.original_bullet}"</h4>
-                                        <div className="flex flex-col items-end gap-2 shrink-0">
-                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border shadow-sm`}>
-                                            {bullet.severity} Priority
-                                          </span>
-                                          <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
-                                            {Math.round(bullet.confidence > 1 ? bullet.confidence : bullet.confidence * 100)}% Confidence
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Analysis Section */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                      {/* Left Column: Issues & Tags */}
-                                      <div className="space-y-3 bg-black/5 dark:bg-white/5 rounded-xl p-4 border border-black/10 dark:border-white/10 shadow-sm">
-                                        <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Detected Issues</h5>
-                                        
-                                        <div className="flex items-start gap-2 mb-3">
-                                          <div className={`mt-0.5 px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor} shadow-sm border border-black/5 dark:border-white/5 shrink-0`}>
-                                            Verb: {bullet.action_verb_rating}
-                                          </div>
-                                          {bullet.action_verb_alternatives?.length > 0 && (
-                                            <p className="text-xs text-muted-foreground leading-tight pt-0.5">
-                                              Consider: <span className="font-medium text-foreground">{bullet.action_verb_alternatives.join(", ")}</span>
-                                            </p>
-                                          )}
-                                        </div>
-                                        
-                                        {bullet.best_practice_violations?.map((violation: string, i: number) => (
-                                          <div key={`rule-${i}`} className="flex items-start gap-2 text-red-700 dark:text-red-400">
-                                            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                                            <p className="text-xs font-medium leading-tight">{violation}</p>
-                                          </div>
-                                        ))}
-                                        
-                                        {bullet.structural_issues?.map((issue: string, i: number) => (
-                                          <div key={`struct-${i}`} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                                            <p className="text-xs font-medium leading-tight">{issue}</p>
-                                          </div>
-                                        ))}
-                                        
-                                        {/* Fallback if no issues */}
-                                        {(!bullet.best_practice_violations?.length && !bullet.structural_issues?.length && bullet.action_verb_rating === "strong") && (
-                                          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                            <p className="text-xs font-medium">Structurally sound.</p>
-                                          </div>
-                                        )}
-                                      </div>
+                        <textarea
+                          className="w-full h-28 p-3 rounded-xl border border-input bg-background text-xs shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none text-foreground custom-scrollbar"
+                          placeholder="Paste the target job description here..."
+                          value={customJD}
+                          onChange={(e) => setCustomJD(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => { setCustomJD(""); handleRerunATS(targetRole, atsMode, ""); }} 
+                            className="h-8 text-xs text-muted-foreground"
+                          >
+                            Reset to Domain Preset
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleRerunATS(targetRole, atsMode, customJD)} 
+                            disabled={isATSLoading || !customJD.trim()}
+                            className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                          >
+                            {isATSLoading ? "Matching Skills..." : "Calculate JD Match %"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
-                                      {/* Right Column: AI Critique */}
-                                      <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between ${sev.bg} ${sev.border} ${sev.text}`}>
-                                        <div className="space-y-3 mb-4">
-                                          <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 opacity-80">
-                                            <Brain className="h-4 w-4" /> AI Critique
-                                          </h5>
-                                          <p className="text-sm leading-relaxed">{bullet.critique}</p>
-                                          
-                                          {bullet.metrics_hint && (
-                                            <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10">
-                                              <p className="text-xs flex items-start gap-2">
-                                                <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
-                                                <span><strong className="opacity-90">Hint:</strong> {bullet.metrics_hint}</span>
-                                              </p>
-                                            </div>
-                                          )}
-                                        </div>
-                                        
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline" 
-                                          className="w-full bg-background/50 hover:bg-background border-black/10 dark:border-white/10 shadow-sm transition-all hover:shadow-md"
-                                          onClick={() => startWorkshop(bullet)}
-                                        >
-                                          <MessageSquare className="h-4 w-4 mr-2" /> Open Workshop
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Suggested Rewrite */}
-                                    {bullet.suggested_rewrite && (
-                                      <div className="p-4 md:p-5 rounded-xl mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 shadow-sm relative overflow-hidden">
-                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
-                                        <div className="flex justify-between items-center mb-3">
-                                          <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase">
-                                            <CheckCircle2 className="h-4 w-4" /> Suggested Rewrite
-                                          </div>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="h-6 text-xs px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400"
-                                            onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
-                                          >
-                                            <Copy className="h-3 w-3 mr-1" /> Copy
-                                          </Button>
-                                        </div>
-                                        <p className="text-base font-medium text-emerald-950 dark:text-emerald-100 leading-relaxed">
-                                          {bullet.suggested_rewrite}
-                                        </p>
-                                      </div>
-                                    )}
+                    {/* Master Gauge Card */}
+                    <MasterScoreGauge 
+                      score={atsReport.overall_score} 
+                      tier={atsReport.tier} 
+                      mode={atsReport.mode} 
+                    />
 
-                                    {/* Benchmark */}
-                                    {bullet.golden_comparison && (
-                                      <div className="px-5 py-4 rounded-xl bg-primary/5 border border-primary/10">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2 opacity-70">
-                                          <Target className="h-3 w-3" />
-                                          Benchmark Inspiration
-                                        </p>
-                                        <p className="text-sm text-primary/80 italic leading-relaxed">"{bullet.golden_comparison}"</p>
-                                      </div>
-                                    )}
-                                  </div>
+                    {/* IITB Policy Alerts (e.g. Prohibited JEE Rank Mentions) */}
+                    {atsReport.policy_alerts && atsReport.policy_alerts.length > 0 && (
+                      <div className="space-y-3">
+                        {atsReport.policy_alerts.map((alert: any, idx: number) => (
+                          <Alert key={idx} className="bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300">
+                            <AlertTriangle className="h-5 w-5 text-rose-500 shrink-0" />
+                            <div className="ml-2">
+                              <AlertTitle className="font-bold text-sm text-rose-700 dark:text-rose-400">
+                                {alert.title}
+                              </AlertTitle>
+                              <AlertDescription className="text-xs mt-1 leading-relaxed text-rose-900/80 dark:text-rose-200/90">
+                                {alert.message}
+                              </AlertDescription>
+                            </div>
+                          </Alert>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 5-Pillar Score Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      
+                      {/* Pillar 1: Parseability */}
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold mb-2">
+                            <span>🛡️ Parseability</span>
+                            <span className="font-mono font-bold text-foreground">{atsReport.pillars?.parseability?.score}%</span>
+                          </div>
+                          <Progress value={atsReport.pillars?.parseability?.score} className="h-1.5 mb-3" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {atsReport.pillars?.parseability?.status} OCR & Entity extraction hygiene.
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Text Stream</span>
+                          <span className="font-semibold text-emerald-500">100% Clean</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 2: Keyword Match */}
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold mb-2">
+                            <span>🎯 Keyword Match</span>
+                            <span className="font-mono font-bold text-foreground">{atsReport.pillars?.keyword_match?.score}%</span>
+                          </div>
+                          <Progress value={atsReport.pillars?.keyword_match?.score} className="h-1.5 mb-3" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {atsReport.pillars?.keyword_match?.found_critical_count} of {atsReport.pillars?.keyword_match?.total_critical_count} critical tools found.
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Domain</span>
+                          <span className="font-semibold text-primary">{atsReport.target_role_label}</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 3: Quantification */}
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold mb-2">
+                            <span>📊 Quantification</span>
+                            <span className="font-mono font-bold text-foreground">{atsReport.pillars?.quantification?.score}%</span>
+                          </div>
+                          <Progress value={atsReport.pillars?.quantification?.score} className="h-1.5 mb-3" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {atsReport.pillars?.quantification?.quantification_ratio}% bullets have hard metrics.
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Target</span>
+                          <span className="font-semibold text-emerald-500">&gt;75% Quantified</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 4: Action Verbs */}
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold mb-2">
+                            <span>⚡ Action Verbs</span>
+                            <span className="font-mono font-bold text-foreground">{atsReport.pillars?.action_verbs?.score}%</span>
+                          </div>
+                          <Progress value={atsReport.pillars?.action_verbs?.score} className="h-1.5 mb-3" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {atsReport.pillars?.action_verbs?.weak_verb_count} weak verbs detected.
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Tone</span>
+                          <span className="font-semibold text-primary">Active Voice</span>
+                        </div>
+                      </div>
+
+                      {/* Pillar 5: Formatting & Budget */}
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-black/5 dark:border-white/10 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold mb-2">
+                            <span>📐 Line Budget</span>
+                            <span className="font-mono font-bold text-foreground">{atsReport.pillars?.formatting_layout?.score}%</span>
+                          </div>
+                          <Progress value={atsReport.pillars?.formatting_layout?.score} className="h-1.5 mb-3" />
+                          <p className="text-[11px] text-muted-foreground">
+                            {atsReport.pillars?.formatting_layout?.word_count} words (1-Page Density).
+                          </p>
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                          <span>Wrap Hazards</span>
+                          <span className={`font-semibold ${atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length > 0 ? "text-amber-500" : "text-emerald-500"}`}>
+                            {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length || 0} Points
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sub-view Navigation Tabs */}
+                    <div className="border-b border-black/5 dark:border-white/10 flex gap-4">
+                      <button
+                        onClick={() => setAtsSubView("overview")}
+                        className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${atsSubView === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                      >
+                        🔍 Health & Checks
+                      </button>
+                      <button
+                        onClick={() => setAtsSubView("keywords")}
+                        className={`pb-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${atsSubView === "keywords" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                      >
+                        🎯 Keyword Matrix
+                        <Badge className="h-4 px-1 text-[9px] bg-primary/20 text-primary border-none">
+                          {atsReport.pillars?.keyword_match?.found_keywords?.length || 0} Found
+                        </Badge>
+                      </button>
+                      <button
+                        onClick={() => setAtsSubView("line_wrap")}
+                        className={`pb-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${atsSubView === "line_wrap" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                      >
+                        📐 Line-Wrap Hazards & Fixes
+                        {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length > 0 && (
+                          <Badge className="h-4 px-1 text-[9px] bg-amber-500/20 text-amber-600 dark:text-amber-400 border-none">
+                            {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length} Flags
+                          </Badge>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setAtsSubView("raw_text")}
+                        className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${atsSubView === "raw_text" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                      >
+                        🤖 ATS Bot Stream Preview
+                      </button>
+                    </div>
+
+                    {/* Sub-view 1: Overview & Checks */}
+                    {atsSubView === "overview" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
+                        {/* Parseability & Formatting Checks */}
+                        <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-4">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-primary" /> Technical & Parseability Verification
+                          </h4>
+                          <div className="space-y-3">
+                            {atsReport.pillars?.parseability?.checks?.map((chk: any, i: number) => (
+                              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-background/60 border border-black/5 dark:border-white/5">
+                                {chk.passed ? (
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                )}
+                                <div>
+                                  <p className="text-xs font-bold text-foreground">{chk.name}</p>
+                                  <p className="text-[11px] text-muted-foreground mt-0.5">{chk.detail}</p>
                                 </div>
-                              )
-                            })}
+                              </div>
+                            ))}
+                            {atsReport.pillars?.formatting_layout?.layout_checks?.map((chk: any, i: number) => (
+                              <div key={`layout-${i}`} className="flex items-start gap-3 p-3 rounded-xl bg-background/60 border border-black/5 dark:border-white/5">
+                                {chk.passed ? (
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                )}
+                                <div>
+                                  <p className="text-xs font-bold text-foreground">{chk.name}</p>
+                                  <p className="text-[11px] text-muted-foreground mt-0.5">{chk.detail}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Quantification & Action Verbs Deep Dive */}
+                        <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-4">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <Target className="h-4 w-4 text-primary" /> Quantification & Language Health
+                          </h4>
+                          
+                          <div className="p-3.5 rounded-xl bg-background/60 border border-black/5 dark:border-white/5 space-y-2">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="font-semibold text-foreground">Metrics Diversity Found</span>
+                              <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500/30">
+                                {atsReport.pillars?.quantification?.metric_types_found?.length || 0} Categories
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {atsReport.pillars?.quantification?.metric_types_found?.map((mt: string, i: number) => (
+                                <Badge key={i} className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  ✓ {mt}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          {atsReport.pillars?.action_verbs?.repetitive_verbs?.length > 0 && (
+                            <div className="p-3.5 rounded-xl bg-background/60 border border-black/5 dark:border-white/5 space-y-1">
+                              <span className="text-xs font-semibold text-foreground">Repetitive Action Verbs</span>
+                              <p className="text-[11px] text-muted-foreground">
+                                Repeating the same opening verb weakens impact. Detected:{" "}
+                                <span className="font-mono text-amber-500">
+                                  {atsReport.pillars?.action_verbs?.repetitive_verbs.join(", ")}
+                                </span>
+                              </p>
+                            </div>
+                          )}
+
+                          {atsReport.pillars?.quantification?.weak_unquantified_bullets?.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <span className="text-xs font-semibold text-muted-foreground">Unquantified Points Needing Metrics:</span>
+                              {atsReport.pillars?.quantification?.weak_unquantified_bullets.slice(0, 2).map((b: string, i: number) => (
+                                <div key={i} className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/15 flex items-center justify-between gap-3">
+                                  <p className="text-[11px] text-foreground/80 line-clamp-1 italic font-mono">"{b}"</p>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => { setBulletToFix({ bullet_text: b }); setFixType("quantify"); }}
+                                    className="h-6 px-2 text-[10px] text-primary border-primary/30 shrink-0"
+                                  >
+                                    ✨ Add Metrics
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-view 2: Keywords Matrix */}
+                    {atsSubView === "keywords" && (
+                      <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Missing Critical Keywords Box */}
+                        {atsReport.pillars?.keyword_match?.missing_critical?.length > 0 && (
+                          <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4" /> Missing High-Priority Domain Keywords ({atsReport.pillars?.keyword_match?.missing_critical?.length})
+                              </h4>
+                              <span className="text-[11px] text-muted-foreground">Crucial for ranking in automated shortlists</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {atsReport.pillars?.keyword_match?.missing_critical.map((kw: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => { setMissingKeywordToInject(kw); setFixType("inject_keyword"); setBulletToFix({ bullet_text: analysisResult?.bullets?.[0]?.original_bullet || "" }); }}
+                                  className="px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-all flex items-center gap-1.5"
+                                >
+                                  <span className="text-rose-500 font-bold">+</span> {kw}
+                                  <span className="text-[9px] opacity-70 underline ml-1">Inject</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Found Keywords */}
+                        <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4" /> Successfully Detected Keywords & Competencies ({atsReport.pillars?.keyword_match?.found_keywords?.length})
+                          </h4>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {atsReport.pillars?.keyword_match?.found_keywords?.map((kw: string, i: number) => (
+                              <Badge key={i} className="px-3 py-1 rounded-xl text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                ✓ {kw}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Recommendations */}
+                        {atsReport.pillars?.keyword_match?.suggestions?.length > 0 && (
+                          <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
+                            <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                              <Lightbulb className="h-4 w-4" /> Placement Optimization Suggestions:
+                            </span>
+                            <ul className="text-xs text-foreground/80 space-y-1.5 list-disc pl-4">
+                              {atsReport.pillars?.keyword_match?.suggestions.map((s: string, i: number) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
                           </div>
                         )}
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
+                    )}
 
-              <div className="flex justify-between pt-4 pb-12">
-                <Button 
-                  size="lg" 
-                  variant="outline"
-                  className="h-12 px-8 border-primary/20 text-primary hover:bg-primary/5 font-semibold" 
-                  onClick={() => startWorkshop({original_bullet: "Overall Resume", section_type: "overall"}, true)}
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" /> Overall Strategy Session
-                </Button>
-                <Button size="lg" className="h-12 px-8 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold" onClick={() => router.push("/dashboard")}>
-                  Continue to Mock Interview <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </div>
-                <div className="flex justify-center pb-8">
-                  <CreatorBadge />
-                </div>
+                    {/* Sub-view 3: Line-Wrap Hazards & Fixer */}
+                    {atsSubView === "line_wrap" && (
+                      <div className="space-y-4 animate-in fade-in duration-300">
+                        <div className="p-4 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                            LaTeX & Word 1-Page Line Budget Auditor
+                          </h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            In 1-page placement resumes, points containing 115–140 characters spill 1–3 orphan words into line 2, wasting vertical margin budget and risking overflow into a 2nd page.
+                          </p>
+                        </div>
+
+                        {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length > 0 ? (
+                          <div className="space-y-3">
+                            {atsReport.pillars?.formatting_layout?.line_wrap_hazards.map((hazard: any, i: number) => (
+                              <div key={i} className="p-4 rounded-2xl bg-background border border-amber-500/25 shadow-sm space-y-3">
+                                <div className="flex items-center justify-between text-xs">
+                                  <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5">
+                                    {hazard.section} • {hazard.char_length} Chars
+                                  </Badge>
+                                  <span className="text-[11px] font-mono text-rose-500 font-semibold">
+                                    Trim ~{hazard.chars_to_trim} chars to fit 1 line
+                                  </span>
+                                </div>
+
+                                <p className="text-sm font-mono text-foreground/90 bg-muted/30 p-3 rounded-xl border border-black/5 dark:border-white/5">
+                                  "{hazard.bullet_text}"
+                                </p>
+
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="text-[11px] text-muted-foreground">{hazard.reason}</span>
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => { setBulletToFix(hazard); setFixType("trim_line_wrap"); }}
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold h-8"
+                                  >
+                                    ✨ 1-Click AI Trim
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-8 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-2">
+                            <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
+                            <h4 className="font-bold text-sm text-foreground">Zero Line-Wrap Hazards Detected</h4>
+                            <p className="text-xs text-muted-foreground">All bullets comfortably fit within single or double line placement margins.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Sub-view 4: Raw ATS Text Preview */}
+                    {atsSubView === "raw_text" && (
+                      <div className="space-y-3 animate-in fade-in duration-300">
+                        <div className="p-3.5 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10 flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Plain Text Stream parsed by automated ATS scrapers (Workday, Greenhouse, Portal Bots)</span>
+                          <Button size="sm" variant="ghost" onClick={() => copyToClipboard(atsReport.pillars?.parseability?.raw_text_preview || "")} className="h-6 text-xs text-primary">
+                            <Copy className="h-3 w-3 mr-1" /> Copy Text
+                          </Button>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-neutral-900 text-neutral-200 font-mono text-xs leading-relaxed max-h-96 overflow-y-auto custom-scrollbar border border-neutral-800">
+                          <pre className="whitespace-pre-wrap">{atsReport.pillars?.parseability?.raw_text_preview || "No raw text stream available."}</pre>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+                {/* TAB 2: DEEP DIAGNOSTIC & BULLET WORKSHOP */}
+                {(activeTab === "diagnostic" || !atsReport) && analysisResult && (
+                  <div className="space-y-8 animate-in fade-in duration-500">
+                    
+                    {/* Summary Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
+                        <Activity className="h-5 w-5 mx-auto mb-1 text-primary" />
+                        <p className="text-xl font-bold">{healthScore}%</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Health Score</p>
+                      </div>
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
+                        <Target className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
+                        <p className="text-xl font-bold">{metricsCount} <span className="text-xs font-normal text-muted-foreground">/ {totalBullets}</span></p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Quantified</p>
+                      </div>
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
+                        <AlertCircle className="h-5 w-5 mx-auto mb-1 text-amber-500" />
+                        <p className="text-xl font-bold text-amber-500">{structuralIssues}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Structural Issues</p>
+                      </div>
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-xl p-4 text-center">
+                        <ShieldAlert className="h-5 w-5 mx-auto mb-1 text-rose-500" />
+                        <p className="text-xl font-bold text-rose-500">{ruleViolations}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Rule Breaks</p>
+                      </div>
+                    </div>
+
+                    {/* Radar Chart & Day 1 Comparison */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-5 flex flex-col items-center justify-center">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-foreground/70 mb-4">Competency Radar</h3>
+                        <RadarChart scores={analysisResult.radar_scores} />
+                      </div>
+                      
+                      <div className="flex flex-col gap-3">
+                        <div className="glass-card dark:bg-neutral-900/40 rounded-2xl p-5 flex-1 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                                <Sparkles className="h-4 w-4" /> Day 1 Placement Benchmark
+                              </h3>
+                              <span className="text-xs font-bold text-primary font-mono">{analysisResult.day1_comparison?.score || 75}%</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {analysisResult.day1_comparison?.summary || "Your profile exhibits strong technical fundamentals. Elevating metric quantification and leadership scale will enhance Day 1 shortlisting probability."}
+                            </p>
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Target Role: <strong className="text-foreground">{targetRole.toUpperCase()}</strong></span>
+                            <span>Phase: <strong className="text-foreground">{resumePhase.toUpperCase()}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grouped Bullets Line-by-Line Critique */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Bullet-by-Bullet Deep Critique</h3>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant={viewMode === "section" ? "default" : "outline"} 
+                            size="sm" 
+                            onClick={() => setViewMode("section")}
+                            className="h-7 text-xs"
+                          >
+                            <Columns className="h-3 w-3 mr-1" /> By Section
+                          </Button>
+                          <Button 
+                            variant={viewMode === "severity" ? "default" : "outline"} 
+                            size="sm" 
+                            onClick={() => setViewMode("severity")}
+                            className="h-7 text-xs"
+                          >
+                            <List className="h-3 w-3 mr-1" /> By Severity
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {sortedGroupKeys.map((groupKey) => {
+                          const bulletsInGroup = groupedBullets[groupKey] || [];
+                          if (bulletsInGroup.length === 0) return null;
+                          const isExpanded = expandedSections[groupKey] ?? true;
+
+                          return (
+                            <div key={groupKey} className="rounded-2xl border border-black/10 dark:border-white/10 bg-muted/10 overflow-hidden">
+                              <button
+                                onClick={() => toggleSection(groupKey)}
+                                className="w-full flex items-center justify-between p-4 bg-muted/20 text-left hover:bg-muted/30 transition-all"
+                              >
+                                <span className="font-bold text-xs uppercase tracking-wider text-foreground flex items-center gap-2">
+                                  {groupKey.toUpperCase()} ({bulletsInGroup.length})
+                                </span>
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
+
+                              {isExpanded && (
+                                <div className="p-4 space-y-3">
+                                  {bulletsInGroup.map((b: any, idx: number) => {
+                                    const colors = getSeverityColors(b.severity);
+                                    return (
+                                      <div key={idx} className={`p-4 rounded-xl border ${colors.border} ${colors.bg} space-y-3 relative overflow-hidden`}>
+                                        <div className={`absolute top-0 left-0 bottom-0 w-1 ${colors.edge}`} />
+                                        <div className="flex items-start justify-between gap-4">
+                                          <p className="text-xs font-mono text-foreground leading-relaxed flex-1">
+                                            "{b.original_bullet}"
+                                          </p>
+                                          <Badge className={`text-[10px] uppercase font-bold shrink-0 ${getVerbColors(b.action_verb_rating)}`}>
+                                            Verb: {b.action_verb_rating}
+                                          </Badge>
+                                        </div>
+                                        
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                          <strong className="text-foreground">Critique:</strong> {b.critique}
+                                        </p>
+
+                                        {b.metrics_hint && (
+                                          <div className="p-2 rounded-lg bg-background/80 border border-primary/20 text-[11px] text-primary flex items-center gap-2">
+                                            <Lightbulb className="h-3.5 w-3.5 shrink-0" />
+                                            <span><strong>Suggested Metric:</strong> {b.metrics_hint}</span>
+                                          </div>
+                                        )}
+
+                                        <div className="flex justify-end gap-2 pt-1">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => startWorkshop(b)}
+                                            className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                                          >
+                                            <MessageSquare className="h-3 w-3 mr-1" /> Open in Workshop
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
               </div>
             </div>
-          </div>
           )}
         </div>
       </div>
+
+      {/* 1-Click Bullet Fix Modal */}
+      {bulletToFix && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel dark:bg-neutral-900 rounded-3xl p-6 max-w-xl w-full border border-black/10 dark:border-white/10 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-black/5 dark:border-white/10 pb-3">
+              <h3 className="font-bold text-base flex items-center gap-2 text-foreground">
+                <Sparkles className="h-4 w-4 text-primary" />
+                1-Click AI Bullet Optimizer
+              </h3>
+              <Button variant="ghost" size="icon" onClick={() => { setBulletToFix(null); setFixedBulletResult(null); }} className="rounded-full h-8 w-8">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Original Bullet</span>
+                <p className="text-xs font-mono p-3 rounded-xl bg-muted/40 text-foreground border border-black/5 dark:border-white/5 mt-1">
+                  "{bulletToFix.bullet_text || bulletToFix.original_bullet}"
+                </p>
+                <span className="text-[10px] text-muted-foreground block mt-1">Length: {(bulletToFix.bullet_text || bulletToFix.original_bullet || "").length} characters</span>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Optimization Strategy</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setFixType("trim_line_wrap")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "trim_line_wrap" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                  >
+                    📐 Trim Line-Wrap Overflow
+                  </button>
+                  <button
+                    onClick={() => setFixType("power_verb")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "power_verb" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                  >
+                    ⚡ Strong Action Verb
+                  </button>
+                  <button
+                    onClick={() => setFixType("inject_keyword")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "inject_keyword" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                  >
+                    🎯 Inject Keyword
+                  </button>
+                  <button
+                    onClick={() => setFixType("quantify")}
+                    className={`p-2 rounded-xl text-xs font-medium border text-left transition-all ${fixType === "quantify" ? "bg-primary/10 border-primary text-primary" : "bg-muted/20 border-transparent text-muted-foreground"}`}
+                  >
+                    📊 Add Metric Brackets
+                  </button>
+                </div>
+              </div>
+
+              {fixType === "inject_keyword" && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Keyword to Weave In</label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 rounded-xl border border-input bg-background text-xs text-foreground outline-none focus:border-primary"
+                    placeholder="e.g. System Design, Market Sizing, PyTorch..."
+                    value={missingKeywordToInject}
+                    onChange={(e) => setMissingKeywordToInject(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {fixedBulletResult && (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <span>✨ AI Refined Output</span>
+                    <span className="font-mono text-[11px]">{fixedBulletResult.new_length} chars ({fixedBulletResult.char_diff > 0 ? `+${fixedBulletResult.char_diff}` : fixedBulletResult.char_diff})</span>
+                  </div>
+                  <p className="text-xs font-mono font-medium text-foreground leading-relaxed bg-background/80 p-3 rounded-xl border border-emerald-500/20">
+                    {fixedBulletResult.refined_bullet}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{fixedBulletResult.explanation}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-black/5 dark:border-white/10">
+              {fixedBulletResult ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      copyToClipboard(fixedBulletResult.refined_bullet);
+                      setCopiedBullet(true);
+                      setTimeout(() => setCopiedBullet(false), 2000);
+                    }}
+                    className="text-xs font-semibold"
+                  >
+                    {copiedBullet ? <Check className="h-3.5 w-3.5 mr-1 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                    {copiedBullet ? "Copied!" : "Copy Refined Point"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => { setBulletToFix(null); setFixedBulletResult(null); }}
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold"
+                  >
+                    Done
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleExecuteBulletFix}
+                  disabled={isFixingBullet}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold w-full"
+                >
+                  {isFixingBullet ? "Optimizing..." : "Execute AI Fix"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Workshop Sidebar Panel */}
       <div 
         className={`fixed top-0 right-0 h-screen w-[400px] bg-background border-l border-black/10 dark:border-white/10 shadow-2xl transition-transform duration-500 z-50 flex flex-col ${activeWorkshopBullet ? 'translate-x-0' : 'translate-x-full'}`}
       >
         <div className="h-14 flex items-center justify-between px-6 border-b border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5">
-          <h3 className="font-bold flex items-center gap-2">
+          <h3 className="font-bold flex items-center gap-2 text-sm">
             <MessageSquare className="h-4 w-4 text-primary" />
-            Strategic Workshop
+            Strategic Bullet Workshop
           </h3>
           <Button variant="ghost" size="icon" onClick={() => setActiveWorkshopBullet(null)} className="rounded-full hover:bg-black/10 dark:hover:bg-white/10">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="p-6 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Focus Area</p>
-          <p className="text-sm font-mono text-foreground/80">"{activeWorkshopBullet?.original_bullet}"</p>
+        <div className="p-4 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Focus Bullet</p>
+          <p className="text-xs font-mono text-foreground/80 line-clamp-3">"{activeWorkshopBullet?.original_bullet}"</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-background">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background custom-scrollbar">
           {workshopMessages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
                 msg.role === 'user' 
                   ? 'bg-primary text-primary-foreground rounded-tr-sm shadow-md' 
-                  : 'bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-foreground rounded-tl-sm shadow-sm'
+                  : 'bg-muted/40 border border-black/10 dark:border-white/10 text-foreground rounded-tl-sm shadow-sm'
               }`}>
                 {renderFormattedText(msg.content)}
               </div>
@@ -917,7 +1620,7 @@ export default function ResumePage() {
           
           {isWorkshopLoading && (
             <div className="flex justify-start">
-              <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl rounded-tl-sm px-4 py-4 flex gap-1 shadow-sm">
+              <div className="bg-muted/40 border border-black/10 dark:border-white/10 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1 shadow-sm">
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce" />
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce delay-75" />
                 <div className="w-1.5 h-1.5 bg-foreground/40 rounded-full animate-bounce delay-150" />
@@ -926,17 +1629,15 @@ export default function ResumePage() {
           )}
 
           {finalWorkshopBullet && (
-            <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 mt-4 shadow-sm animate-in fade-in duration-500">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" /> Final Polished Bullet
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mt-2 shadow-sm animate-in fade-in duration-500">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Final Polished Bullet
               </p>
-              <p className="text-sm font-medium mb-4 text-foreground leading-relaxed">{renderFormattedText(finalWorkshopBullet)}</p>
+              <p className="text-xs font-medium mb-3 text-foreground leading-relaxed">{renderFormattedText(finalWorkshopBullet)}</p>
               <Button 
                 size="sm" 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
-                onClick={() => {
-                  copyToClipboard(finalWorkshopBullet)
-                }}
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-xs h-8"
+                onClick={() => copyToClipboard(finalWorkshopBullet)}
               >
                 Copy to Clipboard
               </Button>
@@ -946,16 +1647,11 @@ export default function ResumePage() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 border-t border-black/10 dark:border-white/10 bg-background shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
+        <div className="p-3.5 border-t border-black/10 dark:border-white/10 bg-background shadow-[0_-4px_15px_rgba(0,0,0,0.05)]">
           <form 
             onSubmit={(e) => {
               e.preventDefault();
-              const fullOverallCtx = analysisResult ? JSON.stringify({
-                radar: analysisResult.radar_scores,
-                summaries: analysisResult.section_summaries,
-                day1: analysisResult.day1_comparison
-              }) : null;
-              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages, activeWorkshopBullet?.section_type === "overall" ? fullOverallCtx : null);
+              sendWorkshopMessage(workshopInput, activeWorkshopBullet, workshopMessages);
             }} 
             className="relative"
           >
@@ -963,17 +1659,17 @@ export default function ResumePage() {
               type="text"
               value={workshopInput}
               onChange={(e) => setWorkshopInput(e.target.value)}
-              placeholder="Type your response..."
-              disabled={isWorkshopLoading || !!finalWorkshopBullet}
-              className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-foreground rounded-full pl-5 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              placeholder="Type your metric or context..."
+              disabled={isWorkshopLoading || !activeWorkshopBullet}
+              className="w-full bg-muted/40 border border-black/10 dark:border-white/10 text-foreground rounded-full pl-4 pr-10 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
             <Button 
               type="submit" 
               size="icon" 
-              disabled={!workshopInput.trim() || isWorkshopLoading || !!finalWorkshopBullet}
-              className="absolute right-1 top-1 bottom-1 h-auto rounded-full w-10 bg-primary hover:bg-primary/90 text-primary-foreground"
+              disabled={!workshopInput.trim() || isWorkshopLoading}
+              className="absolute right-1 top-1 bottom-1 h-auto rounded-full w-8 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             </Button>
           </form>
         </div>

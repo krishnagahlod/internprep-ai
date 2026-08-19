@@ -267,3 +267,84 @@ async def analyze_resume_section(request: Request, body: AnalyzeSectionRequest):
         raise HTTPException(status_code=500, detail="Failed to parse the AI engine's response into structural data.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing section: {str(e)}")
+
+
+class ATSCheckRequest(BaseModel):
+    raw_text: Optional[str] = None
+    target_role: Optional[str] = "consulting"
+    mode: Optional[str] = "iitb_placement"
+    job_description: Optional[str] = None
+    resume_id: Optional[str] = None
+
+
+class ATSFixBulletRequest(BaseModel):
+    bullet_text: str
+    fix_type: str = "trim_line_wrap"
+    target_role: Optional[str] = "consulting"
+    mode: Optional[str] = "iitb_placement"
+    missing_keyword: Optional[str] = None
+    target_length: Optional[int] = None
+
+
+@router.post("/ats-check")
+@limiter.limit("20/hour")
+async def ats_check(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    target_role: str = Form("consulting"),
+    mode: str = Form("iitb_placement"),
+    job_description: Optional[str] = Form(None),
+    resume_id: Optional[str] = Form(None)
+):
+    try:
+        from agents.ats_engine import compute_full_ats_report
+        from dependencies import get_supabase
+        supabase = get_supabase()
+        
+        pdf_bytes = None
+        if file:
+            pdf_bytes = await file.read()
+            
+        if not raw_text and not pdf_bytes and resume_id and supabase:
+            res = supabase.table("resumes").select("raw_text, parsed_content").eq("id", resume_id).execute()
+            if res.data:
+                raw_text = res.data[0].get("raw_text", "")
+                
+        if not raw_text and not pdf_bytes:
+            raise HTTPException(status_code=400, detail="Please provide a resume PDF file or text content.")
+            
+        report = await asyncio.to_thread(
+            compute_full_ats_report,
+            pdf_bytes=pdf_bytes,
+            raw_text=raw_text,
+            target_role=target_role,
+            mode=mode,
+            job_description=job_description
+        )
+        
+        return report
+    except Exception as e:
+        print(f"Error in ats_check: {e}")
+        raise HTTPException(status_code=500, detail=f"Error computing ATS report: {str(e)}")
+
+
+@router.post("/ats-fix-bullet")
+@limiter.limit("30/hour")
+async def ats_fix_bullet_endpoint(request: Request, body: ATSFixBulletRequest):
+    try:
+        from agents.ats_engine import refine_ats_bullet
+        result = await asyncio.to_thread(
+            refine_ats_bullet,
+            bullet_text=body.bullet_text,
+            fix_type=body.fix_type,
+            target_role=body.target_role or "consulting",
+            mode=body.mode or "iitb_placement",
+            missing_keyword=body.missing_keyword,
+            target_length=body.target_length
+        )
+        return result
+    except Exception as e:
+        print(f"Error in ats_fix_bullet: {e}")
+        raise HTTPException(status_code=500, detail=f"Error refining bullet: {str(e)}")
+
