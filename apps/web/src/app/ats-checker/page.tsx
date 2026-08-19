@@ -983,126 +983,429 @@ export default function ATSCheckerPage() {
                 </div>
               )}
 
-              {/* Sub-view: Section Quality Diagnostics */}
+              {/* Sub-view: Multi-Dimensional Section Quality Diagnostics */}
               {activeSubTab === "sections" && (
-                <div className="space-y-4 animate-in fade-in duration-300">
-                  <div className="p-4 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                      Section-by-Section Quality & Depth Diagnostics
-                    </h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Evaluates content depth, role ownership, quantifiable business outcomes, and formatting structure across each key section of your placement profile.
-                    </p>
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-background to-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" /> Multi-Dimensional Section Quality Diagnostics
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        Audited across 4 standardized industry & campus placement benchmarks (25% weight each) with realistic score calibration.
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-[11px] font-mono border-primary/30 text-primary w-fit">
+                      5 Key Sections Audited
+                    </Badge>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Experience Section Card */}
-                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <Briefcase className="h-4 w-4 text-primary" /> Work Experience
-                          </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
-                            {atsReport.section_health?.experience?.score}%
-                          </Badge>
-                        </div>
-                        <Progress value={atsReport.section_health?.experience?.score} className="h-1.5 mb-2" />
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>• {atsReport.section_health?.experience?.bullets_count} Experience points detected.</p>
-                          <p>• {atsReport.section_health?.experience?.quantified_ratio}% of experience points contain metrics.</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
-                        Status: {atsReport.section_health?.experience?.status}
-                      </Badge>
-                    </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Section 1: Work Experience Card */}
+                    {atsReport.section_health?.experience && (
+                      <div className="p-5 rounded-3xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/20 transition-all">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                <Briefcase className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-foreground">{atsReport.section_health.experience.name}</h5>
+                                <span className="text-[10px] text-muted-foreground font-mono">{atsReport.section_health.experience.bullets_count} Points Audited</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={`font-mono text-xs px-2.5 py-0.5 border ${
+                                atsReport.section_health.experience.score >= 82 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                  : atsReport.section_health.experience.score >= 72
+                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              }`}>
+                                {atsReport.section_health.experience.score}% • {atsReport.section_health.experience.status}
+                              </Badge>
+                            </div>
+                          </div>
 
-                    {/* Projects Section Card */}
-                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <FolderGit2 className="h-4 w-4 text-primary" /> Technical Projects
-                          </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
-                            {atsReport.section_health?.projects?.score}%
-                          </Badge>
-                        </div>
-                        <Progress value={atsReport.section_health?.projects?.score} className="h-1.5 mb-2" />
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>• {atsReport.section_health?.projects?.bullets_count} Project points detected.</p>
-                          <p>• Production & Deployment Proof: {atsReport.section_health?.projects?.has_production_proof ? "Verified (Live / Active)" : "Academic / Prototype"}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
-                        Status: {atsReport.section_health?.projects?.status}
-                      </Badge>
-                    </div>
+                          {/* 4-Dimension Sub-Metric Progress Bars */}
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                              Standardized Evaluation Dimensions (25% Each)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {atsReport.section_health.experience.dimensions?.map((dim: any, dIdx: number) => (
+                                <div key={dIdx} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-1.5">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="font-semibold text-foreground truncate">{dim.name}</span>
+                                    <span className="font-mono font-bold text-primary shrink-0 ml-1">{dim.score}%</span>
+                                  </div>
+                                  <Progress value={dim.score} className="h-1.5" />
+                                  <span className="text-[9px] text-muted-foreground font-mono block truncate">Criteria: {dim.benchmark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
 
-                    {/* Education & Scholastic Card */}
-                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <GraduationCap className="h-4 w-4 text-primary" /> Scholastic & Education
-                          </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
-                            {atsReport.section_health?.education?.score}%
-                          </Badge>
-                        </div>
-                        <Progress value={atsReport.section_health?.education?.score} className="h-1.5 mb-2" />
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>• CPI/GPA Header Status: {atsReport.section_health?.education?.has_cpi ? "Verified" : "Missing"}</p>
-                          <p>• Honors / AP Grades: {atsReport.section_health?.education?.has_honors ? "Recognized" : "Standard"}</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
-                        Status: {atsReport.section_health?.education?.status}
-                      </Badge>
-                    </div>
+                          {/* AI Strengths */}
+                          {atsReport.section_health.experience.strengths?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Key Highlights & Strengths
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.experience.strengths.map((str: string, sIdx: number) => (
+                                  <p key={sIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
+                                    {str}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                    {/* Technical Skills Card */}
-                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <Wrench className="h-4 w-4 text-primary" /> Skills Categorization
-                          </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
-                            {atsReport.section_health?.skills?.score}%
-                          </Badge>
-                        </div>
-                        <Progress value={atsReport.section_health?.skills?.score} className="h-1.5 mb-2" />
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>• Table Categories: {atsReport.section_health?.skills?.is_categorized ? "Structured (Languages/Frameworks/Tools)" : "Uncategorized Block"}</p>
+                          {/* AI Targeted Recommendations */}
+                          {atsReport.section_health.experience.gaps?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                  <Sparkles className="h-3 w-3" /> Targeted Recommendation
+                                </span>
+                                <button
+                                  onClick={() => { setFixType("power_verb"); setBulletToFix({ bullet_text: "" }); }}
+                                  className="text-[10px] text-primary font-bold hover:underline flex items-center gap-0.5"
+                                >
+                                  + Launch AI Fix
+                                </button>
+                              </div>
+                              <div className="space-y-1">
+                                {atsReport.section_health.experience.gaps.map((gap: string, gIdx: number) => (
+                                  <p key={gIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-amber-500/40">
+                                    {gap}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
-                        Status: {atsReport.section_health?.skills?.status}
-                      </Badge>
-                    </div>
+                    )}
 
-                    {/* Leadership & PoR Card */}
-                    <div className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-3">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                            <Users className="h-4 w-4 text-primary" /> Positions of Responsibility
-                          </span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-mono font-bold">
-                            {atsReport.section_health?.leadership?.score}%
-                          </Badge>
-                        </div>
-                        <Progress value={atsReport.section_health?.leadership?.score} className="h-1.5 mb-2" />
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          <p>• Leadership Proof: {atsReport.section_health?.leadership?.present ? "Detected (Lead/Manager/Secretary)" : "Optional"}</p>
+                    {/* Section 2: Technical Projects Card */}
+                    {atsReport.section_health?.projects && (
+                      <div className="p-5 rounded-3xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/20 transition-all">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                <FolderGit2 className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-foreground">{atsReport.section_health.projects.name}</h5>
+                                <span className="text-[10px] text-muted-foreground font-mono">{atsReport.section_health.projects.bullets_count} Points Audited</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={`font-mono text-xs px-2.5 py-0.5 border ${
+                                atsReport.section_health.projects.score >= 82 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                  : atsReport.section_health.projects.score >= 72
+                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              }`}>
+                                {atsReport.section_health.projects.score}% • {atsReport.section_health.projects.status}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* 4-Dimension Sub-Metric Progress Bars */}
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                              Standardized Evaluation Dimensions (25% Each)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {atsReport.section_health.projects.dimensions?.map((dim: any, dIdx: number) => (
+                                <div key={dIdx} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-1.5">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="font-semibold text-foreground truncate">{dim.name}</span>
+                                    <span className="font-mono font-bold text-primary shrink-0 ml-1">{dim.score}%</span>
+                                  </div>
+                                  <Progress value={dim.score} className="h-1.5" />
+                                  <span className="text-[9px] text-muted-foreground font-mono block truncate">Criteria: {dim.benchmark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* AI Strengths */}
+                          {atsReport.section_health.projects.strengths?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Key Highlights & Strengths
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.projects.strengths.map((str: string, sIdx: number) => (
+                                  <p key={sIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
+                                    {str}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* AI Targeted Recommendations */}
+                          {atsReport.section_health.projects.gaps?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                  <Sparkles className="h-3 w-3" /> Targeted Recommendation
+                                </span>
+                                <button
+                                  onClick={() => { setFixType("quantify"); setBulletToFix({ bullet_text: "" }); }}
+                                  className="text-[10px] text-primary font-bold hover:underline flex items-center gap-0.5"
+                                >
+                                  + Launch AI Fix
+                                </button>
+                              </div>
+                              <div className="space-y-1">
+                                {atsReport.section_health.projects.gaps.map((gap: string, gIdx: number) => (
+                                  <p key={gIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-amber-500/40">
+                                    {gap}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[10px] w-fit font-mono">
-                        Status: {atsReport.section_health?.leadership?.status}
-                      </Badge>
-                    </div>
+                    )}
+
+                    {/* Section 3: Scholastic Achievements & Education */}
+                    {atsReport.section_health?.education && (
+                      <div className="p-5 rounded-3xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/20 transition-all">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                <GraduationCap className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-foreground">{atsReport.section_health.education.name}</h5>
+                                <span className="text-[10px] text-muted-foreground font-mono">Academic Verification</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={`font-mono text-xs px-2.5 py-0.5 border ${
+                                atsReport.section_health.education.score >= 80 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              }`}>
+                                {atsReport.section_health.education.score}% • {atsReport.section_health.education.status}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                              Standardized Evaluation Dimensions (25% Each)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {atsReport.section_health.education.dimensions?.map((dim: any, dIdx: number) => (
+                                <div key={dIdx} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-1.5">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="font-semibold text-foreground truncate">{dim.name}</span>
+                                    <span className="font-mono font-bold text-primary shrink-0 ml-1">{dim.score}%</span>
+                                  </div>
+                                  <Progress value={dim.score} className="h-1.5" />
+                                  <span className="text-[9px] text-muted-foreground font-mono block truncate">Criteria: {dim.benchmark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {atsReport.section_health.education.strengths?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Key Highlights & Strengths
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.education.strengths.map((str: string, sIdx: number) => (
+                                  <p key={sIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
+                                    {str}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {atsReport.section_health.education.gaps?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" /> Targeted Recommendation
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.education.gaps.map((gap: string, gIdx: number) => (
+                                  <p key={gIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-amber-500/40">
+                                    {gap}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 4: Technical Skills Matrix */}
+                    {atsReport.section_health?.skills && (
+                      <div className="p-5 rounded-3xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/20 transition-all">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                <Wrench className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-foreground">{atsReport.section_health.skills.name}</h5>
+                                <span className="text-[10px] text-muted-foreground font-mono">Taxonomy Structure</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={`font-mono text-xs px-2.5 py-0.5 border ${
+                                atsReport.section_health.skills.score >= 80 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              }`}>
+                                {atsReport.section_health.skills.score}% • {atsReport.section_health.skills.status}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                              Standardized Evaluation Dimensions (25% Each)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {atsReport.section_health.skills.dimensions?.map((dim: any, dIdx: number) => (
+                                <div key={dIdx} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-1.5">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="font-semibold text-foreground truncate">{dim.name}</span>
+                                    <span className="font-mono font-bold text-primary shrink-0 ml-1">{dim.score}%</span>
+                                  </div>
+                                  <Progress value={dim.score} className="h-1.5" />
+                                  <span className="text-[9px] text-muted-foreground font-mono block truncate">Criteria: {dim.benchmark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {atsReport.section_health.skills.strengths?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Key Highlights & Strengths
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.skills.strengths.map((str: string, sIdx: number) => (
+                                  <p key={sIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
+                                    {str}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {atsReport.section_health.skills.gaps?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" /> Targeted Recommendation
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.skills.gaps.map((gap: string, gIdx: number) => (
+                                  <p key={gIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-amber-500/40">
+                                    {gap}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 5: Leadership & PoR */}
+                    {atsReport.section_health?.leadership && (
+                      <div className="p-5 rounded-3xl bg-muted/15 border border-black/5 dark:border-white/10 flex flex-col justify-between space-y-4 shadow-sm hover:border-primary/20 transition-all">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                                <Users className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-foreground">{atsReport.section_health.leadership.name}</h5>
+                                <span className="text-[10px] text-muted-foreground font-mono">{atsReport.section_health.leadership.bullets_count} Points Audited</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={`font-mono text-xs px-2.5 py-0.5 border ${
+                                atsReport.section_health.leadership.score >= 80 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                              }`}>
+                                {atsReport.section_health.leadership.score}% • {atsReport.section_health.leadership.status}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block">
+                              Standardized Evaluation Dimensions (25% Each)
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {atsReport.section_health.leadership.dimensions?.map((dim: any, dIdx: number) => (
+                                <div key={dIdx} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-1.5">
+                                  <div className="flex justify-between text-[11px]">
+                                    <span className="font-semibold text-foreground truncate">{dim.name}</span>
+                                    <span className="font-mono font-bold text-primary shrink-0 ml-1">{dim.score}%</span>
+                                  </div>
+                                  <Progress value={dim.score} className="h-1.5" />
+                                  <span className="text-[9px] text-muted-foreground font-mono block truncate">Criteria: {dim.benchmark}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {atsReport.section_health.leadership.strengths?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Key Highlights & Strengths
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.leadership.strengths.map((str: string, sIdx: number) => (
+                                  <p key={sIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-emerald-500/40">
+                                    {str}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {atsReport.section_health.leadership.gaps?.length > 0 && (
+                            <div className="space-y-1.5 pt-2 border-t border-black/5 dark:border-white/5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <Sparkles className="h-3 w-3" /> Targeted Recommendation
+                              </span>
+                              <div className="space-y-1">
+                                {atsReport.section_health.leadership.gaps.map((gap: string, gIdx: number) => (
+                                  <p key={gIdx} className="text-xs text-muted-foreground leading-relaxed pl-2 border-l-2 border-amber-500/40">
+                                    {gap}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

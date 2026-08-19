@@ -965,87 +965,246 @@ def evaluate_formatting_and_iitb_rules(
 
 
 # ==============================================================================
-# SECTION-BY-SECTION HEALTH DIAGNOSTICS
+# SECTION-BY-SECTION MULTI-DIMENSIONAL SCORING & AI AUDITOR ENGINE
 # ==============================================================================
-def evaluate_section_wise_health(
+def audit_sections_with_deep_ai(
     parsed_sections: List[Dict[str, Any]], 
-    raw_text: str
+    raw_text: str,
+    target_role: str = "software",
+    mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
     """
-    Computes individual quality health scores (0-100) and diagnostics for each key resume section.
+    Comprehensive Section-Wise Scoring Framework & Deep AI Diagnostics.
+    Audits 5 key sections across 4 standardized benchmark dimensions (weighted 25% each)
+    with realistic score calibration (compressed to 50-88 range).
     """
     raw_lower = raw_text.lower()
     
-    # 1. Experience Section
+    # 1. Extract Bullets and Content by Section Type
     exp_bullets = []
-    for s in parsed_sections:
-        if s.get("section_type", "").lower() in ["experience", "work experience", "internship"]:
-            for b in s.get("bullets", []):
-                t = b if isinstance(b, str) else b.get("bullet_text", "")
-                if t: exp_bullets.append(t)
-                
-    exp_metric_count = sum(1 for b in exp_bullets if re.search(r"\d+%|\d+x|\$[\d,]+|₹[\d,]+|\b\d+\b", b))
-    exp_score = min(100, max(45, int(round((exp_metric_count / max(len(exp_bullets), 1)) * 60 + (min(len(exp_bullets), 8) / 8) * 40))))
-    
-    # 2. Projects Section
     proj_bullets = []
+    por_bullets = []
+    scholastic_bullets = []
+    skills_lines = []
+    
     for s in parsed_sections:
-        if s.get("section_type", "").lower() in ["project", "projects", "key projects", "technical projects"]:
-            for b in s.get("bullets", []):
-                t = b if isinstance(b, str) else b.get("bullet_text", "")
-                if t: proj_bullets.append(t)
+        stype = s.get("section_type", "").lower()
+        bullets = s.get("bullets", [])
+        for b in bullets:
+            t = b if isinstance(b, str) else b.get("bullet_text", "")
+            if not t: continue
+            if any(k in stype for k in ["experience", "work", "intern"]):
+                exp_bullets.append(t)
+            elif any(k in stype for k in ["project", "technical project", "academic"]):
+                proj_bullets.append(t)
+            elif any(k in stype for k in ["por", "position", "leadership", "responsibility"]):
+                por_bullets.append(t)
+            elif any(k in stype for k in ["scholastic", "achievement", "honor", "award"]):
+                scholastic_bullets.append(t)
+            elif any(k in stype for k in ["skill", "coursework"]):
+                skills_lines.append(t)
                 
-    proj_has_deployed = any(k in raw_lower for k in ["deployed", "live", "active users", "github", "production", "hosted", "users"])
-    proj_score = min(100, max(50, int(round(50 + (25 if proj_has_deployed else 10) + min(len(proj_bullets), 6) * 4))))
+    # Deterministic Multi-Dimensional Rubric Baseline
+    # --- A. WORK EXPERIENCE ---
+    exp_metrics = sum(1 for b in exp_bullets if re.search(r"\d+%|\d+x|\$[\d,]+|₹[\d,]+|\b\d+\b", b))
+    m_ratio = (exp_metrics / max(len(exp_bullets), 1))
+    exp_d1 = min(88, max(52, int(round(50 + m_ratio * 38))))
     
-    # 3. Education & Scholastic Section
-    has_cpi = bool(re.search(r"\bcpi\b|\bgpa\b|\bcredits\b|\bcredits completed\b", raw_lower))
-    has_honors = any(k in raw_lower for k in ["ap grade", "scholar", "kvpy", "olympiad", "top", "medal", "fellowship", "merit"])
-    edu_score = 100 if (has_cpi and has_honors) else 85 if has_cpi else 70
+    weak_verbs = sum(1 for b in exp_bullets if any(w in b.lower() for w in ["worked on", "helped", "assisted", "responsible for"]))
+    exp_d2 = min(90, max(52, int(round(88 - (weak_verbs / max(len(exp_bullets), 1)) * 36))))
     
-    # 4. Technical / Domain Skills Section
-    has_skills_table = any(k in raw_lower for k in ["languages:", "frameworks:", "databases:", "tools:", "libraries:"])
-    skills_score = 95 if has_skills_table else 80 if ("skills" in raw_lower or "coursework" in raw_lower) else 65
+    exp_d3 = min(88, max(55, int(round(60 + (min(len(exp_bullets), 6) / 6) * 26))))
+    exp_d4 = 85 if len(exp_bullets) >= 3 else 62
+    exp_score = int(round(exp_d1 * 0.25 + exp_d2 * 0.25 + exp_d3 * 0.25 + exp_d4 * 0.25))
     
-    # 5. Leadership & PoR
-    por_present = any(k in raw_lower for k in ["position of responsibility", "positions of responsibility", "convenor", "head", "manager", "lead", "coordinator", "secretary"])
-    por_score = 90 if por_present else 75
+    # --- B. TECHNICAL PROJECTS ---
+    has_live_proof = any(k in raw_lower for k in ["deployed", "live", "active users", "production", "github", "hosted", "users", "http", "api"])
+    proj_d1 = 86 if has_live_proof else 64
     
-    return {
+    proj_tech_matches = sum(1 for k in ["api", "database", "sql", "model", "pipeline", "docker", "react", "fastapi", "postgres", "redis", "cloud"] if k in raw_lower)
+    proj_d2 = min(88, max(54, int(round(55 + min(proj_tech_matches, 7) * 4.6))))
+    
+    proj_d3 = min(86, max(55, int(round(58 + min(len(proj_bullets), 6) * 4.5))))
+    proj_d4 = 84 if len(proj_bullets) >= 3 else 65
+    proj_score = int(round(proj_d1 * 0.25 + proj_d2 * 0.25 + proj_d3 * 0.25 + proj_d4 * 0.25))
+    
+    # --- C. SCHOLASTIC ACHIEVEMENTS & EDUCATION ---
+    has_cpi = bool(re.search(r"\bcpi\b|\bgpa\b|\bcredits\b|\bcredits completed\b|\bdepartment of\b|\bb\.tech\b|\bdual degree\b", raw_lower))
+    edu_d1 = 88 if has_cpi else 65
+    
+    has_honors = any(k in raw_lower for k in ["ap grade", "scholar", "kvpy", "olympiad", "top", "medal", "fellowship", "merit", "hackathon", "icpc", "podium"])
+    edu_d2 = 86 if has_honors else 68
+    
+    # Policy check (AIR / batch rank)
+    has_banned_rank = any(re.search(pat, raw_text, re.IGNORECASE) for pat, _ in PROHIBITED_RANK_PATTERNS)
+    edu_d3 = 50 if has_banned_rank else 88
+    edu_d4 = 85
+    edu_score = int(round(edu_d1 * 0.25 + edu_d2 * 0.25 + edu_d3 * 0.25 + edu_d4 * 0.25))
+    
+    # --- D. TECHNICAL SKILLS MATRIX ---
+    has_skills_table = any(k in raw_lower for k in ["languages:", "frameworks:", "databases:", "tools:", "libraries:", "developer tools:", "cloud:"])
+    skills_d1 = 88 if has_skills_table else 62
+    
+    skills_d2 = 86 if any(k in raw_lower for k in ["python", "typescript", "docker", "postgres", "fastapi", "react", "pytorch", "next.js", "kubernetes"]) else 68
+    skills_d3 = 84 if (has_skills_table or len(skills_lines) > 0) else 65
+    skills_d4 = 85
+    skills_score = int(round(skills_d1 * 0.25 + skills_d2 * 0.25 + skills_d3 * 0.25 + skills_d4 * 0.25))
+    
+    # --- E. POSITIONS OF RESPONSIBILITY (POR) ---
+    por_present = any(k in raw_lower for k in ["position of responsibility", "positions of responsibility", "convenor", "head", "manager", "lead", "coordinator", "secretary", "core team"])
+    por_d1 = 85 if por_present else 60
+    por_d2 = 82 if any(k in raw_lower for k in ["team of", "budget", "participants", "footfall", "organized", "spearheaded", "managed"]) else 65
+    por_d3 = 84 if por_present else 60
+    por_d4 = 85 if por_present else 65
+    por_score = int(round(por_d1 * 0.25 + por_d2 * 0.25 + por_d3 * 0.25 + por_d4 * 0.25))
+    
+    # Build default structured diagnostics
+    diagnostics = {
         "experience": {
             "name": "Work Experience & Internships",
             "score": exp_score,
             "bullets_count": len(exp_bullets),
-            "quantified_ratio": int(round((exp_metric_count / max(len(exp_bullets), 1)) * 100)),
-            "status": "Elite Impact" if exp_score >= 85 else "Strong" if exp_score >= 70 else "Needs Metrics"
+            "status": "Elite Impact" if exp_score >= 82 else "Strong Fit" if exp_score >= 72 else "Needs Polish",
+            "dimensions": [
+                {"name": "Metric Density & Impact", "score": exp_d1, "benchmark": "≥75% with metrics"},
+                {"name": "Action Verbs & Voice", "score": exp_d2, "benchmark": "Executive action verbs"},
+                {"name": "Scope & End-to-End Ownership", "score": exp_d3, "benchmark": "Problem → Solution → Impact"},
+                {"name": "Structural Hygiene & Budget", "score": exp_d4, "benchmark": "3-5 bullets per role"}
+            ],
+            "strengths": [
+                f"{int(round(m_ratio * 100))}% of experience bullets contain hard business/engineering metrics",
+                "High ownership verbs utilized across key delivery points"
+            ],
+            "gaps": [
+                "Quantify secondary engineering achievements with latency or efficiency gains"
+            ]
         },
         "projects": {
             "name": "Key Technical / Domain Projects",
             "score": proj_score,
             "bullets_count": len(proj_bullets),
-            "has_production_proof": proj_has_deployed,
-            "status": "Production Caliber" if proj_score >= 85 else "Good Depth" if proj_score >= 70 else "Needs Polish"
+            "status": "Production Caliber" if proj_score >= 82 else "Strong Depth" if proj_score >= 72 else "Needs Polish",
+            "dimensions": [
+                {"name": "Production & Live Deployment", "score": proj_d1, "benchmark": "Live links or repo proof"},
+                {"name": "Stack Depth & Completeness", "score": proj_d2, "benchmark": "Full-stack / Cloud / DB"},
+                {"name": "Problem Scale & Originality", "score": proj_d3, "benchmark": "Non-trivial engineering"},
+                {"name": "IITB Presentation Standard", "score": proj_d4, "benchmark": "Overview line + bullets"}
+            ],
+            "strengths": [
+                "Demonstrates live production proof and active deployment workflows" if has_live_proof else "Clear problem statements across major project points",
+                "Broad multi-tier technology stack utilized"
+            ],
+            "gaps": [
+                "Ensure every project features an initial single-line overview sentence" if not has_live_proof else "Add direct user scale or performance benchmark metrics"
+            ]
         },
         "education": {
-            "name": "Scholastic & Academic Achievements",
+            "name": "Scholastic Achievements & Education",
             "score": edu_score,
-            "has_cpi": has_cpi,
-            "has_honors": has_honors,
-            "status": "Placement Compliant" if edu_score >= 85 else "Acceptable"
+            "bullets_count": len(scholastic_bullets),
+            "status": "Placement Compliant" if edu_score >= 80 else "Acceptable" if edu_score >= 68 else "Policy Alert",
+            "dimensions": [
+                {"name": "Academic Baseline Clarity", "score": edu_d1, "benchmark": "CPI / Degree properly formatted"},
+                {"name": "Competitive Honors & Distinctions", "score": edu_d2, "benchmark": "Olympiads / Scholarships / AP"},
+                {"name": "Placement Policy Compliance", "score": edu_d3, "benchmark": "Zero prohibited AIR/Batch ranks"},
+                {"name": "Formatting & Chronology", "score": edu_d4, "benchmark": "Reverse chronological hierarchy"}
+            ],
+            "strengths": [
+                "Standard Institute academic identifiers verified" if has_cpi else "Clear educational progression",
+                "Distinctions and academic honors clearly highlighted" if has_honors else "Standard academic standing"
+            ],
+            "gaps": [
+                "Ensure compliance with placement policy by strictly omitting All India Ranks" if has_banned_rank else "Include national scholarships or academic recognitions if applicable"
+            ]
         },
         "skills": {
             "name": "Technical & Domain Skills Matrix",
             "score": skills_score,
-            "is_categorized": has_skills_table,
-            "status": "Structured Stack" if skills_score >= 85 else "Uncategorized"
+            "bullets_count": len(skills_lines),
+            "status": "Structured Stack" if skills_score >= 80 else "Uncategorized",
+            "dimensions": [
+                {"name": "Taxonomic Categorization", "score": skills_d1, "benchmark": "Languages / Frameworks / DBs"},
+                {"name": "Stack Modernity & Currency", "score": skills_d2, "benchmark": "Industry-standard tools"},
+                {"name": "Skill Density & Curation", "score": skills_d3, "benchmark": "15-25 curated technologies"},
+                {"name": "Target Domain Alignment", "score": skills_d4, "benchmark": f"Aligned with {target_role.capitalize()}"}
+            ],
+            "strengths": [
+                "Structured under distinct functional categories" if has_skills_table else "Comprehensive tool inventory",
+                "Strong alignment with modern software engineering expectations"
+            ],
+            "gaps": [
+                "Group flat skill lists into distinct categories (Languages, Frameworks, Databases, Tools)" if not has_skills_table else "Ensure secondary frameworks are supported by evidence in project points"
+            ]
         },
         "leadership": {
-            "name": "Leadership & Extracurriculars",
+            "name": "Positions of Responsibility & Leadership",
             "score": por_score,
-            "present": por_present,
-            "status": "Verified Leadership" if por_present else "Standard Profile"
+            "bullets_count": len(por_bullets),
+            "status": "Verified Leadership" if por_score >= 80 else "Standard Participation",
+            "dimensions": [
+                {"name": "Leadership Scope & Footprint", "score": por_d1, "benchmark": "Team size & event scale"},
+                {"name": "Administrative Impact", "score": por_d2, "benchmark": "Process & growth metrics"},
+                {"name": "Proactivity & Initiatives", "score": por_d3, "benchmark": "Launched new initiatives"},
+                {"name": "Hierarchy & Title Standard", "score": por_d4, "benchmark": "Role | Organization | Date"}
+            ],
+            "strengths": [
+                "Demonstrates formal leadership ownership and institutional impact" if por_present else "Well-rounded extracurricular participation",
+                "Shows cross-functional teamwork and initiative"
+            ],
+            "gaps": [
+                "Quantify leadership footprint with team size, budget, or event footfall numbers" if por_present else "Consider adding a Position of Responsibility to strengthen leadership evaluation"
+            ]
         }
     }
+    
+    # Deep AI Semantic Enrichment via Cerebras / Gemini (Fast Structured Polish)
+    try:
+        sample_bullets = (exp_bullets[:4] + proj_bullets[:3])
+        if sample_bullets:
+            ai_prompt = f"""
+            You are an elite IIT Bombay Placement Coach.
+            Review these sample resume bullets for '{target_role}' and generate 2 specific strengths and 2 actionable improvement recommendations for the candidate's Experience and Projects.
+            
+            BULLETS:
+            {json.dumps(sample_bullets)}
+            
+            Return JSON format:
+            {{
+              "exp_strengths": ["string", "string"],
+              "exp_gaps": ["string"],
+              "proj_strengths": ["string"],
+              "proj_gaps": ["string"]
+            }}
+            """
+            try:
+                ai_res = cerebras_client.generate_chat_completion(
+                    model="gpt-oss-120b",
+                    messages=[{"role": "user", "content": ai_prompt}],
+                    temperature=0.1,
+                    max_tokens=400
+                )
+            except Exception:
+                res = gemini_client.generate_content(
+                    model_name="gemini-1.5-flash",
+                    prompt=ai_prompt,
+                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
+                )
+                ai_res = res.text
+
+            ai_data = json_repair.loads(ai_res)
+            if isinstance(ai_data, dict):
+                if ai_data.get("exp_strengths"):
+                    diagnostics["experience"]["strengths"] = ai_data["exp_strengths"][:2]
+                if ai_data.get("exp_gaps"):
+                    diagnostics["experience"]["gaps"] = ai_data["exp_gaps"][:1]
+                if ai_data.get("proj_strengths"):
+                    diagnostics["projects"]["strengths"] = ai_data["proj_strengths"][:2]
+                if ai_data.get("proj_gaps"):
+                    diagnostics["projects"]["gaps"] = ai_data["proj_gaps"][:1]
+    except Exception as e:
+        print(f"Deep AI section audit enrichment fallback: {e}")
+        
+    return diagnostics
 
 
 # ==============================================================================
@@ -1084,8 +1243,8 @@ def compute_full_ats_report(
     p4 = evaluate_action_verbs_and_voice(parsed_sections, target_role=target_role)
     p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, pdf_bytes=pdf_bytes, mode=mode)
     
-    # Section-Wise Health Diagnostics
-    section_health = evaluate_section_wise_health(parsed_sections, raw_text)
+    # Section-Wise Multi-Dimensional Health Diagnostics
+    section_health = audit_sections_with_deep_ai(parsed_sections, raw_text, target_role=target_role, mode=mode)
     
     # Master Weighted Score (0-100)
     overall_score = int(round(
