@@ -812,13 +812,13 @@ export default function ATSCheckerPage() {
                     </div>
                     <Progress value={atsReport.pillars?.formatting_layout?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
-                      {atsReport.pillars?.formatting_layout?.word_count} words (1-Page Density).
+                      {atsReport.pillars?.formatting_layout?.word_count} words ({atsReport.pillars?.formatting_layout?.page_count || 1}-Page Density).
                     </p>
                   </div>
                   <div className="mt-3 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
-                    <span>Wrap Flags</span>
+                    <span>Visual Wraps</span>
                     <span className={`font-semibold ${atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length > 0 ? "text-amber-500" : "text-emerald-500"}`}>
-                      {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length || 0} Points
+                      {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length || 0} Orphan Flags
                     </span>
                   </div>
                 </div>
@@ -848,7 +848,7 @@ export default function ATSCheckerPage() {
                   className={`pb-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${activeSubTab === "line_wrap" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Line-Wrap Hazards & Fixes
+                  Visual Line-Wrap Inspector
                   {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length > 0 && (
                     <Badge className="h-4 px-1 text-[9px] bg-amber-500/20 text-amber-600 dark:text-amber-400 border-none">
                       {atsReport.pillars?.formatting_layout?.line_wrap_hazards?.length} Flags
@@ -1082,10 +1082,10 @@ export default function ATSCheckerPage() {
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <div className="p-4 rounded-xl bg-muted/20 border border-black/5 dark:border-white/10">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                      LaTeX & Word 1-Page Line Budget Auditor
+                      Visual Geometry & Line Budget Inspector ({atsReport.pillars?.formatting_layout?.page_count || 1}-Page Resume)
                     </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      In 1-page placement resumes, points containing 115–140 characters spill 1–3 orphan words into line 2, wasting vertical margin budget and risking overflow into a 2nd page.
+                      Uses PDF visual line bounding-box analysis to detect genuine orphan line wraps (where a point renders across multiple lines and spills only 1–3 trailing words onto the final line, leaving excessive empty margin space).
                     </p>
                   </div>
 
@@ -1094,11 +1094,18 @@ export default function ATSCheckerPage() {
                       {atsReport.pillars?.formatting_layout?.line_wrap_hazards.map((hazard: any, i: number) => (
                         <div key={i} className="p-4 rounded-2xl bg-background border border-amber-500/25 shadow-sm space-y-3">
                           <div className="flex items-center justify-between text-xs">
-                            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5">
-                              {hazard.section} • {hazard.char_length} Chars
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/5">
+                                {hazard.section} • {hazard.char_length} Chars
+                              </Badge>
+                              {hazard.visual_lines && (
+                                <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px]">
+                                  {hazard.visual_lines} Visual Lines
+                                </Badge>
+                              )}
+                            </div>
                             <span className="text-[11px] font-mono text-rose-500 font-semibold">
-                              Trim ~{hazard.chars_to_trim} chars to fit 1 line
+                              Trim ~{hazard.chars_to_trim} chars to eliminate orphan line
                             </span>
                           </div>
 
@@ -1122,8 +1129,10 @@ export default function ATSCheckerPage() {
                   ) : (
                     <div className="p-8 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-2">
                       <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                      <h4 className="font-bold text-sm text-foreground">Zero Line-Wrap Hazards Detected</h4>
-                      <p className="text-xs text-muted-foreground">All bullets comfortably fit within single or double line placement margins.</p>
+                      <h4 className="font-bold text-sm text-foreground">Zero Visual Orphan Hazards Detected</h4>
+                      <p className="text-xs text-muted-foreground">
+                        All points render with clean single lines or well-filled multi-lines across your {atsReport.pillars?.formatting_layout?.page_count || 1}-page placement document.
+                      </p>
                     </div>
                   )}
                 </div>

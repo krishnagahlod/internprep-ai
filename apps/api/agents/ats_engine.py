@@ -575,44 +575,168 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
 
 
 
+def inspect_pdf_visual_geometry_and_hazards(
+    pdf_bytes: Optional[bytes], 
+    raw_text: str, 
+    parsed_sections: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Visual OCR & Bounding Box Layout Analyzer using PyMuPDF.
+    Accurately detects page count and true visual orphan word spills on rendered PDF lines.
+    """
+    page_count = 1
+    hazards = []
+    
+    if pdf_bytes:
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            page_count = len(doc)
+            
+            # Map of bullet text normalized to section
+            bullet_section_map = {}
+            for sec in parsed_sections:
+                stype = sec.get("section_type", "Experience")
+                for b in sec.get("bullets", []):
+                    bt = b if isinstance(b, str) else b.get("bullet_text", "")
+                    if bt:
+                        bullet_section_map[re.sub(r"\s+", " ", bt.strip()).lower()] = (stype, bt)
+
+            for page in doc:
+                doc_dict = page.get_text("dict")
+                blocks = doc_dict.get("blocks", [])
+                
+                for block in blocks:
+                    if "lines" not in block:
+                        continue
+                    
+                    lines = block["lines"]
+                    if not lines:
+                        continue
+                    
+                    # Group spans in this block
+                    block_line_texts = []
+                    block_line_widths = []
+                    for l in lines:
+                        l_text = "".join([s.get("text", "") for s in l.get("spans", [])]).strip()
+                        bbox = l.get("bbox", (0, 0, 0, 0))
+                        width = bbox[2] - bbox[0]
+                        if l_text:
+                            block_line_texts.append(l_text)
+                            block_line_widths.append(width)
+                            
+                    if not block_line_texts:
+                        continue
+                        
+                    full_block_text = " ".join(block_line_texts)
+                    clean_block_text = re.sub(r"\s+", " ", full_block_text).strip()
+                    
+                    # Check if this block is a multi-line bullet with an orphan spill
+                    # e.g., if block has 2+ visual lines and the last line width is < 25% of the max width in block
+                    # or last line has <= 3 short words (< 20 chars)
+                    if len(block_line_texts) >= 2:
+                        max_w = max(block_line_widths) if block_line_widths else 1
+                        last_w = block_line_widths[-1]
+                        last_text = block_line_texts[-1].strip()
+                        last_words = last_text.split()
+                        
+                        width_ratio = last_w / max(max_w, 1)
+                        
+                        # True orphan hazard: last line takes < 25% width and has only 1-3 words (<20 chars)
+                        is_orphan = (width_ratio < 0.25 and len(last_words) <= 3) or (len(last_words) <= 2 and len(last_text) < 18)
+                        
+                        if is_orphan and len(clean_block_text) > 35:
+                            # Match with a bullet in parsed_sections
+                            matched_stype = "Experience"
+                            matched_bullet_full = clean_block_text
+                            
+                            for b_key, (st, orig_b) in bullet_section_map.items():
+                                if b_key in clean_block_text.lower() or clean_block_text.lower() in b_key:
+                                    matched_stype = st
+                                    matched_bullet_full = orig_b
+                                    break
+                                    
+                            hazards.append({
+                                "section": matched_stype,
+                                "bullet_text": matched_bullet_full,
+                                "char_length": len(matched_bullet_full),
+                                "visual_lines": len(block_line_texts),
+                                "orphan_words": last_text,
+                                "target_trim_chars": len(last_text) + 2,
+                                "chars_to_trim": len(last_text) + 2,
+                                "reason": f"Visual 2-line wrap: '{last_text}' spilled as an orphan on the last line."
+                            })
+            doc.close()
+        except Exception as e:
+            print(f"Visual geometry analysis error: {e}")
+
+    # If no pdf_bytes (pasted plain text), fallback to natural line breaks & high threshold (>165 chars)
+    if not pdf_bytes or len(hazards) == 0:
+        if not pdf_bytes:
+            for sec in parsed_sections:
+                stype = sec.get("section_type", "Experience")
+                for b in sec.get("bullets", []):
+                    b_text = b if isinstance(b, str) else b.get("bullet_text", "")
+                    length = len(b_text)
+                    if 165 <= length <= 190:
+                        hazards.append({
+                            "section": stype,
+                            "bullet_text": b_text,
+                            "char_length": length,
+                            "visual_lines": 2,
+                            "orphan_words": "Trailing 1-2 words",
+                            "target_trim_chars": length - 150,
+                            "chars_to_trim": length - 150,
+                            "reason": f"{length} chars exceeds standard single line capacity by ~10-15 chars."
+                        })
+                    
+    return {
+        "page_count": page_count,
+        "hazards": hazards
+    }
+
+
 def evaluate_formatting_and_iitb_rules(
     raw_text: str, 
     parsed_sections: List[Dict[str, Any]], 
+    pdf_bytes: Optional[bytes] = None,
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
-    """Pillar 5: 1-Page Line Budget, Density & Placement Rules (0-100)."""
+    """Pillar 5: Line Budget, Visual Geometry Density & Placement Rules (0-100)."""
     words = raw_text.split()
     word_count = len(words)
     
-    # 1-Page Placement Resume Optimal Word Budget: 420–580 words.
-    if 400 <= word_count <= 600:
-        word_density_score = 100
-        density_status = "Optimal (400-600 words)"
-    elif 300 <= word_count < 400 or 600 < word_count <= 850:
-        word_density_score = 85
-        density_status = "Dense (700-850 words)" if word_count > 600 else "Light (<400 words)"
+    # Visual geometry & page count analysis
+    visual_analysis = inspect_pdf_visual_geometry_and_hazards(pdf_bytes, raw_text, parsed_sections)
+    page_count = visual_analysis["page_count"]
+    hazards = visual_analysis["hazards"]
+    
+    # Calibrated Word Budget based on Auto-Detected Page Count
+    if page_count == 1:
+        # 1-Page Placement Resume Optimal Word Budget: 400–650 words.
+        if 380 <= word_count <= 650:
+            word_density_score = 100
+            density_status = f"Optimal for 1-Page ({word_count} words)"
+        elif 280 <= word_count < 380 or 650 < word_count <= 850:
+            word_density_score = 85
+            density_status = f"Dense ({word_count} words)" if word_count > 650 else f"Light ({word_count} words)"
+        else:
+            word_density_score = 70
+            density_status = f"Very Dense ({word_count} words)"
     else:
-        word_density_score = 65
-        density_status = "Very Dense (>850 words)"
-        
-    # Line-Wrap Hazard Inspection: Bullets between 115 and 140 chars often spill 1-3 orphan words into line 2
-    hazards = []
-    for sec in parsed_sections:
-        stype = sec.get("section_type", "Experience")
-        for b in sec.get("bullets", []):
-            b_text = b if isinstance(b, str) else b.get("bullet_text", "")
-            length = len(b_text)
-            if 115 <= length <= 140:
-                hazards.append({
-                    "section": stype,
-                    "bullet_text": b_text,
-                    "char_length": length,
-                    "target_trim_chars": length - 110,
-                    "chars_to_trim": length - 110,
-                    "reason": f"{length} chars spills 1-3 words onto line 2."
-                })
-                
-    wrap_score = max(40, 100 - (len(hazards) * 5))
+        # 2-Page Master Resume Optimal Word Budget: 850–1650 words.
+        if 850 <= word_count <= 1650:
+            word_density_score = 100
+            density_status = f"Optimal for 2-Page Master ({word_count} words)"
+        elif 700 <= word_count < 850 or 1650 < word_count <= 1950:
+            word_density_score = 88
+            density_status = f"Dense ({word_count} words)" if word_count > 1650 else f"Light ({word_count} words)"
+        else:
+            word_density_score = 75
+            density_status = f"Very Dense ({word_count} words)"
+            
+    # Line wrap score based on REAL visual orphan spills (not normal single lines!)
+    wrap_score = max(50, 100 - (len(hazards) * 8))
     
     # Prohibited Rank Mentions Inspection
     policy_alerts = []
@@ -628,16 +752,16 @@ def evaluate_formatting_and_iitb_rules(
                 
     layout_checks = [
         {
-            "name": "1-Page Word Count Density",
+            "name": f"{page_count}-Page Word Count Density",
             "passed": word_density_score >= 80,
             "score": word_density_score,
             "status": density_status
         },
         {
-            "name": "1-Page Margin & Line Budget",
+            "name": "Visual Line-Wrap & Margin Budget",
             "passed": len(hazards) <= 2,
             "score": wrap_score,
-            "status": "Optimal" if len(hazards) == 0 else f"{len(hazards)} Wrap Flags"
+            "status": "Optimal (0 Overflow)" if len(hazards) == 0 else f"{len(hazards)} Visual Wrap Flags"
         }
     ]
     
@@ -654,11 +778,13 @@ def evaluate_formatting_and_iitb_rules(
     
     return {
         "score": final_score,
+        "page_count": page_count,
         "word_count": word_count,
         "line_wrap_hazards": hazards,
         "policy_alerts": policy_alerts,
         "layout_checks": layout_checks
     }
+
 
 
 
@@ -694,7 +820,7 @@ def compute_full_ats_report(
     p2 = evaluate_keyword_match(raw_text, parsed_sections, target_role=target_role, job_description=job_description, mode=mode)
     p3 = evaluate_quantification_impact(parsed_sections)
     p4 = evaluate_action_verbs_and_voice(parsed_sections, target_role=target_role)
-    p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, mode=mode)
+    p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, pdf_bytes=pdf_bytes, mode=mode)
     
     # Master Weighted Score (0-100)
     # Skill Alignment: 30%, Quantification: 25%, Parseability: 15%, Action Verbs: 15%, Formatting/Budget: 15%
