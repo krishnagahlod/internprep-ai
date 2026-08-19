@@ -12,14 +12,14 @@ import {
   Target, Copy, Lightbulb, ChevronDown, 
   Brain, FileText, Zap, AlertTriangle, ShieldCheck, 
   Search, Check, GraduationCap, Building2, SlidersHorizontal, 
-  TrendingUp, Cpu, Sparkles, X, Info, HelpCircle
+  TrendingUp, Cpu, Sparkles, X, Info, HelpCircle, ArrowUpRight
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 
 // Master Radial Gauge Component for ATS Score
 const MasterScoreGauge = ({ score, tier, mode, roleLabel }: { score: number, tier: string, mode: string, roleLabel: string }) => {
-  const radius = 68;
+  const radius = 64;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
@@ -33,24 +33,24 @@ const MasterScoreGauge = ({ score, tier, mode, roleLabel }: { score: number, tie
   const colors = getColor();
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-8 p-6 md:p-8 rounded-3xl bg-gradient-to-br from-primary/5 via-background to-primary/10 border border-primary/20 shadow-md">
+    <div className="flex items-center gap-6">
       <div className="relative flex items-center justify-center shrink-0">
-        <svg className="w-40 h-40 transform -rotate-90">
+        <svg className="w-36 h-36 transform -rotate-90">
           <circle
-            cx="80"
-            cy="80"
+            cx="72"
+            cy="72"
             r={radius}
             stroke="currentColor"
-            strokeWidth="11"
+            strokeWidth="10"
             className="text-black/5 dark:text-white/10"
             fill="transparent"
           />
           <circle
-            cx="80"
-            cy="80"
+            cx="72"
+            cy="72"
             r={radius}
             stroke="currentColor"
-            strokeWidth="11"
+            strokeWidth="10"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
@@ -58,45 +58,45 @@ const MasterScoreGauge = ({ score, tier, mode, roleLabel }: { score: number, tie
             fill="transparent"
           />
         </svg>
-        <div className="absolute flex flex-col items-center justify-center">
-          <span className={`text-4xl font-extrabold tracking-tight ${colors.text}`}>{score}</span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">OUT OF 100</span>
+        <div className="absolute flex flex-col items-center justify-center text-center">
+          <span className={`text-3xl font-black tracking-tight ${colors.text}`}>{score}</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">OUT OF 100</span>
         </div>
       </div>
 
-      <div className="flex-1 text-center sm:text-left space-y-2.5">
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-          <Badge className={`px-3 py-1 font-semibold text-xs border ${colors.badge}`}>
+      <div className="space-y-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className={`px-2.5 py-0.5 font-semibold text-[11px] border ${colors.badge}`}>
             {tier}
           </Badge>
-          <span className="text-xs font-mono text-muted-foreground uppercase flex items-center gap-1">
+          <span className="text-[11px] font-mono text-muted-foreground uppercase flex items-center gap-1">
             {mode === "iitb_placement" ? (
-              <><GraduationCap className="h-3.5 w-3.5 text-primary" /> IIT Bombay Placement Standard</>
+              <><GraduationCap className="h-3 w-3 text-primary" /> IITB Day 1 Standard</>
             ) : (
-              <><Building2 className="h-3.5 w-3.5 text-primary" /> Global Enterprise ATS Standard</>
+              <><Building2 className="h-3 w-3 text-primary" /> Corporate ATS Standard</>
             )}
           </span>
         </div>
-        <h3 className="text-2xl font-bold tracking-tight text-foreground">
+        <h3 className="text-lg font-bold tracking-tight text-foreground line-clamp-1">
           {score >= 85 
-            ? "Elite Candidate Profile — High Shortlisting Probability" 
+            ? "Elite Placement Candidate Profile" 
             : score >= 72 
-            ? "Strong Foundation — Targeted Optimization Recommended" 
+            ? "Strong Shortlist Contender" 
             : score >= 58 
-            ? "Moderate Alignment — Key Competency & Metric Gaps" 
-            : "Significant Formatting & Content Adjustments Required"}
+            ? "Moderate Alignment — Key Gaps" 
+            : "Formatting & Content Adjustments Required"}
         </h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
           {mode === "iitb_placement" 
-            ? `Calibrated for ${roleLabel} campus shortlisting: rigorously evaluates 1-page line budget, CPI notice, scholastic distinction highlights, metric density, and domain-specific section hierarchy.`
-            : `Calibrated for corporate enterprise ATS systems (Workday, Greenhouse, Eightfold): evaluates OCR extractability, semantic skill match rate for ${roleLabel}, active power verbs, and single-column parsing flow.`}
+            ? `Calibrated for ${roleLabel} campus shortlisting: 1-page LaTeX line budget, scholastic CPI highlights, and domain competency density.`
+            : `Calibrated for corporate enterprise ATS systems (Workday, Greenhouse, Eightfold): OCR extractability and semantic skill match for ${roleLabel}.`}
         </p>
       </div>
     </div>
   );
 };
 
-// Check Row with Progress Bar & Status Pill (No messy descriptions)
+// Check Row Component with Full Title, Status Pill and Mini Progress Bar (Zero Truncation)
 const CheckRow = ({ name, score, status, passed }: { name: string, score: number, status: string, passed: boolean }) => {
   const getStatusBadge = () => {
     if (score >= 85 || passed) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
@@ -106,18 +106,18 @@ const CheckRow = ({ name, score, status, passed }: { name: string, score: number
   };
 
   return (
-    <div className="flex items-center justify-between p-3.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 hover:border-primary/20 transition-all">
-      <div className="flex items-center gap-2.5 min-w-0 pr-3">
+    <div className="flex items-center justify-between p-3 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 hover:border-primary/20 transition-all">
+      <div className="flex items-center gap-2.5 min-w-0 pr-2">
         {passed ? (
           <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
         ) : (
           <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
         )}
-        <span className="text-xs font-semibold text-foreground truncate">{name}</span>
+        <span className="text-xs font-semibold text-foreground">{name}</span>
       </div>
 
       <div className="flex items-center gap-3 shrink-0">
-        <div className="w-20 sm:w-28 hidden sm:block">
+        <div className="w-16 sm:w-24 hidden sm:block">
           <Progress value={score} className="h-1.5" />
         </div>
         <Badge className={`text-[10px] font-mono px-2 py-0.5 border ${getStatusBadge()}`}>
@@ -236,7 +236,6 @@ export default function ATSCheckerPage() {
       setIsScanning(false);
     }
   };
-
 
   const handleExecuteBulletFix = async () => {
     if (!bulletToFix) return
@@ -561,10 +560,10 @@ export default function ATSCheckerPage() {
             </div>
             
             {/* Main Scorecard Content */}
-            <div className="flex-1 overflow-y-auto px-2 lg:pl-6 custom-scrollbar pb-20 space-y-8 animate-in fade-in duration-500">
+            <div className="flex-1 overflow-y-auto px-2 lg:pl-6 custom-scrollbar pb-20 space-y-6 animate-in fade-in duration-500">
               
               {/* Benchmark Switcher Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-muted/25 border border-black/5 dark:border-white/10">
+              <div className="flex flex-wrap items-center justify-between gap-4 p-3.5 rounded-2xl bg-muted/25 border border-black/5 dark:border-white/10">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">Standard:</span>
                   <button
@@ -641,13 +640,74 @@ export default function ATSCheckerPage() {
                 </div>
               )}
 
-              {/* Master Score Radial Gauge Card */}
-              <MasterScoreGauge 
-                score={atsReport.overall_score} 
-                tier={atsReport.tier} 
-                mode={atsReport.mode} 
-                roleLabel={atsReport.target_role_label}
-              />
+              {/* Master Split Hero: Gauge on Left + Quick Wins Roadmap on Right */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Left: Master Gauge Card */}
+                <div className="lg:col-span-7 p-6 rounded-3xl bg-gradient-to-br from-primary/5 via-background to-primary/10 border border-primary/20 shadow-md flex items-center">
+                  <MasterScoreGauge 
+                    score={atsReport.overall_score} 
+                    tier={atsReport.tier} 
+                    mode={atsReport.mode} 
+                    roleLabel={atsReport.target_role_label}
+                  />
+                </div>
+
+                {/* Right: Quick Wins Roadmap Card */}
+                <div className="lg:col-span-5 p-5 rounded-3xl bg-muted/20 border border-black/5 dark:border-white/10 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <span className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Immediate Score Roadmap
+                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">High-Yield Priorities</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {atsReport.quick_wins?.map((qw: any, i: number) => (
+                        <div key={i} className="p-2.5 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 flex items-center justify-between gap-3 hover:border-primary/20 transition-all">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <Badge className="text-[9px] px-1.5 py-0 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-mono shrink-0">
+                                {qw.impact_pts}
+                              </Badge>
+                              <p className="text-xs font-bold text-foreground truncate">{qw.title}</p>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground truncate mt-0.5">{qw.hint}</p>
+                          </div>
+
+                          {qw.action_type === "inject_keyword" && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => setActiveSubTab("keywords")} 
+                              className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10 shrink-0"
+                            >
+                              View Skills <ArrowUpRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          )}
+                          {qw.action_type === "trim_line_wrap" && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => setActiveSubTab("line_wrap")} 
+                              className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10 shrink-0"
+                            >
+                              Trim Lines <ArrowUpRight className="h-3 w-3 ml-0.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[10px] text-muted-foreground">
+                    <span>Target: 85+ (Placement Ready)</span>
+                    <span className="font-semibold text-primary">Est. Gain: +15-25 pts</span>
+                  </div>
+                </div>
+
+              </div>
 
               {/* IITB Policy Alerts (e.g. Prohibited JEE Rank Mentions) */}
               {atsReport.policy_alerts && atsReport.policy_alerts.length > 0 && (
@@ -678,7 +738,7 @@ export default function ATSCheckerPage() {
                       <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-primary" /> Parseability</span>
                       <span className="font-mono font-bold text-foreground">{atsReport.pillars?.parseability?.score}%</span>
                     </div>
-                    <Progress value={atsReport.pillars?.parseability?.score} className="h-1.5 mb-3" />
+                    <Progress value={atsReport.pillars?.parseability?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
                       Layout structure & entity extraction hygiene.
                     </p>
@@ -696,7 +756,7 @@ export default function ATSCheckerPage() {
                       <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5 text-primary" /> Skill Match</span>
                       <span className="font-mono font-bold text-foreground">{atsReport.pillars?.keyword_match?.score}%</span>
                     </div>
-                    <Progress value={atsReport.pillars?.keyword_match?.score} className="h-1.5 mb-3" />
+                    <Progress value={atsReport.pillars?.keyword_match?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
                       {atsReport.pillars?.keyword_match?.found_critical_count} of {atsReport.pillars?.keyword_match?.total_critical_count} core competencies matched.
                     </p>
@@ -714,7 +774,7 @@ export default function ATSCheckerPage() {
                       <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5 text-primary" /> Quantification</span>
                       <span className="font-mono font-bold text-foreground">{atsReport.pillars?.quantification?.score}%</span>
                     </div>
-                    <Progress value={atsReport.pillars?.quantification?.score} className="h-1.5 mb-3" />
+                    <Progress value={atsReport.pillars?.quantification?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
                       {atsReport.pillars?.quantification?.quantification_ratio}% bullets have hard metrics.
                     </p>
@@ -732,7 +792,7 @@ export default function ATSCheckerPage() {
                       <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Action Verbs</span>
                       <span className="font-mono font-bold text-foreground">{atsReport.pillars?.action_verbs?.score}%</span>
                     </div>
-                    <Progress value={atsReport.pillars?.action_verbs?.score} className="h-1.5 mb-3" />
+                    <Progress value={atsReport.pillars?.action_verbs?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
                       {atsReport.pillars?.action_verbs?.weak_verb_count} weak verbs detected.
                     </p>
@@ -750,7 +810,7 @@ export default function ATSCheckerPage() {
                       <span className="flex items-center gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5 text-primary" /> Line Budget</span>
                       <span className="font-mono font-bold text-foreground">{atsReport.pillars?.formatting_layout?.score}%</span>
                     </div>
-                    <Progress value={atsReport.pillars?.formatting_layout?.score} className="h-1.5 mb-3" />
+                    <Progress value={atsReport.pillars?.formatting_layout?.score} className="h-1.5 mb-2.5" />
                     <p className="text-[11px] text-muted-foreground">
                       {atsReport.pillars?.formatting_layout?.word_count} words (1-Page Density).
                     </p>
@@ -780,7 +840,7 @@ export default function ATSCheckerPage() {
                   <Target className="h-3.5 w-3.5" />
                   Competency & Skill Matrix
                   <Badge className="h-4 px-1 text-[9px] bg-primary/20 text-primary border-none">
-                    {atsReport.pillars?.keyword_match?.found_keywords?.length || 0} Matched
+                    {atsReport.pillars?.keyword_match?.found_critical_count} / {atsReport.pillars?.keyword_match?.total_critical_count} Matched
                   </Badge>
                 </button>
                 <button
@@ -804,7 +864,7 @@ export default function ATSCheckerPage() {
                 </button>
               </div>
 
-              {/* Sub-view 1: Overview & Checks (Clean Scores & Progress Bars, No Messy Descriptions) */}
+              {/* Sub-view 1: Overview & Checks */}
               {activeSubTab === "overview" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-300">
                   {/* Parseability & Formatting Checks */}
@@ -904,17 +964,32 @@ export default function ATSCheckerPage() {
                 </div>
               )}
 
-              {/* Sub-view 2: Keywords Matrix */}
+              {/* Sub-view 2: Categorized Competencies & Skill Matrix */}
               {activeSubTab === "keywords" && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                  {/* Missing Critical Keywords Box */}
+                  
+                  {/* Custom JD Match Overview if Present */}
+                  {atsReport.pillars?.keyword_match?.jd_match_info && (
+                    <div className="p-5 rounded-2xl bg-primary/10 border border-primary/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+                          <Target className="h-4 w-4" /> Target Job Description Skill Match: {atsReport.pillars?.keyword_match?.jd_match_info?.match_rate}%
+                        </h4>
+                        <Badge className="bg-primary text-primary-foreground font-mono text-xs">
+                          {atsReport.pillars?.keyword_match?.jd_match_info?.found} / {atsReport.pillars?.keyword_match?.jd_match_info?.total} Skills
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Missing High-Yield Competencies Box */}
                   {atsReport.pillars?.keyword_match?.missing_critical?.length > 0 && (
                     <div className="p-5 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4" /> Missing High-Priority Domain Keywords ({atsReport.pillars?.keyword_match?.missing_critical?.length})
+                          <AlertTriangle className="h-4 w-4" /> Recommended High-Priority Competencies ({atsReport.pillars?.keyword_match?.missing_critical?.length})
                         </h4>
-                        <span className="text-[11px] text-muted-foreground">Crucial for ranking in automated shortlists</span>
+                        <span className="text-[11px] text-muted-foreground">Click any skill to launch 1-Click AI Bullet Injector</span>
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         {atsReport.pillars?.keyword_match?.missing_critical.map((kw: string, i: number) => (
@@ -931,19 +1006,60 @@ export default function ATSCheckerPage() {
                     </div>
                   )}
 
-                  {/* Found Keywords */}
-                  <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Successfully Detected Keywords & Competencies ({atsReport.pillars?.keyword_match?.found_keywords?.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {atsReport.pillars?.keyword_match?.found_keywords?.map((kw: string, i: number) => (
-                        <Badge key={i} className="px-3 py-1 rounded-xl text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                          <Check className="h-3 w-3 mr-1 inline" /> {kw}
-                        </Badge>
+                  {/* Categorized Matrix Breakdown */}
+                  {atsReport.pillars?.keyword_match?.categorized_matrix ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {atsReport.pillars?.keyword_match?.categorized_matrix.map((cat: any, idx: number) => (
+                        <div key={idx} className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
+                          <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2">
+                            <h5 className="text-xs font-bold text-foreground">{cat.category}</h5>
+                            <Badge variant="outline" className="text-[10px] font-mono">
+                              {cat.matched?.length} / {(cat.matched?.length || 0) + (cat.missing?.length || 0)}
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            {cat.matched?.map((m: any, mi: number) => (
+                              <div key={mi} className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs flex items-center justify-between">
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                                  <Check className="h-3 w-3" /> {m.name}
+                                </span>
+                                <span className="text-[9px] font-mono text-muted-foreground opacity-70 truncate max-w-[90px]">
+                                  via "{m.matched_via}"
+                                </span>
+                              </div>
+                            ))}
+
+                            {cat.missing?.map((ms: string, msi: number) => (
+                              <div key={msi} className="p-2 rounded-lg bg-muted/20 border border-dashed border-muted-foreground/30 text-xs flex items-center justify-between">
+                                <span className="text-muted-foreground">{ms}</span>
+                                <button 
+                                  onClick={() => { setMissingKeywordToInject(ms); setFixType("inject_keyword"); setBulletToFix({ bullet_text: "" }); }}
+                                  className="text-[10px] text-primary font-bold hover:underline"
+                                >
+                                  + Inject
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  </div>
+                  ) : (
+                    /* Fallback Flat List */
+                    <div className="p-5 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4" /> Detected Competencies ({atsReport.pillars?.keyword_match?.found_keywords?.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {atsReport.pillars?.keyword_match?.found_keywords?.map((kw: string, i: number) => (
+                          <Badge key={i} className="px-3 py-1 rounded-xl text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                            <Check className="h-3 w-3 mr-1 inline" /> {kw}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Recommendations */}
                   {atsReport.pillars?.keyword_match?.suggestions?.length > 0 && (
