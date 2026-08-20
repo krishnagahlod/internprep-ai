@@ -1,0 +1,26 @@
+{
+  "whitelisted_emails": [
+    {
+      "email": "krishnagahlod@gmail.com",
+      "role": "admin",
+      "granted_at": "2026-08-20",
+      "notes": "Platform Owner"
+    },
+    {
+      "email": "creator@internprep.ai",
+      "role": "admin",
+      "granted_at": "2026-08-20",
+      "notes": "System Administrator"
+    }
+  ],
+  "invite_codes": [
+    "IITB-VIP-2026",
+    "IITB-CAMPUS-PASS"
+  ],
+  "verified_log": [
+    {
+      "email": "210050012@iitb.ac.in",
+      "verified_at": "2026-08-20T10:48:51.822088"
+    }
+  ]
+}
