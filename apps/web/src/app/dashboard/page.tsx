@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2 } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
@@ -289,6 +289,10 @@ export default function DashboardPage() {
             <UploadCloud className="mr-3 h-4 w-4" />
             Resume Builder
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/placement-analysis")}>
+            <Building2 className="mr-3 h-4 w-4 text-amber-500" />
+            Placement Analysis
+          </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/interview")}>
             <Briefcase className="mr-3 h-4 w-4" />
             Interviews
@@ -364,6 +368,10 @@ export default function DashboardPage() {
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume-builder"); setIsMobileMenuOpen(false); }}>
             <UploadCloud className="mr-3 h-4 w-4" />
             Resume Builder
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/placement-analysis"); setIsMobileMenuOpen(false); }}>
+            <Building2 className="mr-3 h-4 w-4 text-amber-500" />
+            Placement Analysis
           </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
             <Briefcase className="mr-3 h-4 w-4" />
@@ -514,6 +522,23 @@ export default function DashboardPage() {
                 <h2 className="text-2xl font-bold mb-2 group-hover:text-emerald-700 transition-colors font-outfit">Resume Builder</h2>
                 <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
                   Turn raw experiences into high-impact, placement-focused bullets using the Achievement Vault.
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Placement Analysis & Company Intelligence Card (Spans 2 columns) */}
+            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/placement-analysis")}>
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-100/50 dark:from-amber-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
+              <div className="flex items-start justify-between relative z-10">
+                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-amber-100 dark:border-amber-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                  <Building2 className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <span className="text-xs font-semibold tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-3 py-1 rounded-full border border-amber-100 dark:border-amber-800/50">IITB EXCLUSIVE</span>
+              </div>
+              <div className="relative z-10">
+                <h2 className="text-2xl font-bold mb-2 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors font-outfit">Placement Analysis</h2>
+                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
+                  627+ verified recruiters (2024–26), JAF compensation breakdowns, selection questions & round blueprints.
                 </p>
               </div>
             </motion.div>
