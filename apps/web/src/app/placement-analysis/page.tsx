@@ -51,7 +51,12 @@ import {
   BrainCircuit,
   Target,
   BarChart3,
-  CheckSquare
+  CheckSquare,
+  Scale,
+  Percent,
+  Calculator,
+  FileCheck,
+  AlertCircle
 } from "lucide-react"
 
 // Types
@@ -166,6 +171,26 @@ interface WhitelistedUser {
   granted_by?: string
 }
 
+interface ResumeMatchResult {
+  match_score: number
+  match_rating: string
+  matched_skills: string[]
+  missing_critical_skills: string[]
+  tailored_resume_bullets: string[]
+}
+
+interface SalaryBreakdownResult {
+  ctc_inr: number
+  base_pay_annual: number
+  variable_bonus_annual: number
+  esops_annual: number
+  estimated_monthly_gross: number
+  estimated_monthly_net_inhand: number
+  estimated_annual_tax: number
+  estimated_annual_epf: number
+  vesting_schedule: string
+}
+
 const SECTOR_TABS = [
   "All Sectors",
   "Product Management",
@@ -242,8 +267,24 @@ export default function PlacementAnalysisPage() {
   const [selectedCompanySlug, setSelectedCompanySlug] = useState<string | null>(null)
   const [companyDetails, setCompanyDetails] = useState<any | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
-  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "keywords" | "selection" | "roadmap">("roles")
+  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "keywords" | "resumematch" | "selection" | "roadmap">("roles")
   const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
+
+  // Comparison State
+  const [comparedSlugs, setComparedSlugs] = useState<string[]>([])
+  const [showCompareModal, setShowCompareModal] = useState(false)
+  const [comparisonData, setComparisonData] = useState<any | null>(null)
+  const [loadingComparison, setLoadingComparison] = useState(false)
+
+  // Resume Matcher State
+  const [customResumeText, setCustomResumeText] = useState("")
+  const [matchResult, setMatchResult] = useState<ResumeMatchResult | null>(null)
+  const [matchingResume, setMatchingResume] = useState(false)
+  const [copiedBulletIdx, setCopiedBulletIdx] = useState<number | null>(null)
+
+  // Salary Breakdown State
+  const [salaryBreakdown, setSalaryBreakdown] = useState<SalaryBreakdownResult | null>(null)
+  const [loadingSalary, setLoadingSalary] = useState(false)
 
   // Check IITB verification from user profile / localStorage
   useEffect(() => {
@@ -313,6 +354,8 @@ export default function PlacementAnalysisPage() {
   useEffect(() => {
     if (!selectedCompanySlug) {
       setCompanyDetails(null)
+      setMatchResult(null)
+      setSalaryBreakdown(null)
       return
     }
 
@@ -325,6 +368,11 @@ export default function PlacementAnalysisPage() {
           const data = await res.json()
           setCompanyDetails(data)
           setSelectedRoleIndex(0)
+          
+          // Auto-fetch salary breakdown for first role
+          if (data.roles && data.roles[0]) {
+            fetchSalaryBreakdown(data.roles[0].id)
+          }
         }
       } catch (err) {
         console.error("Error fetching company details:", err)
@@ -335,6 +383,82 @@ export default function PlacementAnalysisPage() {
 
     fetchDetails()
   }, [selectedCompanySlug])
+
+  // Fetch Salary Breakdown for a specific role
+  const fetchSalaryBreakdown = async (roleId: string) => {
+    setLoadingSalary(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/placement-analysis/salary-breakdown`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role_id: roleId })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSalaryBreakdown(data)
+      }
+    } catch (err) {
+      console.error("Failed to load salary breakdown:", err)
+    } finally {
+      setLoadingSalary(false)
+    }
+  }
+
+  // Handle Resume Matching
+  const handleMatchResume = async (roleId: string) => {
+    setMatchingResume(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/placement-analysis/match-resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role_id: roleId,
+          resume_text: customResumeText.trim() || "Designed and optimized scalable systems with Python, C++, SQL, Kafka, Docker and A/B testing."
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setMatchResult(data)
+      }
+    } catch (err) {
+      console.error("Failed to match resume:", err)
+    } finally {
+      setMatchingResume(false)
+    }
+  }
+
+  // Handle Compare Toggle
+  const handleToggleCompare = (slug: string) => {
+    setComparedSlugs((prev) => {
+      if (prev.includes(slug)) {
+        return prev.filter((s) => s !== slug)
+      } else {
+        if (prev.length >= 3) return prev
+        return [...prev, slug]
+      }
+    })
+  }
+
+  // Open Comparison Modal
+  const handleOpenComparison = async () => {
+    if (comparedSlugs.length < 2) return
+    setLoadingComparison(true)
+    setShowCompareModal(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/placement-analysis/compare?slugs=${comparedSlugs.join(",")}`)
+      if (res.ok) {
+        const data = await res.json()
+        setComparisonData(data)
+      }
+    } catch (err) {
+      console.error("Failed to load comparison data:", err)
+    } finally {
+      setLoadingComparison(false)
+    }
+  }
 
   // Fetch Admin Users list
   const fetchAdminData = async () => {
@@ -557,6 +681,13 @@ export default function PlacementAnalysisPage() {
     setTimeout(() => setCopiedCode(null), 2000)
   }
 
+  // Copy Bullet Point
+  const handleCopyBullet = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text)
+    setCopiedBulletIdx(idx)
+    setTimeout(() => setCopiedBulletIdx(null), 2000)
+  }
+
   // Format INR Currency
   const formatINRAmount = (amt: number) => {
     if (!amt || amt <= 0) return "N/A"
@@ -595,7 +726,6 @@ export default function PlacementAnalysisPage() {
   // Filtered Companies
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
-      // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchName = c.name.toLowerCase().includes(q)
@@ -606,7 +736,6 @@ export default function PlacementAnalysisPage() {
         if (!matchName && !matchSector && !matchLoc && !matchRole && !matchSkill) return false
       }
 
-      // 2. Sector Filter
       if (selectedSector !== "All Sectors") {
         const sec = selectedSector.toLowerCase()
         const matchSector = c.primary_sector.toLowerCase() === sec
@@ -618,7 +747,6 @@ export default function PlacementAnalysisPage() {
         if (!matchSector && !matchAvailable) return false
       }
 
-      // 3. Skill Filter
       if (selectedSkill !== "All Skills") {
         const sk = selectedSkill.toLowerCase()
         const hasSkill = c.top_skills?.some((s) => s.toLowerCase().includes(sk))
@@ -626,16 +754,13 @@ export default function PlacementAnalysisPage() {
         if (!hasSkill && !inOverview) return false
       }
 
-      // 4. Session Filter
       if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
       if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
 
-      // 5. Tier Filter
       if (selectedTier !== "all") {
         if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
       }
 
-      // 6. International Filter
       if (isInternationalOnly && !c.has_international_offers) return false
 
       return true
@@ -679,7 +804,6 @@ export default function PlacementAnalysisPage() {
         <div className="absolute top-10 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-10 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[140px] pointer-events-none" />
 
-        {/* Top Header */}
         <header className="flex justify-between items-center max-w-7xl mx-auto w-full mb-6 z-10">
           <Button
             variant="ghost"
@@ -692,7 +816,6 @@ export default function PlacementAnalysisPage() {
           <ThemeToggle />
         </header>
 
-        {/* Gatekeeper Card */}
         <main className="max-w-xl mx-auto w-full my-auto z-10">
           <div className="rounded-3xl border border-primary/30 bg-card/90 backdrop-blur-xl p-8 md:p-10 shadow-2xl relative overflow-hidden text-center">
             <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/20 rounded-full blur-3xl" />
@@ -713,7 +836,6 @@ export default function PlacementAnalysisPage() {
               Historical campus recruitment data, verified JAF salary breakdowns, hiring tier slottings (C1 Dream / C2 / C3), and authentic senior selection questions across <strong className="text-foreground">627+ companies (2024–2026)</strong> are restricted to verified IIT Bombay students and authorized users.
             </p>
 
-            {/* Verification Form */}
             {!showInviteField ? (
               !otpSent ? (
                 <div className="space-y-4 text-left">
@@ -872,8 +994,8 @@ export default function PlacementAnalysisPage() {
   // 2. MAIN VERIFIED PLACEMENT ANALYSIS STUDIO
   // ---------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20 selection:bg-primary/20">
-      {/* Top Banner Navigation */}
+    <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-primary/20">
+      {/* Top Header */}
       <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -907,7 +1029,7 @@ export default function PlacementAnalysisPage() {
                 onClick={() => setShowAdminModal(true)}
                 className="h-8 text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1.5"
               >
-                <Key className="h-3.5 w-3.5" /> Admin Access Console
+                <Key className="h-3.5 w-3.5" /> Admin Console
               </Button>
             )}
 
@@ -921,9 +1043,7 @@ export default function PlacementAnalysisPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        {/* ----------------------------------------------------------------- */}
-        {/* HERO & PLATFORM STATS RIBBON                                      */}
-        {/* ----------------------------------------------------------------- */}
+        {/* HERO & PLATFORM STATS RIBBON */}
         <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-primary/10 via-background to-purple-500/10 border border-primary/20 shadow-lg overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
           
@@ -1012,9 +1132,7 @@ export default function PlacementAnalysisPage() {
           </div>
         </div>
 
-        {/* ----------------------------------------------------------------- */}
-        {/* SEARCH, FILTER TABS & CONTROL MATRIX                             */}
-        {/* ----------------------------------------------------------------- */}
+        {/* SEARCH, FILTER TABS & CONTROL MATRIX */}
         <div className="space-y-4">
           <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
             <div className="relative w-full md:w-96">
@@ -1196,9 +1314,7 @@ export default function PlacementAnalysisPage() {
           )}
         </div>
 
-        {/* ----------------------------------------------------------------- */}
-        {/* COMPANIES DIRECTORY (GRID & TABLE)                                */}
-        {/* ----------------------------------------------------------------- */}
+        {/* COMPANIES DIRECTORY (GRID & TABLE) */}
         {loading ? (
           <div className="text-center py-20">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mb-4" />
@@ -1231,16 +1347,19 @@ export default function PlacementAnalysisPage() {
             {filteredCompanies.map((comp) => {
               const isC1 = comp.tier_category.includes("C1")
               const hasInsights = !!comp.selection_insights
+              const isCompared = comparedSlugs.includes(comp.slug)
 
               return (
                 <div
                   key={comp.id}
-                  onClick={() => setSelectedCompanySlug(comp.slug)}
-                  className="group relative rounded-3xl border border-border/70 hover:border-primary/50 bg-card p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between cursor-pointer hover:-translate-y-1"
+                  className="group relative rounded-3xl border border-border/70 hover:border-primary/50 bg-card p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between hover:-translate-y-1"
                 >
                   <div className="space-y-4">
                     <div className="flex justify-between items-start gap-3">
-                      <div className="flex items-center gap-3">
+                      <div
+                        onClick={() => setSelectedCompanySlug(comp.slug)}
+                        className="flex items-center gap-3 cursor-pointer"
+                      >
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-purple-500/10 border border-primary/20 flex items-center justify-center font-outfit font-extrabold text-lg text-primary group-hover:scale-105 transition-transform shadow-xs">
                           {comp.name.substring(0, 2).toUpperCase()}
                         </div>
@@ -1254,27 +1373,46 @@ export default function PlacementAnalysisPage() {
                         </div>
                       </div>
 
-                      {/* Tier & Difficulty Badge */}
-                      <div className="flex flex-col items-end gap-1">
-                        {isC1 ? (
-                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
-                            <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] font-semibold px-2 py-0.5 shrink-0">
-                            {comp.tier_category || "Standard"}
-                          </Badge>
-                        )}
+                      {/* Tier, Difficulty & Compare Toggle */}
+                      <div className="flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          {isC1 ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
+                              <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] font-semibold px-2 py-0.5 shrink-0">
+                              {comp.tier_category || "Standard"}
+                            </Badge>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleToggleCompare(comp.slug)
+                            }}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                              isCompared
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary border-border"
+                            }`}
+                            title="Add to Compare"
+                          >
+                            {isCompared ? "✓ Compared" : "+ Compare"}
+                          </button>
+                        </div>
                         {comp.difficulty_score && (
                           <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-0.5">
-                            <Target className="h-2.5 w-2.5 text-primary" /> {comp.difficulty_score}/10
+                            <Target className="h-2.5 w-2.5 text-primary" /> Difficulty: {comp.difficulty_score}/10
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Compensation Highlight Card */}
-                    <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
+                    <div
+                      onClick={() => setSelectedCompanySlug(comp.slug)}
+                      className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5 cursor-pointer"
+                    >
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground font-medium">Highest CTC</span>
                         <span className="font-extrabold text-foreground font-outfit text-sm">
@@ -1347,7 +1485,10 @@ export default function PlacementAnalysisPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3.5 border-t border-border/40 flex justify-between items-center text-xs">
+                  <div
+                    onClick={() => setSelectedCompanySlug(comp.slug)}
+                    className="mt-5 pt-3.5 border-t border-border/40 flex justify-between items-center text-xs cursor-pointer"
+                  >
                     <span className="text-muted-foreground text-[11px] line-clamp-1">
                       {comp.locations.slice(0, 2).join(", ")}
                     </span>
@@ -1377,72 +1518,288 @@ export default function PlacementAnalysisPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {filteredCompanies.map((comp) => (
-                    <tr
-                      key={comp.id}
-                      onClick={() => setSelectedCompanySlug(comp.slug)}
-                      className="hover:bg-muted/40 transition-colors cursor-pointer"
-                    >
-                      <td className="p-4 font-bold text-foreground font-outfit">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-extrabold flex items-center justify-center text-xs shrink-0">
-                            {comp.name.substring(0, 2).toUpperCase()}
+                  {filteredCompanies.map((comp) => {
+                    const isCompared = comparedSlugs.includes(comp.slug)
+                    return (
+                      <tr
+                        key={comp.id}
+                        className="hover:bg-muted/40 transition-colors cursor-pointer"
+                      >
+                        <td
+                          onClick={() => setSelectedCompanySlug(comp.slug)}
+                          className="p-4 font-bold text-foreground font-outfit"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-extrabold flex items-center justify-center text-xs shrink-0">
+                              {comp.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="block">{comp.name}</span>
+                              {comp.available_roles && (
+                                <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                                  {comp.available_roles.slice(0, 2).join(", ")}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <span className="block">{comp.name}</span>
-                            {comp.available_roles && (
-                              <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
-                                {comp.available_roles.slice(0, 2).join(", ")}
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 text-muted-foreground font-medium">{comp.primary_sector}</td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
+                          <Badge variant="outline" className="text-[10px]">
+                            {comp.tier_category || "Standard"}
+                          </Badge>
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-extrabold text-foreground font-outfit">
+                          {formatINRAmount(comp.highest_ctc_inr)}
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
+                          {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {comp.top_skills?.slice(0, 3).map((s, idx) => (
+                              <span key={idx} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium">
+                                {s}
                               </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
+                          <div className="flex gap-1">
+                            {comp.is_hiring_25_26 && (
+                              <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-bold">25-26</span>
+                            )}
+                            {comp.is_hiring_24_25 && (
+                              <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">24-25</span>
                             )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-muted-foreground font-medium">{comp.primary_sector}</td>
-                      <td className="p-4">
-                        <Badge variant="outline" className="text-[10px]">
-                          {comp.tier_category || "Standard"}
-                        </Badge>
-                      </td>
-                      <td className="p-4 font-extrabold text-foreground font-outfit">
-                        {formatINRAmount(comp.highest_ctc_inr)}
-                      </td>
-                      <td className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                        {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {comp.top_skills?.slice(0, 3).map((s, idx) => (
-                            <span key={idx} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-1">
-                          {comp.is_hiring_25_26 && (
-                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-bold">25-26</span>
-                          )}
-                          {comp.is_hiring_24_25 && (
-                            <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">24-25</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4 font-semibold text-muted-foreground">{comp.roles_count}</td>
-                      <td className="p-4 text-right">
-                        <Button size="sm" variant="ghost" className="h-8 text-xs font-semibold text-primary">
-                          Explore <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-muted-foreground">{comp.roles_count}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleToggleCompare(comp.slug)
+                              }}
+                              className={`px-2 py-1 rounded text-[11px] font-bold border transition-colors ${
+                                isCompared
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary border-border"
+                              }`}
+                            >
+                              {isCompared ? "✓ Compared" : "+ Compare"}
+                            </button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedCompanySlug(comp.slug)}
+                              className="h-8 text-xs font-semibold text-primary"
+                            >
+                              Explore <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
         )}
       </main>
+
+      {/* ------------------------------------------------------------------- */}
+      {/* PERSISTENT FLOATING COMPARISON TRAY                                 */}
+      {/* ------------------------------------------------------------------- */}
+      {comparedSlugs.length > 0 && (
+        <div className="fixed bottom-6 inset-x-0 z-40 max-w-2xl mx-auto px-4 animate-in slide-in-from-bottom-6 duration-300">
+          <div className="p-4 rounded-3xl bg-card/95 backdrop-blur-xl border border-primary/40 shadow-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-2xl bg-primary/15 text-primary">
+                <Scale className="h-5 w-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-foreground block">
+                  Comparing {comparedSlugs.length} of 3 Companies
+                </span>
+                <div className="flex gap-1.5 mt-0.5">
+                  {comparedSlugs.map((slug) => {
+                    const c = companies.find((x) => x.slug === slug)
+                    return (
+                      <span key={slug} className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-semibold text-foreground">
+                        {c?.name || slug}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setComparedSlugs([])}
+                className="text-xs text-muted-foreground hover:text-foreground underline px-2"
+              >
+                Clear
+              </button>
+              <Button
+                size="sm"
+                disabled={comparedSlugs.length < 2}
+                onClick={handleOpenComparison}
+                className="h-9 px-4 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+              >
+                Compare Now <ArrowRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------- */}
+      {/* SIDE-BY-SIDE COMPANY COMPARISON MODAL                               */}
+      {/* ------------------------------------------------------------------- */}
+      {showCompareModal && (
+        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
+          <div className="relative w-full max-w-5xl max-h-[92vh] bg-card border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border/60 bg-gradient-to-r from-primary/10 via-background to-purple-500/10 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-2xl bg-primary/20 text-primary">
+                  <Scale className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-foreground font-outfit">
+                    Side-by-Side Company Comparison Studio
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Comprehensive compensation benchmarks, hiring difficulty, and selection hurdles comparison.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowCompareModal(false)}
+                className="p-2 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6 custom-scrollbar">
+              {loadingComparison ? (
+                <div className="text-center py-20">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mb-3" />
+                  <p className="text-xs text-muted-foreground">Generating side-by-side comparison matrix...</p>
+                </div>
+              ) : comparisonData?.companies_compared ? (
+                <div className="space-y-6">
+                  {/* Shared Skills Callout */}
+                  {comparisonData.shared_skills && comparisonData.shared_skills.length > 0 && (
+                    <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 space-y-2">
+                      <span className="text-xs font-extrabold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4" /> Common In-Demand Skills Across Selected Companies:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {comparisonData.shared_skills.map((sk: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs bg-primary/15 text-primary border-primary/30">
+                            {sk}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Aligned Comparison Cards Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {comparisonData.companies_compared.map((comp: any) => (
+                      <div
+                        key={comp.slug}
+                        className="rounded-3xl border border-border/70 bg-card p-5 space-y-4 shadow-sm flex flex-col justify-between"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <h3 className="font-extrabold text-lg text-foreground font-outfit">
+                                {comp.name}
+                              </h3>
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {comp.primary_sector}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-bold">
+                              {comp.tier_category || "Standard"}
+                            </Badge>
+                          </div>
+
+                          <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground">Highest CTC</span>
+                              <span className="font-extrabold text-foreground font-outfit text-sm">
+                                {formatINRAmount(comp.highest_ctc_inr)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-muted-foreground">In-Hand Salary</span>
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
+                                {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] pt-1 border-t border-border/40">
+                              <span className="text-muted-foreground">Hiring Difficulty</span>
+                              <span className="font-bold text-amber-500 flex items-center gap-1">
+                                <Target className="h-3 w-3" /> {comp.difficulty_score}/10
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                              Primary Selection Hurdle:
+                            </span>
+                            <p className="text-xs text-foreground bg-muted/30 p-2.5 rounded-xl border border-border/40 leading-relaxed">
+                              {comp.selection_hurdle}
+                            </p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                              Top Core Competencies:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {comp.top_skills?.slice(0, 5).map((sk: string, i: number) => (
+                                <span key={i} className="px-2 py-0.5 rounded-md bg-muted text-[10px] font-semibold text-foreground">
+                                  {sk}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] text-muted-foreground space-y-0.5 pt-2 border-t border-border/40">
+                            <div><strong>Locations:</strong> {comp.locations?.join(", ")}</div>
+                            <div><strong>Roles ({comp.roles_count}):</strong> {comp.available_roles?.join(", ")}</div>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setShowCompareModal(false)
+                            setSelectedCompanySlug(comp.slug)
+                          }}
+                          className="w-full h-9 text-xs font-semibold mt-3"
+                        >
+                          View Full Dossier <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------- */}
       {/* ADMIN ACCESS MANAGEMENT MODAL                                       */}
@@ -1636,6 +1993,21 @@ export default function PlacementAnalysisPage() {
                 <BrainCircuit className="h-3.5 w-3.5" /> Deep JD Keyword & Skill Analysis
               </button>
               <button
+                onClick={() => {
+                  setActiveDossierTab("resumematch")
+                  if (companyDetails?.roles?.[selectedRoleIndex] && !matchResult) {
+                    handleMatchResume(companyDetails.roles[selectedRoleIndex].id)
+                  }
+                }}
+                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                  activeDossierTab === "resumematch"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <FileCheck className="h-3.5 w-3.5" /> Resume Fit & Keyword Gap
+              </button>
+              <button
                 onClick={() => setActiveDossierTab("selection")}
                 className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
                   activeDossierTab === "selection"
@@ -1653,7 +2025,7 @@ export default function PlacementAnalysisPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5" /> AI Prep Roadmap & Playbook
+                <Sparkles className="h-3.5 w-3.5" /> AI Prep Roadmap
               </button>
             </div>
 
@@ -1676,7 +2048,10 @@ export default function PlacementAnalysisPage() {
                         {companyDetails.roles.map((r: PlacementRole, idx: number) => (
                           <button
                             key={r.id}
-                            onClick={() => setSelectedRoleIndex(idx)}
+                            onClick={() => {
+                              setSelectedRoleIndex(idx)
+                              fetchSalaryBreakdown(r.id)
+                            }}
                             className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold text-left shrink-0 border transition-all ${
                               selectedRoleIndex === idx
                                 ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.01]"
@@ -1751,6 +2126,24 @@ export default function PlacementAnalysisPage() {
                               </div>
                             </div>
 
+                            {/* Monthly Take-Home & Tax Visualizer Box */}
+                            {salaryBreakdown && salaryBreakdown.estimated_monthly_net_inhand > 0 && (
+                              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Calculator className="h-4 w-4" /> Estimated Monthly In-Hand Take-Home Pay:
+                                  </span>
+                                  <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 font-outfit">
+                                    ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()} / month
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Projected post-tax under FY 2025–26 New Regime with standard ₹75K deduction & statutory EPF.
+                                  Estimated annual income tax: ₹{salaryBreakdown.estimated_annual_tax.toLocaleString()}.
+                                </p>
+                              </div>
+                            )}
+
                             {curRole.perks_and_benefits && curRole.perks_and_benefits.length > 0 && (
                               <div className="pt-2 border-t border-border/40">
                                 <span className="text-xs font-semibold text-foreground mb-1.5 block">
@@ -1773,7 +2166,7 @@ export default function PlacementAnalysisPage() {
                             )}
                           </div>
 
-                          {/* Key Responsibilities */}
+                          {/* Responsibilities */}
                           {curRole.responsibilities && curRole.responsibilities.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1831,7 +2224,6 @@ export default function PlacementAnalysisPage() {
                             </p>
                           </div>
 
-                          {/* 1. Programming Languages */}
                           {kw.languages && kw.languages.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -1847,7 +2239,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* 2. Frameworks & Tools */}
                           {kw.frameworks_and_tools && kw.frameworks_and_tools.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -1863,7 +2254,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* 3. Core Domain Concepts */}
                           {kw.core_concepts && kw.core_concepts.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -1879,7 +2269,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* 4. Leadership Competencies */}
                           {kw.leadership && kw.leadership.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
@@ -1895,7 +2284,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* Topic Weightage Breakdown */}
                           {curRole.intelligence?.topic_weightage && (
                             <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-3">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1934,8 +2322,113 @@ export default function PlacementAnalysisPage() {
                     })()
                   )}
                 </div>
+              ) : activeDossierTab === "resumematch" ? (
+                /* TAB 3: RESUME FIT & KEYWORD GAP ANALYZER */
+                <div className="space-y-6">
+                  {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
+                    (() => {
+                      const curRole: PlacementRole = companyDetails.roles[selectedRoleIndex]
+                      return (
+                        <div className="space-y-6">
+                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 flex justify-between items-center flex-wrap gap-3">
+                            <div>
+                              <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <FileCheck className="h-4 w-4 text-primary" /> Live Resume Compatibility & Keyword Gap
+                              </h3>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Target Role: <strong>{curRole.job_title}</strong> at {curRole.company_name}
+                              </p>
+                            </div>
+
+                            <Button
+                              size="sm"
+                              disabled={matchingResume}
+                              onClick={() => handleMatchResume(curRole.id)}
+                              className="h-8 text-xs font-bold bg-primary text-primary-foreground"
+                            >
+                              {matchingResume ? "Analyzing Resume..." : "Re-Scan My Resume"}
+                            </Button>
+                          </div>
+
+                          {/* Match Score & Status */}
+                          {matchResult && (
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center p-5 rounded-2xl bg-card border border-border/60">
+                              <div className="sm:col-span-4 flex flex-col items-center justify-center p-3 rounded-2xl bg-muted/40 border border-border/40">
+                                <div className="relative flex items-center justify-center w-20 h-20 rounded-full border-4 border-primary/30 text-2xl font-extrabold font-outfit text-primary">
+                                  {matchResult.match_score}%
+                                </div>
+                                <span className="text-xs font-bold text-foreground mt-2">
+                                  {matchResult.match_rating}
+                                </span>
+                              </div>
+
+                              <div className="sm:col-span-8 space-y-3">
+                                <div>
+                                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 block mb-1">
+                                    ✓ Matched Skills ({matchResult.matched_skills.length}):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {matchResult.matched_skills.length > 0 ? (
+                                      matchResult.matched_skills.map((s, i) => (
+                                        <span key={i} className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                                          {s}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground italic">No direct matches found in sample text.</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <span className="text-xs font-bold text-destructive block mb-1">
+                                    ⚠ Missing High-Yield Keywords ({matchResult.missing_critical_skills.length}):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {matchResult.missing_critical_skills.map((s, i) => (
+                                      <span key={i} className="px-2 py-0.5 rounded-md bg-destructive/10 text-destructive border border-destructive/20 text-[11px] font-semibold">
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Tailored Resume Bullets Ready to Copy */}
+                          {matchResult?.tailored_resume_bullets && (
+                            <div className="space-y-3">
+                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <Sparkles className="h-4 w-4 text-amber-500" /> AI-Generated Tailored Resume Bullets (STAR / Google X-Y-Z):
+                              </h4>
+                              <div className="space-y-2">
+                                {matchResult.tailored_resume_bullets.map((bullet, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-3.5 rounded-2xl bg-card border border-border/60 text-xs flex justify-between items-start gap-3 shadow-2xs hover:border-primary/40 transition-colors"
+                                  >
+                                    <span className="text-foreground leading-relaxed font-medium">{bullet}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleCopyBullet(bullet, idx)}
+                                      className="h-7 px-2 text-[11px] font-bold text-primary shrink-0"
+                                    >
+                                      {copiedBulletIdx === idx ? "Copied!" : <><Copy className="h-3 w-3 mr-1" /> Copy</>}
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
               ) : activeDossierTab === "selection" ? (
-                /* TAB 3: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
+                /* TAB 4: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1995,7 +2488,7 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
               ) : (
-                /* TAB 4: AI PREPARATION ROADMAP & PLAYBOOK */
+                /* TAB 5: AI PREPARATION ROADMAP & PLAYBOOK */
                 <div className="space-y-6">
                   {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
                     (() => {
@@ -2016,7 +2509,6 @@ export default function PlacementAnalysisPage() {
                             </p>
                           </div>
 
-                          {/* Key Selection Hurdle Card */}
                           {intel?.key_selection_hurdle && (
                             <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1.5">
                               <h4 className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -2028,7 +2520,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* Resume Power Tip Card */}
                           {intel?.resume_power_tip && (
                             <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-1.5">
                               <h4 className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -2071,7 +2562,7 @@ export default function PlacementAnalysisPage() {
               )}
             </div>
 
-            {/* Modal Footer with 1-Click Tailored Mock Interview Launch */}
+            {/* Modal Footer */}
             <div className="p-4 sm:p-6 border-t border-border/60 bg-muted/40 flex flex-col sm:flex-row justify-between items-center gap-3">
               <div className="text-xs text-muted-foreground text-center sm:text-left">
                 Ready to practice for <strong className="text-foreground">{companyDetails?.company?.name}</strong>?

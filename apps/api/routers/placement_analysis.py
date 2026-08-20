@@ -97,6 +97,16 @@ class LaunchMockInterviewRequest(BaseModel):
     interview_type: Optional[str] = "comprehensive"
 
 
+class MatchResumeRequest(BaseModel):
+    role_id: str
+    resume_text: Optional[str] = ""
+    candidate_skills: Optional[List[str]] = []
+
+
+class SalaryBreakdownRequest(BaseModel):
+    role_id: str
+
+
 def is_admin_authorized(key_or_email: str) -> bool:
     if not key_or_email:
         return False
@@ -121,7 +131,6 @@ async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
     email_clean = body.email.strip().lower()
     store = get_access_store()
     
-    # Check if user is whitelisted
     whitelisted_set = {u.get("email", "").lower() for u in store.get("whitelisted_emails", [])}
     is_whitelisted = email_clean in whitelisted_set
     is_admin = is_admin_authorized(email_clean)
@@ -144,7 +153,6 @@ async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
         }
     elif body.action == "verify_otp":
         if body.otp and (body.otp.strip() == "202626" or len(body.otp.strip()) == 6 or is_admin or is_whitelisted):
-            # Log verification
             log = store.get("verified_log", [])
             log.append({"email": email_clean, "verified_at": datetime.utcnow().isoformat()})
             store["verified_log"] = log[-200:]
@@ -166,9 +174,7 @@ async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
 @router.post("/redeem-invite-code")
 @limiter.limit("20/minute")
 async def redeem_invite_code(request: Request, body: RedeemInviteRequest):
-    """
-    Allows candidates to redeem an invite code or master admin key to unlock Placement Analysis.
-    """
+    """Allows candidates to redeem an invite code or master admin key to unlock Placement Analysis."""
     code_clean = body.code.strip().upper()
     store = get_access_store()
     
@@ -222,7 +228,6 @@ async def grant_user_access(request: Request, body: GrantAccessRequest):
     store = get_access_store()
     users = store.get("whitelisted_emails", [])
     
-    # Check if already exists
     existing = next((u for u in users if u.get("email", "").lower() == email_clean), None)
     if existing:
         existing["role"] = body.role
@@ -343,7 +348,7 @@ async def list_placement_companies(
     max_ctc_inr: Optional[float] = Query(None, description="Maximum CTC in INR"),
     sort_by: Optional[str] = Query("highest_ctc", description="'highest_ctc', 'median_ctc', 'roles_count', 'name'"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(24, ge=1, le=1000)
+    page_size: int = Query(700, ge=1, le=1000)
 ):
     """Lists companies with multi-criteria filtering, sorting, and pagination."""
     data = get_dataset()
@@ -357,7 +362,12 @@ async def list_placement_companies(
         q = search.strip().lower()
         matching_slugs = set()
         for c in companies:
-            if q in c["name"].lower() or q in c["slug"]:
+            if (
+                q in c["name"].lower() or 
+                q in c["slug"] or
+                any(q in str(r).lower() for r in c.get("available_roles", [])) or
+                any(q in str(s).lower() for s in c.get("top_skills", []))
+            ):
                 matching_slugs.add(c["slug"])
                 
         for r in roles:
@@ -373,7 +383,12 @@ async def list_placement_companies(
     # 2. Sector Filter
     if sector and sector.strip() and sector.lower() != "all" and sector.lower() != "all sectors":
         sec_clean = sector.strip().lower()
-        filtered = [c for c in filtered if c["primary_sector"].lower() == sec_clean or sec_clean in c["primary_sector"].lower()]
+        filtered = [
+            c for c in filtered 
+            if c["primary_sector"].lower() == sec_clean or 
+            sec_clean in c["primary_sector"].lower() or
+            any(sec_clean in str(r).lower() for r in c.get("available_roles", []))
+        ]
         
     # 3. Session Filter
     if session and session.strip() and session.lower() != "all":
@@ -440,7 +455,6 @@ async def get_company_details(request: Request, id_or_slug: str):
         
     company_roles = [r for r in roles if r["company_slug"] == company["slug"]]
     
-    # Group roles by session
     roles_by_session: Dict[str, List[Dict[str, Any]]] = {
         "2025-26": [],
         "2024-25": []
@@ -452,7 +466,6 @@ async def get_company_details(request: Request, id_or_slug: str):
         else:
             roles_by_session["2024-25"].append(r)
             
-    # Extract unique skills across all company roles
     all_skills = []
     seen_skills = set()
     for r in company_roles:
@@ -461,7 +474,6 @@ async def get_company_details(request: Request, id_or_slug: str):
                 seen_skills.add(sk.lower())
                 all_skills.append(sk)
                 
-    # Compile Selection Blueprint
     insights = company.get("selection_insights")
     blueprint = {
         "has_authentic_student_data": bool(insights),
@@ -485,13 +497,260 @@ async def get_company_details(request: Request, id_or_slug: str):
     }
 
 
+# ---------------------------------------------------------------------------
+# UPGRADED FEATURES: RESUME MATCHER, COMPARISON STUDIO & SALARY CALCULATOR
+# ---------------------------------------------------------------------------
+
+@router.post("/match-resume")
+@limiter.limit("20/minute")
+async def match_resume_to_jaf(request: Request, body: MatchResumeRequest):
+    """
+    Compares candidate resume text / skills against a target JAF role.
+    Computes ATS compatibility score (0-100%), missing keywords, and tailored STAR bullets.
+    """
+    data = get_dataset()
+    roles = data.get("roles", [])
+    
+    role = next((r for r in roles if r["id"] == body.role_id), None)
+    if not role:
+        raise HTTPException(status_code=404, detail="Target JAF role not found.")
+        
+    resume_text_lower = (body.resume_text or "").lower()
+    candidate_skills_lower = set(s.lower() for s in body.candidate_skills or [])
+    
+    kw_dict = role.get("categorized_keywords", {})
+    all_role_skills = role.get("required_skills", [])
+    
+    matched_skills = []
+    missing_skills = []
+    
+    for sk in all_role_skills:
+        sk_lower = sk.lower()
+        if sk_lower in candidate_skills_lower or re.search(r'\b' + re.escape(sk_lower) + r'\b', resume_text_lower):
+            matched_skills.append(sk)
+        else:
+            missing_skills.append(sk)
+            
+    # Also check languages and tools
+    for lang in kw_dict.get("languages", []):
+        if lang.lower() in candidate_skills_lower or re.search(r'\b' + re.escape(lang.lower()) + r'\b', resume_text_lower):
+            if lang not in matched_skills:
+                matched_skills.append(lang)
+        else:
+            if lang not in missing_skills:
+                missing_skills.append(lang)
+                
+    for tool in kw_dict.get("frameworks_and_tools", []):
+        if tool.lower() in candidate_skills_lower or re.search(r'\b' + re.escape(tool.lower()) + r'\b', resume_text_lower):
+            if tool not in matched_skills:
+                matched_skills.append(tool)
+        else:
+            if tool not in missing_skills:
+                missing_skills.append(tool)
+                
+    # Calculate weighted compatibility score (0-100%)
+    total_expected = len(matched_skills) + len(missing_skills)
+    if total_expected > 0:
+        base_match_ratio = len(matched_skills) / total_expected
+        # Boost score slightly if length of resume text is rich
+        text_richness_bonus = min(0.15, len(resume_text_lower) / 10000) if resume_text_lower else 0.05
+        match_score = min(98, max(35, round((base_match_ratio * 80 + text_richness_bonus * 100) + 12)))
+    else:
+        match_score = 75
+        
+    # Generate 3 tailored STAR/Google X-Y-Z resume bullet suggestions
+    sector = role["primary_sector"]
+    cname = role["company_name"]
+    top_tool = kw_dict.get("frameworks_and_tools", ["modern tools"])[0] if kw_dict.get("frameworks_and_tools") else "production systems"
+    top_concept = kw_dict.get("core_concepts", ["scalability"])[0] if kw_dict.get("core_concepts") else "performance optimization"
+    top_lang = kw_dict.get("languages", ["Python"])[0] if kw_dict.get("languages") else "Python"
+    
+    if sector == "Product Management":
+        bullets = [
+            f"Spearheaded user research and authored PRDs for high-impact features, improving D30 retention by +22% through systematic A/B experimentation.",
+            f"Defined North Star metrics and mapped user journey funnels using {top_tool}, reducing checkout drop-off rates by 18% across 50K+ active users.",
+            f"Collaborated cross-functionally across engineering and design sprints to deliver MVP roadmap milestones 2 weeks ahead of schedule."
+        ]
+    elif sector == "Finance & Quant":
+        bullets = [
+            f"Engineered high-throughput algorithmic backtesting pipelines in {top_lang}, simulating {top_concept} across 500M+ order book tick records.",
+            f"Developed statistical risk models with Monte Carlo simulations, optimizing portfolio Sharpe ratio from 1.4 to 2.1 under heavy volatility.",
+            f"Refactored low-latency execution routines in C++, reducing critical path tail latency from 14μs to 3.8μs."
+        ]
+    elif sector == "Consulting & Strategy":
+        bullets = [
+            f"Formulated comprehensive market entry strategy for a leading enterprise client, identifying $4.2M in annual cost-saving synergies using MECE structuring.",
+            f"Conducted rigorous unit economics and valuation sensitivity analyses, delivering executive presentation to senior leadership and stakeholders.",
+            f"Streamlined operational supply chain workflows, driving a 15% reduction in cycle lead time across 8 regional distribution centers."
+        ]
+    elif sector == "AI, ML & Data Science":
+        bullets = [
+            f"Architected end-to-end {top_concept} pipeline using {top_tool} and {top_lang}, boosting inference accuracy by +14% (F1: 0.91) under high throughput.",
+            f"Constructed scalable feature engineering ETL workflows on distributed clusters, reducing daily data pipeline runtimes by 35%.",
+            f"Fine-tuned transformer models with LoRA/QLoRA on proprietary domain corpora, cutting latency by 40% while preserving benchmark accuracy."
+        ]
+    else:
+        bullets = [
+            f"Architected and deployed microservices in {top_lang} leveraging {top_tool}, supporting 10K+ concurrent requests/sec with 99.98% uptime.",
+            f"Optimized database indexing and caching layers utilizing {top_concept}, slashing 95th-percentile API response latency by 45%.",
+            f"Spearheaded automated CI/CD deployment pipelines with Docker and Kubernetes, reducing production release cycles from 4 hours to 12 minutes."
+        ]
+        
+    return {
+        "status": "success",
+        "role_id": role["id"],
+        "job_title": role["job_title"],
+        "company_name": cname,
+        "match_score": match_score,
+        "match_rating": "Strong Match" if match_score >= 80 else "Good Potential" if match_score >= 60 else "Skills Gap Identified",
+        "matched_skills": matched_skills,
+        "missing_critical_skills": missing_skills[:8],
+        "tailored_resume_bullets": bullets
+    }
+
+
+@router.get("/compare")
+@limiter.limit("30/minute")
+async def compare_companies(request: Request, slugs: str = Query(..., description="Comma-separated company slugs (up to 3)")):
+    """
+    Returns aligned side-by-side comparison matrix for 2–3 companies.
+    """
+    slug_list = [s.strip().lower() for s in slugs.split(",") if s.strip()][:3]
+    if len(slug_list) < 2:
+        raise HTTPException(status_code=400, detail="Please provide at least 2 company slugs to compare.")
+        
+    data = get_dataset()
+    companies = data.get("companies", [])
+    roles = data.get("roles", [])
+    
+    selected_companies = []
+    for s in slug_list:
+        comp = next((c for c in companies if c["slug"] == s or c["name"].lower() == s), None)
+        if comp:
+            comp_roles = [r for r in roles if r["company_slug"] == comp["slug"]]
+            selected_companies.append({
+                "company": comp,
+                "roles_sample": comp_roles[:3]
+            })
+            
+    if len(selected_companies) < 2:
+        raise HTTPException(status_code=404, detail="Could not find enough matching companies to compare.")
+        
+    # Compute skill intersection
+    all_skill_sets = [set(c["company"].get("top_skills", [])) for c in selected_companies]
+    shared_skills = list(set.intersection(*all_skill_sets)) if all_skill_sets else []
+    
+    comparison_cards = []
+    for item in selected_companies:
+        comp = item["company"]
+        sample_roles = item["roles_sample"]
+        comparison_cards.append({
+            "name": comp["name"],
+            "slug": comp["slug"],
+            "primary_sector": comp["primary_sector"],
+            "tier_category": comp["tier_category"],
+            "difficulty_score": comp.get("difficulty_score", 8.0),
+            "difficulty_tier": comp.get("difficulty_tier", "Tier 1 High Impact"),
+            "highest_ctc_inr": comp["highest_ctc_inr"],
+            "median_ctc_inr": comp["median_ctc_inr"],
+            "highest_inhand_inr": comp["highest_inhand_inr"],
+            "dominant_currency": comp["dominant_currency"],
+            "has_international_offers": comp["has_international_offers"],
+            "locations": comp["locations"],
+            "top_skills": comp.get("top_skills", [])[:8],
+            "roles_count": comp["roles_count"],
+            "available_roles": comp.get("available_roles", [])[:4],
+            "selection_insights_available": bool(comp.get("selection_insights")),
+            "selection_hurdle": sample_roles[0]["intelligence"]["key_selection_hurdle"] if sample_roles and "intelligence" in sample_roles[0] else "Competitive multi-stage technical evaluation."
+        })
+        
+    return {
+        "status": "success",
+        "companies_compared": comparison_cards,
+        "shared_skills": shared_skills[:6]
+    }
+
+
+@router.post("/salary-breakdown")
+@limiter.limit("30/minute")
+async def calculate_salary_breakdown(request: Request, body: SalaryBreakdownRequest):
+    """
+    Computes estimated Indian Income Tax (New Tax Regime FY 25-26), EPF,
+    and projects estimated monthly in-hand net take-home pay.
+    """
+    data = get_dataset()
+    roles = data.get("roles", [])
+    
+    role = next((r for r in roles if r["id"] == body.role_id), None)
+    if not role:
+        raise HTTPException(status_code=404, detail="Target role not found.")
+        
+    comp = role["compensation"]
+    ctc_inr = comp["ctc_inr_equivalent"]
+    inhand_inr = comp["inhand_inr_equivalent"]
+    
+    # If in-hand is not specified, approximate realistic base as 65-75% of CTC
+    if inhand_inr <= 0:
+        base_annual = round(ctc_inr * 0.70)
+    else:
+        base_annual = inhand_inr
+        
+    variable_bonus = max(0, round(ctc_inr * 0.15))
+    esop_annual = max(0, ctc_inr - base_annual - variable_bonus)
+    
+    # Tax Calculation under FY 2025-26 New Regime
+    # Standard Deduction: ₹75,000
+    taxable_income = max(0, base_annual + variable_bonus - 75000)
+    tax = 0.0
+    
+    if taxable_income <= 700000:
+        tax = 0.0  # Section 87A Full Rebate
+    else:
+        if taxable_income > 1500000:
+            tax += (taxable_income - 1500000) * 0.30
+            taxable_income = 1500000
+        if taxable_income > 1200000:
+            tax += (taxable_income - 1200000) * 0.20
+            taxable_income = 1200000
+        if taxable_income > 1000000:
+            tax += (taxable_income - 1000000) * 0.15
+            taxable_income = 1000000
+        if taxable_income > 700000:
+            tax += (taxable_income - 700000) * 0.10
+            taxable_income = 700000
+        if taxable_income > 300000:
+            tax += (taxable_income - 300000) * 0.05
+            
+        # 4% Health & Education Cess
+        tax = round(tax * 1.04)
+        
+    epf_annual = round(min(base_annual * 0.12, 21600))  # standard statutory cap or percentage
+    
+    net_annual_take_home = max(0, base_annual - tax - epf_annual)
+    monthly_net_inhand = round(net_annual_take_home / 12)
+    monthly_gross = round(base_annual / 12)
+    
+    return {
+        "status": "success",
+        "job_title": role["job_title"],
+        "company_name": role["company_name"],
+        "original_currency": comp["original_currency"],
+        "ctc_inr": ctc_inr,
+        "base_pay_annual": base_annual,
+        "variable_bonus_annual": variable_bonus,
+        "esops_annual": esop_annual,
+        "estimated_monthly_gross": monthly_gross,
+        "estimated_monthly_net_inhand": monthly_net_inhand,
+        "estimated_annual_tax": tax,
+        "estimated_annual_epf": epf_annual,
+        "vesting_schedule": "25% Year 1, 25% Year 2, 25% Year 3, 25% Year 4" if esop_annual > 0 else "Annual Performance Cycle"
+    }
+
+
 @router.post("/launch-mock")
 @limiter.limit("20/minute")
 async def launch_tailored_mock_interview(request: Request, body: LaunchMockInterviewRequest):
-    """
-    Creates a pre-configured mock interview session payload tailored specifically to
-    the target company's job description, selection format, and historical questions.
-    """
+    """Creates a pre-configured mock interview session payload tailored specifically to target company."""
     data = get_dataset()
     companies = data.get("companies", [])
     roles = data.get("roles", [])
@@ -512,7 +771,6 @@ async def launch_tailored_mock_interview(request: Request, body: LaunchMockInter
     insights = company.get("selection_insights") or {}
     past_questions = insights.get("questions_asked", [])
     
-    # Formulate customized prompt context for the AI Interview Coach
     system_prompt_context = f"""
     You are an elite Senior Interviewer conducting a realistic campus placement interview for {company['name']} for the position of '{role_title}'.
     Target Sector: {company['primary_sector']}
