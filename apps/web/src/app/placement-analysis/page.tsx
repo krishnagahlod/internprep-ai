@@ -45,7 +45,13 @@ import {
   UserPlus,
   UserX,
   Copy,
-  Plus
+  Plus,
+  Code,
+  Wrench,
+  BrainCircuit,
+  Target,
+  BarChart3,
+  CheckSquare
 } from "lucide-react"
 
 // Types
@@ -58,6 +64,27 @@ interface Compensation {
   ctc_inr_equivalent: number
   inhand_inr_equivalent: number
   is_international: boolean
+}
+
+interface CategorizedKeywords {
+  all: string[]
+  languages: string[]
+  frameworks_and_tools: string[]
+  core_concepts: string[]
+  leadership: string[]
+}
+
+interface RoleIntelligence {
+  difficulty_score: number
+  difficulty_tier: string
+  key_selection_hurdle: string
+  resume_power_tip: string
+  topic_weightage: {
+    dsa_and_problem_solving: number
+    system_and_domain_design: number
+    case_and_business_sense: number
+    resume_and_leadership_fit: number
+  }
 }
 
 interface PlacementRole {
@@ -75,11 +102,13 @@ interface PlacementRole {
   compensation: Compensation
   role_summary: string
   required_skills: string[]
+  categorized_keywords?: CategorizedKeywords
   responsibilities: string[]
   selection_rounds: string[]
   perks_and_benefits: string[]
   additional_info_raw: string
   raw_jd: string
+  intelligence?: RoleIntelligence
 }
 
 interface SelectionInsights {
@@ -100,15 +129,19 @@ interface Company {
   is_hiring_24_25: boolean
   is_hiring_25_26: boolean
   roles_count: number
+  available_roles?: string[]
   highest_ctc_inr: number
   highest_inhand_inr: number
   median_ctc_inr: number
   dominant_currency: string
   has_international_offers: boolean
   locations: string[]
+  top_skills?: string[]
   roles: string[]
   selection_insights: SelectionInsights | null
   ai_overview: string
+  difficulty_score?: number
+  difficulty_tier?: string
 }
 
 interface PlatformStats {
@@ -135,14 +168,33 @@ interface WhitelistedUser {
 
 const SECTOR_TABS = [
   "All Sectors",
+  "Product Management",
   "Software & Engineering",
   "Finance & Quant",
   "Consulting & Strategy",
   "AI, ML & Data Science",
   "Core Engineering & Technology",
-  "Product Management",
-  "FMCG & Consumer",
+  "FMCG & Operations",
   "Design & UI/UX"
+]
+
+const POPULAR_SKILLS = [
+  "All Skills",
+  "Product Roadmap",
+  "PRD Writing",
+  "A/B Testing",
+  "Python",
+  "C++",
+  "Low-Latency",
+  "Distributed Systems",
+  "PyTorch",
+  "System Design",
+  "SQL",
+  "Statistical Arbitrage",
+  "Guesstimates",
+  "Kafka",
+  "Docker",
+  "VLSI Design"
 ]
 
 export default function PlacementAnalysisPage() {
@@ -179,6 +231,7 @@ export default function PlacementAnalysisPage() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSector, setSelectedSector] = useState("All Sectors")
+  const [selectedSkill, setSelectedSkill] = useState("All Skills")
   const [selectedSession, setSelectedSession] = useState<"all" | "25-26" | "24-25">("all")
   const [selectedTier, setSelectedTier] = useState<"all" | "C1" | "C2" | "C3">("all")
   const [isInternationalOnly, setIsInternationalOnly] = useState(false)
@@ -189,13 +242,12 @@ export default function PlacementAnalysisPage() {
   const [selectedCompanySlug, setSelectedCompanySlug] = useState<string | null>(null)
   const [companyDetails, setCompanyDetails] = useState<any | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
-  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "selection" | "roadmap">("roles")
+  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "keywords" | "selection" | "roadmap">("roles")
   const [selectedRoleIndex, setSelectedRoleIndex] = useState(0)
 
   // Check IITB verification from user profile / localStorage
   useEffect(() => {
     const checkAuth = () => {
-      // 1. Direct login with admin or @iitb.ac.in email
       if (user?.email) {
         const email = user.email.toLowerCase()
         if (email === "krishnagahlod@gmail.com" || email === "creator@internprep.ai" || email.includes("admin")) {
@@ -209,7 +261,6 @@ export default function PlacementAnalysisPage() {
         }
       }
 
-      // 2. Saved local institutional verification
       const savedVerification = localStorage.getItem("iitb_placement_verified")
       const savedAdmin = localStorage.getItem("iitb_placement_admin")
       if (savedVerification === "true") {
@@ -232,14 +283,12 @@ export default function PlacementAnalysisPage() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       
-      // 1. Fetch Stats
       const statsRes = await fetch(`${API_URL}/placement-analysis/stats`)
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
       }
 
-      // 2. Fetch Companies
       const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=700&sort_by=${sortBy}`)
       if (!companiesRes.ok) throw new Error("Failed to load placement companies.")
       
@@ -309,7 +358,7 @@ export default function PlacementAnalysisPage() {
     }
   }, [showAdminModal, isAdmin])
 
-  // IITB Verification Handlers
+  // Verification Handlers
   const handleSendOTP = async () => {
     setVerificationError("")
     const email = verificationEmail.trim().toLowerCase()
@@ -546,32 +595,52 @@ export default function PlacementAnalysisPage() {
   // Filtered Companies
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
+      // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchName = c.name.toLowerCase().includes(q)
         const matchSector = c.primary_sector.toLowerCase().includes(q)
         const matchLoc = c.locations.some((l) => l.toLowerCase().includes(q))
-        if (!matchName && !matchSector && !matchLoc) return false
+        const matchRole = c.available_roles?.some((r) => r.toLowerCase().includes(q))
+        const matchSkill = c.top_skills?.some((s) => s.toLowerCase().includes(q))
+        if (!matchName && !matchSector && !matchLoc && !matchRole && !matchSkill) return false
       }
 
+      // 2. Sector Filter
       if (selectedSector !== "All Sectors") {
-        if (c.primary_sector.toLowerCase() !== selectedSector.toLowerCase()) {
+        const sec = selectedSector.toLowerCase()
+        const matchSector = c.primary_sector.toLowerCase() === sec
+        const matchAvailable = c.available_roles?.some((r) => {
+          if (sec.includes("product")) return r.toLowerCase().includes("product") || r.toLowerCase().includes("apm")
+          if (sec.includes("quant")) return r.toLowerCase().includes("quant") || r.toLowerCase().includes("trader")
           return false
-        }
+        })
+        if (!matchSector && !matchAvailable) return false
       }
 
+      // 3. Skill Filter
+      if (selectedSkill !== "All Skills") {
+        const sk = selectedSkill.toLowerCase()
+        const hasSkill = c.top_skills?.some((s) => s.toLowerCase().includes(sk))
+        const inOverview = c.ai_overview?.toLowerCase().includes(sk)
+        if (!hasSkill && !inOverview) return false
+      }
+
+      // 4. Session Filter
       if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
       if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
 
+      // 5. Tier Filter
       if (selectedTier !== "all") {
         if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
       }
 
+      // 6. International Filter
       if (isInternationalOnly && !c.has_international_offers) return false
 
       return true
     })
-  }, [companies, searchQuery, selectedSector, selectedSession, selectedTier, isInternationalOnly])
+  }, [companies, searchQuery, selectedSector, selectedSkill, selectedSession, selectedTier, isInternationalOnly])
 
   // Launch Tailored Mock Interview Hand-off
   const handleLaunchMockInterview = async (company: Company, role?: PlacementRole) => {
@@ -747,7 +816,6 @@ export default function PlacementAnalysisPage() {
                 </div>
               )
             ) : (
-              /* Invite Code / Admin Passcode Mode */
               <div className="space-y-4 text-left">
                 <div>
                   <label className="text-xs font-semibold text-foreground mb-1.5 block">
@@ -832,7 +900,6 @@ export default function PlacementAnalysisPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Admin Management Console Button */}
             {isAdmin && (
               <Button
                 variant="outline"
@@ -954,7 +1021,7 @@ export default function PlacementAnalysisPage() {
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search by company, role, skill, or location..."
+                placeholder="Search by company, role (e.g. APM), skill, or location..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-11 rounded-2xl bg-card border-border/60 shadow-sm text-sm"
@@ -1063,7 +1130,8 @@ export default function PlacementAnalysisPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {/* Sector Tabs Pill Carousel */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
             {SECTOR_TABS.map((sec) => {
               const isSelected = selectedSector === sec
               return (
@@ -1081,6 +1149,29 @@ export default function PlacementAnalysisPage() {
               )
             })}
           </div>
+
+          {/* In-Demand Skill & Keyword Quick Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 custom-scrollbar">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+              <Sparkles className="h-3 w-3 text-primary" /> Key Skills:
+            </span>
+            {POPULAR_SKILLS.map((sk) => {
+              const isSelected = selectedSkill === sk
+              return (
+                <button
+                  key={sk}
+                  onClick={() => setSelectedSkill(sk)}
+                  className={`whitespace-nowrap px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all shrink-0 ${
+                    isSelected
+                      ? "bg-primary/20 text-primary border border-primary/40 font-bold"
+                      : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40"
+                  }`}
+                >
+                  {sk}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Match Count Header */}
@@ -1088,11 +1179,12 @@ export default function PlacementAnalysisPage() {
           <span>
             Showing <strong className="text-foreground font-semibold">{filteredCompanies.length}</strong> companies matching current criteria
           </span>
-          {(searchQuery || selectedSector !== "All Sectors" || selectedSession !== "all" || selectedTier !== "all" || isInternationalOnly) && (
+          {(searchQuery || selectedSector !== "All Sectors" || selectedSkill !== "All Skills" || selectedSession !== "all" || selectedTier !== "all" || isInternationalOnly) && (
             <button
               onClick={() => {
                 setSearchQuery("")
                 setSelectedSector("All Sectors")
+                setSelectedSkill("All Skills")
                 setSelectedSession("all")
                 setSelectedTier("all")
                 setIsInternationalOnly(false)
@@ -1117,7 +1209,7 @@ export default function PlacementAnalysisPage() {
             <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
             <h3 className="text-base font-bold text-foreground">No matching companies found</h3>
             <p className="text-xs text-muted-foreground mt-1 mb-4">
-              Try adjusting your search keywords, sector selection, or tier filters.
+              Try adjusting your search keywords, sector selection, or skill filters.
             </p>
             <Button
               size="sm"
@@ -1125,6 +1217,7 @@ export default function PlacementAnalysisPage() {
               onClick={() => {
                 setSearchQuery("")
                 setSelectedSector("All Sectors")
+                setSelectedSkill("All Skills")
                 setSelectedSession("all")
                 setSelectedTier("all")
                 setIsInternationalOnly(false)
@@ -1161,17 +1254,26 @@ export default function PlacementAnalysisPage() {
                         </div>
                       </div>
 
-                      {isC1 ? (
-                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
-                          <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] font-semibold px-2 py-0.5 shrink-0">
-                          {comp.tier_category || "Standard"}
-                        </Badge>
-                      )}
+                      {/* Tier & Difficulty Badge */}
+                      <div className="flex flex-col items-end gap-1">
+                        {isC1 ? (
+                          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
+                            <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] font-semibold px-2 py-0.5 shrink-0">
+                            {comp.tier_category || "Standard"}
+                          </Badge>
+                        )}
+                        {comp.difficulty_score && (
+                          <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-0.5">
+                            <Target className="h-2.5 w-2.5 text-primary" /> {comp.difficulty_score}/10
+                          </span>
+                        )}
+                      </div>
                     </div>
 
+                    {/* Compensation Highlight Card */}
                     <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground font-medium">Highest CTC</span>
@@ -1197,7 +1299,33 @@ export default function PlacementAnalysisPage() {
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5">
+                    {/* Key Competencies & Skills Badges */}
+                    {comp.top_skills && comp.top_skills.length > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap gap-1">
+                          {comp.top_skills.slice(0, 4).map((sk, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-md bg-card border border-border/60 text-[10px] font-semibold text-foreground">
+                              {sk}
+                            </span>
+                          ))}
+                          {comp.top_skills.length > 4 && (
+                            <span className="px-1.5 py-0.5 text-[10px] text-muted-foreground font-medium">
+                              +{comp.top_skills.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Roles Tagline */}
+                    {comp.available_roles && comp.available_roles.length > 0 && (
+                      <p className="text-[11px] text-muted-foreground line-clamp-1">
+                        <strong className="text-foreground">Roles:</strong> {comp.available_roles.slice(0, 2).join(", ")}
+                      </p>
+                    )}
+
+                    {/* Hiring Sessions Chips */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
                       {comp.is_hiring_25_26 && (
                         <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold">
                           2025–26 Hiring
@@ -1242,6 +1370,7 @@ export default function PlacementAnalysisPage() {
                     <th className="p-4">Hiring Tier</th>
                     <th className="p-4">Highest CTC (INR)</th>
                     <th className="p-4">In-Hand Salary</th>
+                    <th className="p-4">Key In-Demand Skills</th>
                     <th className="p-4">Sessions</th>
                     <th className="p-4">Roles</th>
                     <th className="p-4 text-right">Action</th>
@@ -1259,7 +1388,14 @@ export default function PlacementAnalysisPage() {
                           <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary font-extrabold flex items-center justify-center text-xs shrink-0">
                             {comp.name.substring(0, 2).toUpperCase()}
                           </div>
-                          <span>{comp.name}</span>
+                          <div>
+                            <span className="block">{comp.name}</span>
+                            {comp.available_roles && (
+                              <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                                {comp.available_roles.slice(0, 2).join(", ")}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="p-4 text-muted-foreground font-medium">{comp.primary_sector}</td>
@@ -1273,6 +1409,15 @@ export default function PlacementAnalysisPage() {
                       </td>
                       <td className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
                         {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {comp.top_skills?.slice(0, 3).map((s, idx) => (
+                            <span key={idx} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium">
+                              {s}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="p-4">
                         <div className="flex gap-1">
@@ -1323,7 +1468,6 @@ export default function PlacementAnalysisPage() {
               </button>
             </div>
 
-            {/* Grant Access Section */}
             <div className="p-4 rounded-2xl bg-muted/40 border border-border/60 space-y-3">
               <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <UserPlus className="h-4 w-4 text-primary" /> Grant User Access (Whitelist Email)
@@ -1356,7 +1500,6 @@ export default function PlacementAnalysisPage() {
               )}
             </div>
 
-            {/* Active Invite Passcodes */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1388,7 +1531,6 @@ export default function PlacementAnalysisPage() {
               </div>
             </div>
 
-            {/* Whitelisted Users List */}
             <div className="space-y-3">
               <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Users className="h-4 w-4 text-purple-500" /> Authorized / Whitelisted Accounts ({adminUsers.length})
@@ -1426,11 +1568,11 @@ export default function PlacementAnalysisPage() {
       )}
 
       {/* ------------------------------------------------------------------- */}
-      {/* COMPANY INTELLIGENCE DOSSIER MODAL / SLIDE-OVER                     */}
+      {/* UPGRADED COMPANY INTELLIGENCE DOSSIER MODAL                         */}
       {/* ------------------------------------------------------------------- */}
       {selectedCompanySlug && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-          <div className="relative w-full max-w-4xl max-h-[90vh] bg-card border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-4xl max-h-[92vh] bg-card border border-border/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-6 border-b border-border/60 bg-gradient-to-r from-primary/10 via-background to-purple-500/10 flex justify-between items-start">
               <div className="flex items-start gap-4">
@@ -1445,6 +1587,11 @@ export default function PlacementAnalysisPage() {
                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs font-bold">
                       {companyDetails?.company?.tier_category || "C1"}
                     </Badge>
+                    {companyDetails?.company?.difficulty_score && (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs font-bold flex items-center gap-1">
+                        <Target className="h-3 w-3" /> Difficulty: {companyDetails.company.difficulty_score}/10
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                     <span>{companyDetails?.company?.primary_sector}</span>
@@ -1476,7 +1623,17 @@ export default function PlacementAnalysisPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Briefcase className="h-3.5 w-3.5" /> JAF Roles & Compensation ({companyDetails?.roles_count || 0})
+                <Briefcase className="h-3.5 w-3.5" /> JAF Postings & Compensation ({companyDetails?.roles_count || 0})
+              </button>
+              <button
+                onClick={() => setActiveDossierTab("keywords")}
+                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                  activeDossierTab === "keywords"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <BrainCircuit className="h-3.5 w-3.5" /> Deep JD Keyword & Skill Analysis
               </button>
               <button
                 onClick={() => setActiveDossierTab("selection")}
@@ -1496,12 +1653,12 @@ export default function PlacementAnalysisPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5" /> AI Prep Roadmap & High-Yield Topics
+                <Sparkles className="h-3.5 w-3.5" /> AI Prep Roadmap & Playbook
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6 custom-scrollbar">
+            <div className="p-6 overflow-y-auto max-h-[62vh] space-y-6 custom-scrollbar">
               {loadingDetails ? (
                 <div className="text-center py-16">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mb-3" />
@@ -1509,6 +1666,7 @@ export default function PlacementAnalysisPage() {
                 </div>
               ) : activeDossierTab === "roles" ? (
                 <div className="space-y-6">
+                  {/* Role Selector */}
                   {companyDetails?.roles && companyDetails.roles.length > 1 && (
                     <div>
                       <span className="text-xs font-semibold text-muted-foreground mb-2 block">
@@ -1519,14 +1677,14 @@ export default function PlacementAnalysisPage() {
                           <button
                             key={r.id}
                             onClick={() => setSelectedRoleIndex(idx)}
-                            className={`px-3 py-2 rounded-xl text-xs font-semibold text-left shrink-0 border transition-all ${
+                            className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold text-left shrink-0 border transition-all ${
                               selectedRoleIndex === idx
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm scale-[1.01]"
                                 : "bg-card hover:bg-muted text-muted-foreground border-border"
                             }`}
                           >
-                            <span className="block font-bold truncate max-w-[200px]">{r.job_title}</span>
-                            <span className="text-[10px] opacity-80 block">{r.session_label}</span>
+                            <span className="block font-bold truncate max-w-[220px]">{r.job_title}</span>
+                            <span className="text-[10px] opacity-80 block">{r.session_label} • {r.primary_sector}</span>
                           </button>
                         ))}
                       </div>
@@ -1542,7 +1700,7 @@ export default function PlacementAnalysisPage() {
                             <div className="flex justify-between items-start flex-wrap gap-2">
                               <div>
                                 <span className="text-xs font-semibold text-primary uppercase tracking-wider block">
-                                  {curRole.session_label} • {curRole.category_tier} Tier
+                                  {curRole.session_label} • {curRole.category_tier} Tier • {curRole.primary_sector}
                                 </span>
                                 <h3 className="text-lg font-extrabold text-foreground font-outfit mt-0.5">
                                   {curRole.job_title}
@@ -1615,24 +1773,7 @@ export default function PlacementAnalysisPage() {
                             )}
                           </div>
 
-                          {curRole.required_skills && curRole.required_skills.length > 0 && (
-                            <div className="space-y-2">
-                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                                Required Technical Competencies & Tech Stack
-                              </h4>
-                              <div className="flex flex-wrap gap-2">
-                                {curRole.required_skills.map((skill, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-1 rounded-xl bg-muted border border-border/60 text-foreground text-xs font-semibold shadow-2xs"
-                                  >
-                                    {skill}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
+                          {/* Key Responsibilities */}
                           {curRole.responsibilities && curRole.responsibilities.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1649,6 +1790,7 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
+                          {/* Full Raw JAF Description */}
                           {curRole.raw_jd && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1664,7 +1806,136 @@ export default function PlacementAnalysisPage() {
                     })()
                   )}
                 </div>
+              ) : activeDossierTab === "keywords" ? (
+                /* TAB 2: DEEP JD KEYWORD & COMPETENCY ANALYSIS */
+                <div className="space-y-6">
+                  {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
+                    (() => {
+                      const curRole: PlacementRole = companyDetails.roles[selectedRoleIndex]
+                      const kw: CategorizedKeywords = curRole.categorized_keywords || {
+                        all: curRole.required_skills || [],
+                        languages: [],
+                        frameworks_and_tools: [],
+                        core_concepts: [],
+                        leadership: []
+                      }
+
+                      return (
+                        <div className="space-y-6">
+                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 space-y-1.5">
+                            <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <BrainCircuit className="h-4 w-4 text-primary" /> Multi-Dimensional Skill Taxonomy Extraction
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                              Extracted directly from the official Job Announcement Form (JAF) for <strong>{curRole.job_title}</strong>.
+                            </p>
+                          </div>
+
+                          {/* 1. Programming Languages */}
+                          {kw.languages && kw.languages.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Code className="h-4 w-4 text-blue-500" /> Core Programming Languages
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {kw.languages.map((l, i) => (
+                                  <span key={i} className="px-3 py-1 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-xs font-bold shadow-2xs">
+                                    {l}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. Frameworks & Tools */}
+                          {kw.frameworks_and_tools && kw.frameworks_and_tools.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Wrench className="h-4 w-4 text-purple-500" /> Frameworks, Libraries & Developer Tools
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {kw.frameworks_and_tools.map((t, i) => (
+                                  <span key={i} className="px-3 py-1 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs font-bold shadow-2xs">
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. Core Domain Concepts */}
+                          {kw.core_concepts && kw.core_concepts.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Target className="h-4 w-4 text-amber-500" /> Domain Architecture & Methodologies
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {kw.core_concepts.map((c, i) => (
+                                  <span key={i} className="px-3 py-1 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-xs font-bold shadow-2xs">
+                                    {c}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. Leadership Competencies */}
+                          {kw.leadership && kw.leadership.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Award className="h-4 w-4 text-emerald-500" /> Leadership & Problem Solving Competencies
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {kw.leadership.map((l, i) => (
+                                  <span key={i} className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold shadow-2xs">
+                                    {l}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Topic Weightage Breakdown */}
+                          {curRole.intelligence?.topic_weightage && (
+                            <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-3">
+                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <BarChart3 className="h-4 w-4 text-primary" /> Interview Topic Focus Distribution
+                              </h4>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+                                  <span className="text-lg font-extrabold text-primary font-outfit">
+                                    {curRole.intelligence.topic_weightage.dsa_and_problem_solving}%
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground block mt-0.5">Problem Solving / DSA</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+                                  <span className="text-lg font-extrabold text-purple-500 font-outfit">
+                                    {curRole.intelligence.topic_weightage.system_and_domain_design}%
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground block mt-0.5">System & Product Design</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+                                  <span className="text-lg font-extrabold text-amber-500 font-outfit">
+                                    {curRole.intelligence.topic_weightage.case_and_business_sense}%
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground block mt-0.5">Business & Case Sense</span>
+                                </div>
+                                <div className="p-2.5 rounded-xl bg-muted/40 border border-border/40">
+                                  <span className="text-lg font-extrabold text-emerald-500 font-outfit">
+                                    {curRole.intelligence.topic_weightage.resume_and_leadership_fit}%
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground block mt-0.5">Resume & Cultural Fit</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()
+                  )}
+                </div>
               ) : activeDossierTab === "selection" ? (
+                /* TAB 3: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -1724,42 +1995,78 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
               ) : (
+                /* TAB 4: AI PREPARATION ROADMAP & PLAYBOOK */
                 <div className="space-y-6">
-                  <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-purple-500/10 border border-primary/30 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                      <h3 className="text-sm font-extrabold text-foreground font-outfit">
-                        AI Placement Preparation Playbook for {companyDetails?.company?.name}
-                      </h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      Customized high-yield revision topics synthesized from {companyDetails?.company?.name}'s historical JAF requirements and senior student interview experiences.
-                    </p>
-                  </div>
+                  {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
+                    (() => {
+                      const curRole: PlacementRole = companyDetails.roles[selectedRoleIndex]
+                      const intel: RoleIntelligence | undefined = curRole.intelligence
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-2">
-                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <Award className="h-4 w-4 text-amber-500" /> Must-Revise Core Fundamentals
-                      </h4>
-                      <ul className="text-xs text-muted-foreground space-y-1.5">
-                        <li>• Data Structures & Algorithms: Graphs, Dynamic Programming, Trees</li>
-                        <li>• System Architecture: Scalability, Caching, DB Indexing & Concurrency</li>
-                        <li>• Problem Solving: Clean Code, Edge-Case Handling, Time Complexity Analysis</li>
-                      </ul>
-                    </div>
+                      return (
+                        <div className="space-y-6">
+                          <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-purple-500/10 border border-primary/30 space-y-3">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                              <h3 className="text-sm font-extrabold text-foreground font-outfit">
+                                AI Placement Preparation Playbook for {companyDetails?.company?.name} ({curRole.job_title})
+                              </h3>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Customized high-yield revision topics and resume power points synthesized from historical JAF requirements and senior student interview experiences.
+                            </p>
+                          </div>
 
-                    <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-2">
-                      <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                        <Flame className="h-4 w-4 text-primary" /> Resume Talking Points to Highlight
-                      </h4>
-                      <ul className="text-xs text-muted-foreground space-y-1.5">
-                        <li>• Quantifiable causal impact on technical projects (latency, %, scale)</li>
-                        <li>• Familiarity with production tech stack: {companyDetails?.unique_skills?.slice(0, 4).join(", ") || "Python, C++, SQL"}</li>
-                        <li>• Clear explanation of design trade-offs made during internships</li>
-                      </ul>
-                    </div>
-                  </div>
+                          {/* Key Selection Hurdle Card */}
+                          {intel?.key_selection_hurdle && (
+                            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-1.5">
+                              <h4 className="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <Target className="h-4 w-4 text-amber-500" /> Primary Selection Hurdle
+                              </h4>
+                              <p className="text-xs text-foreground leading-relaxed font-medium">
+                                {intel.key_selection_hurdle}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Resume Power Tip Card */}
+                          {intel?.resume_power_tip && (
+                            <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-1.5">
+                              <h4 className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <Flame className="h-4 w-4 text-emerald-500" /> What Winning Resumes Highlight
+                              </h4>
+                              <p className="text-xs text-foreground leading-relaxed font-medium">
+                                {intel.resume_power_tip}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Award className="h-4 w-4 text-amber-500" /> Must-Revise Core Fundamentals
+                              </h4>
+                              <ul className="text-xs text-muted-foreground space-y-1.5">
+                                <li>• Data Structures & Algorithms: Graphs, Dynamic Programming, Trees</li>
+                                <li>• System Architecture: Scalability, Caching, DB Indexing & Concurrency</li>
+                                <li>• Problem Solving: Clean Code, Edge-Case Handling, Time Complexity Analysis</li>
+                              </ul>
+                            </div>
+
+                            <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-2">
+                              <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <CheckSquare className="h-4 w-4 text-primary" /> Interview Day Checklist
+                              </h4>
+                              <ul className="text-xs text-muted-foreground space-y-1.5">
+                                <li>• Articulate thought process clearly before coding / solving</li>
+                                <li>• Clarify constraints and edge cases proactively</li>
+                                <li>• Demonstrate deep ownership of past projects and PoRs</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()
+                  )}
                 </div>
               )}
             </div>

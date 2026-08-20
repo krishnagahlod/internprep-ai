@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Placement Analysis & Company Intelligence Ingestion Engine.
+Placement Analysis & Company Intelligence Deep Ingestion Engine.
 Processes Placement_tijori.xlsx (2,246 records across 3 sheets: 24-25, 25-26 s1, 25-26 s2)
-and fuses with data/selection insights/*.xlsx.
-Outputs structured, enriched JSON/SQLite store and optionally syncs to Supabase.
+with multi-factor role classification, categorized keyword taxonomy extraction,
+and fusion with authentic student selection insights (data/selection insights/*.xlsx).
 """
 
 import os
@@ -26,26 +26,6 @@ CURRENCY_RATES_TO_INR = {
     "AED": 23.5,
     "HKD": 11.1,
     "TWD": 2.7
-}
-
-SECTOR_MAPPING = {
-    "IT/Software": "Software & Engineering",
-    "Software Development": "Software & Engineering",
-    "Engineering & Technology": "Core Engineering & Technology",
-    "Research & Development": "Core Engineering & Technology",
-    "Finance": "Finance & Quant",
-    "Consulting": "Consulting & Strategy",
-    "Data Science": "AI, ML & Data Science",
-    "Analytics": "AI, ML & Data Science",
-    "AI/ML": "AI, ML & Data Science",
-    "Product Management": "Product Management",
-    "Design": "Design & UI/UX",
-    "FMCG/Consumer Goods": "FMCG & Consumer",
-    "Operations": "Operations & Supply Chain",
-    "Public Sector Undertaking": "PSU & Government",
-    "Education": "Education & Research",
-    "Services": "Services & Advisory",
-    "Other": "General & Other"
 }
 
 
@@ -100,6 +80,71 @@ def generate_slug(name: str) -> str:
     """Generates a clean URL slug from company name."""
     clean = re.sub(r'[^a-zA-Z0-9]+', '-', name.lower()).strip('-')
     return clean or "company"
+
+
+def classify_role_intelligently(title: str, jd: str, raw_job_sector: str, raw_comp_sector: str) -> str:
+    """
+    Classifies every placement role into its true functional domain using
+    Job Title semantic signals, Job Description keywords, and sector fallbacks.
+    """
+    t = str(title).lower().strip() if pd.notna(title) else ""
+    j = str(jd).lower().strip() if pd.notna(jd) else ""
+    rjs = str(raw_job_sector).lower().strip() if pd.notna(raw_job_sector) else ""
+    rcs = str(raw_comp_sector).lower().strip() if pd.notna(raw_comp_sector) else ""
+    
+    # 1. Product Management
+    if any(k in t for k in ['product manager', 'associate product manager', 'apm\b', 'product owner', 'product analyst', 'product lead', 'technical product manager', 'tpm\b', 'product designer', 'growth product', 'digital product']):
+        return 'Product Management'
+    if re.search(r'\b(apm|prd|product roadmap|product management|backlog grooming|user stories)\b', t):
+        return 'Product Management'
+    if 'product management' in rjs or 'product management' in rcs:
+        return 'Product Management'
+    if any(k in t for k in ['product definition', 'product engineer', 'product specialist']) and any(k in j for k in ['roadmap', 'user research', 'prd', 'feature prioritization', 'a/b testing']):
+        return 'Product Management'
+
+    # 2. Finance & Quant / High Frequency Trading
+    if any(k in t for k in ['quant', 'trader', 'trading', 'investment banking', 'equity research', 'risk analyst', 'portfolio', 'hedge fund', 'fixed income', 'derivatives', 'market maker', 'hft', 'algo trader']):
+        return 'Finance & Quant'
+    if 'finance' in rjs or 'finance' in rcs:
+        return 'Finance & Quant'
+    if any(k in j for k in ['algorithmic trading', 'market making', 'order book', 'options pricing', 'derivatives trading', 'alpha generation', 'stochastic calculus', 'greenbook']):
+        return 'Finance & Quant'
+
+    # 3. AI, ML, Data Science & Analytics
+    if any(k in t for k in ['data scientist', 'machine learning', 'ai/ml', 'ai engineer', 'nlp', 'computer vision', 'data engineer', 'deep learning', 'ml engineer', 'business analyst', 'analytics', 'data analyst', 'bi analyst', 'applied scientist', 'research scientist (ai)', 'generative ai']):
+        return 'AI, ML & Data Science'
+    if any(k in rjs for k in ['data science', 'analytics', 'ai/ml']) or any(k in rcs for k in ['data science', 'analytics', 'ai/ml']):
+        return 'AI, ML & Data Science'
+
+    # 4. Consulting & Strategy
+    if any(k in t for k in ['consultant', 'consulting', 'strategy', 'advisory', 'management trainee', 'business consultant', 'strategic initiatives', 'program associate', 'general management', 'analyst - strategy']):
+        return 'Consulting & Strategy'
+    if 'consulting' in rjs or 'consulting' in rcs:
+        return 'Consulting & Strategy'
+
+    # 5. Core Engineering & Semiconductor / R&D
+    if any(k in t for k in ['vlsi', 'asic', 'fpga', 'embedded', 'hardware', 'mechanical', 'chemical', 'civil', 'aerospace', 'materials', 'metallurgy', 'robotics', 'cad', 'cae', 'cfd', 'thermal', 'electrical engineer', 'substation', 'rf engineer', 'semiconductor', 'process engineer', 'plant engineer', 'manufacturing engineer']):
+        return 'Core Engineering & Technology'
+
+    # 6. Software & Engineering
+    if any(k in t for k in ['software', 'developer', 'sde', 'swe', 'frontend', 'backend', 'fullstack', 'full stack', 'devops', 'cloud', 'security engineer', 'qa', 'sre', 'systems engineer', 'firmware', 'application engineer']):
+        return 'Software & Engineering'
+    if any(k in rjs for k in ['it/software', 'software development']) or any(k in rcs for k in ['it/software', 'software development']):
+        return 'Software & Engineering'
+
+    # 7. Design & UI/UX
+    if any(k in t for k in ['ui/ux', 'ux designer', 'interaction designer', 'visual designer', 'graphic designer', 'industrial design']):
+        return 'Design & UI/UX'
+
+    # 8. FMCG & Operations
+    if any(k in t for k in ['supply chain', 'operations', 'logistics', 'procurement', 'fmcg', 'plant operations']):
+        return 'FMCG & Operations'
+
+    # Fallback to sector maps
+    if 'engineering & technology' in rjs or 'research & development' in rjs or 'engineering & technology' in rcs or 'research & development' in rcs:
+        return 'Core Engineering & Technology'
+
+    return 'General & Other'
 
 
 def parse_pipe_number(val: Any) -> Dict[str, Any]:
@@ -192,74 +237,195 @@ def parse_additional_info_details(info_str: str) -> Dict[str, Any]:
     }
 
 
-def extract_jd_semantic_structure(jd_text: str, title: str, company: str) -> Dict[str, Any]:
-    """
-    Extracts structured must-have skills, selection rounds, and role summary from raw JAF text.
-    """
-    if not jd_text or pd.isna(jd_text) or str(jd_text).lower() == "nan":
-        return {
-            "role_summary": f"Full-time graduate placement opportunity for {title} at {company}.",
-            "skills": [],
-            "responsibilities": [],
-            "selection_rounds": ["Resume Shortlisting", "Online Assessment", "Technical Interview Rounds", "HR / Culture Fit"]
-        }
-        
-    text = str(jd_text).strip()
-    
-    # Skill taxonomy patterns
-    known_tech_skills = [
-        "Python", "C++", "Java", "Go", "Golang", "Rust", "C#", "JavaScript", "TypeScript", "React", "Next.js",
-        "Node.js", "SQL", "PostgreSQL", "MySQL", "MongoDB", "Redis", "Kafka", "Docker", "Kubernetes", "AWS",
-        "GCP", "Azure", "PyTorch", "TensorFlow", "Scikit-Learn", "Machine Learning", "Deep Learning", "LLMs",
-        "NLP", "Computer Vision", "DSA", "Algorithms", "System Design", "Distributed Systems", "Microservices",
-        "Git", "CI/CD", "Linux", "gRPC", "REST APIs", "MATLAB", "Simulink", "Verilog", "VHDL", "FPGA", "Embedded C",
-        "RTOS", "VLSI", "Power BI", "Tableau", "Excel", "Financial Modeling", "Guesstimates", "Case Solving",
-        "Probability", "Statistics", "Stochastic Calculus", "Quantitative Analysis", "Optimization", "Spark"
+# Comprehensive Multi-Category Keyword Taxonomies
+KEYWORD_TAXONOMIES = {
+    "languages": [
+        "Python", "C++", "Java", "Go", "Golang", "Rust", "C#", "C", "SQL", "TypeScript", "JavaScript",
+        "R", "Scala", "MATLAB", "Verilog", "VHDL", "SystemVerilog", "Solidity", "Kotlin", "Swift", "Bash", "Shell"
+    ],
+    "frameworks_and_tools": [
+        "PyTorch", "TensorFlow", "Scikit-Learn", "Keras", "React", "Next.js", "Node.js", "Express", "Django",
+        "FastAPI", "Spring Boot", "Docker", "Kubernetes", "Kafka", "Spark", "dbt", "Airflow", "Hadoop",
+        "AWS", "GCP", "Azure", "Redis", "PostgreSQL", "MySQL", "MongoDB", "Cassandra", "Elasticsearch",
+        "Figma", "Jira", "Mixpanel", "Amplitude", "Postman", "Tableau", "Power BI", "Excel", "Bloomberg",
+        "Git", "GitHub", "CI/CD", "Linux", "gRPC", "GraphQL", "Simulink", "Ansys", "SolidWorks", "AutoCAD"
+    ],
+    "core_domain_concepts": [
+        # Software & Systems
+        "Low-Latency", "Distributed Systems", "Concurrency", "Multithreading", "Microservices", "System Design",
+        "High Throughput", "Database Indexing", "Cache Invalidation", "REST APIs", "Event-Driven Architecture",
+        "Object-Oriented Programming", "Data Structures & Algorithms", "Networking Protocols", "Linux Kernel",
+        # Product Management
+        "Product Roadmap", "PRD Writing", "User Stories", "A/B Testing", "GTM Strategy", "Feature Prioritization",
+        "User Research", "Wireframing", "Customer Discovery", "Unit Economics", "North Star Metric", "Cohort Retention",
+        "Product Lifecycle Management", "Market Analysis", "Design Sprints", "Conversion Funnel Optimization",
+        # Finance & Quant
+        "Market Making", "Order Book Dynamics", "Statistical Arbitrage", "Options Greeks", "Stochastic Calculus",
+        "Alpha Generation", "Backtesting", "Risk Management", "Portfolio Optimization", "Monte Carlo Simulation",
+        "Time Series Forecasting", "Financial Modeling", "Valuation (DCF/Comps)", "Derivatives Pricing",
+        # Consulting & Strategy
+        "Profitability Framework", "Market Entry", "M&A Synergies", "Guesstimates", "Value Chain Analysis",
+        "MECE Structuring", "Root Cause Analysis", "Executive Storyboarding", "Competitive Benchmarking",
+        # AI / ML & Data
+        "LLM Fine-Tuning", "RAG Architecture", "Prompt Engineering", "Vector Embeddings", "Transformers",
+        "Computer Vision", "NLP", "Deep Learning", "Feature Engineering", "Data Pipelines / ETL", "Data Lakehouse",
+        # Core Hardware & Engineering
+        "VLSI Design", "RTL Design", "ASIC Timing Closure", "FPGA Synthesis", "Embedded Systems", "PCB Design",
+        "Finite Element Analysis (FEA)", "Computational Fluid Dynamics (CFD)", "Thermal Analysis", "Process Optimization"
+    ],
+    "leadership_competencies": [
+        "First-Principles Problem Solving", "Cross-Functional Leadership", "Data-Driven Decision Making",
+        "Stakeholder Management", "Ambiguity Navigation", "High Ownership & Accountability",
+        "Client-Facing Communication", "Analytical Rigor", "Fast Prototyping & Execution"
     ]
-    
-    extracted_skills = []
+}
+
+
+def extract_jd_deep_keywords_and_analysis(jd_text: str, title: str, company: str, sector: str, ctc_inr: float, tier_cat: str) -> Dict[str, Any]:
+    """
+    Extracts multi-dimensional categorized keywords, role summary, responsibilities,
+    selection rounds, and synthesized preparation playbook for each role.
+    """
+    text = str(jd_text).strip() if (pd.notna(jd_text) and str(jd_text).lower() != "nan") else ""
     text_lower = text.lower()
-    for skill in known_tech_skills:
-        # Check whole word boundary
-        pattern = r'\b' + re.escape(skill.lower()) + r'\b'
-        if re.search(pattern, text_lower):
-            extracted_skills.append(skill)
+    title_lower = title.lower()
+    
+    extracted_languages = []
+    extracted_frameworks = []
+    extracted_concepts = []
+    extracted_leadership = []
+    
+    # 1. Extract Languages
+    for lang in KEYWORD_TAXONOMIES["languages"]:
+        p = r'\b' + re.escape(lang.lower()) + r'\b'
+        if re.search(p, text_lower) or re.search(p, title_lower):
+            extracted_languages.append(lang)
             
-    # Responsibilities extraction (lines or numbered points)
+    # 2. Extract Frameworks & Tools
+    for tool in KEYWORD_TAXONOMIES["frameworks_and_tools"]:
+        p = r'\b' + re.escape(tool.lower()) + r'\b'
+        if re.search(p, text_lower) or re.search(p, title_lower):
+            extracted_frameworks.append(tool)
+            
+    # 3. Extract Core Domain Concepts
+    for concept in KEYWORD_TAXONOMIES["core_domain_concepts"]:
+        p = r'\b' + re.escape(concept.lower()) + r'\b'
+        if re.search(p, text_lower) or re.search(p, title_lower):
+            extracted_concepts.append(concept)
+            
+    # 4. Extract Leadership Competencies
+    for comp in KEYWORD_TAXONOMIES["leadership_competencies"]:
+        words = comp.lower().split()
+        if any(w in text_lower for w in words if len(w) > 4):
+            extracted_leadership.append(comp)
+
+    # Defaults if JD text is concise
+    if sector == "Product Management" and not extracted_concepts:
+        extracted_concepts = ["Product Roadmap", "PRD Writing", "User Stories", "A/B Testing", "GTM Strategy"]
+    elif sector == "Finance & Quant" and not extracted_concepts:
+        extracted_concepts = ["Statistical Arbitrage", "Alpha Generation", "Probability", "Time Series", "Risk Management"]
+    elif sector == "Consulting & Strategy" and not extracted_concepts:
+        extracted_concepts = ["Profitability Framework", "Market Entry", "Guesstimates", "MECE Structuring"]
+    elif sector == "AI, ML & Data Science" and not extracted_concepts:
+        extracted_concepts = ["Machine Learning", "Deep Learning", "Data Pipelines / ETL", "Feature Engineering"]
+    elif sector == "Software & Engineering" and not extracted_concepts:
+        extracted_concepts = ["Data Structures & Algorithms", "System Design", "Distributed Systems", "REST APIs"]
+
+    all_keywords = extracted_languages + extracted_frameworks + extracted_concepts[:6]
+
+    # Responsibilities extraction
     resp_matches = re.findall(r'(?:(?:[\d\.\-\•\*\–\—]+|\b(?:responsibility|responsibilities|tasks|role|you will)\b[:\-]?)\s*)([A-Z][^\.\n]{20,180}\.?)', text)
     responsibilities = [r.strip() for r in resp_matches[:6]]
-    
     if not responsibilities:
-        # Split by sentences
         sentences = [s.strip() for s in re.split(r'[\.\n]+', text) if len(s.strip()) > 30 and len(s.strip()) < 180]
         responsibilities = sentences[:4]
-        
+
     # Selection process detection
     selection_rounds = []
     if any(k in text_lower for k in ["online test", "coding test", "aptitude test", "assessment", "oa", "written test"]):
-        selection_rounds.append("Round 1: Online Assessment (Coding / Aptitude / Technical)")
+        selection_rounds.append("Round 1: Online Assessment (Coding Challenges, Aptitude & Domain Fundamentals)")
     else:
         selection_rounds.append("Round 1: Resume Shortlisting & Preliminary Screening")
         
-    if any(k in text_lower for k in ["technical interview", "tech round", "coding interview", "system design", "case interview"]):
-        selection_rounds.append("Round 2: Technical Interview (Problem Solving & Core Fundamentals)")
-        selection_rounds.append("Round 3: Advanced Technical / Domain Deep-Dive")
+    if sector == "Consulting & Strategy":
+        selection_rounds.append("Round 2: Problem Solving & Case Study Interview (Market Entry / Profitability)")
+        selection_rounds.append("Round 3: Senior Partner Case + Guesstimate & Fit Discussion")
+    elif sector == "Product Management":
+        selection_rounds.append("Round 2: Product Sense & RCA / Feature Design Interview")
+        selection_rounds.append("Round 3: Technical & Metric Analytics Discussion")
+    elif sector == "Finance & Quant":
+        selection_rounds.append("Round 2: Probability, Statistics, Mental Math & Speed Coding")
+        selection_rounds.append("Round 3: Advanced Algorithmic / Brainteaser Deep-Dive")
     else:
-        selection_rounds.append("Round 2: Technical Evaluation Interview")
+        selection_rounds.append("Round 2: Core Technical Interview (Problem Solving & System Architecture)")
+        selection_rounds.append("Round 3: Advanced Domain Deep-Dive & Projects Review")
         
-    selection_rounds.append("Final Round: Leadership, Team Fit & HR Discussion")
-    
-    # Generate concise role summary
+    selection_rounds.append("Final Round: Leadership, Team Fit & Cultural Alignment")
+
+    # Role summary
     first_paragraph = text.split("\n\n")[0] if "\n\n" in text else text[:250]
     role_summary = re.sub(r'\s+', ' ', first_paragraph).strip()
-    if len(role_summary) > 280:
+    if not role_summary:
+        role_summary = f"Full-time campus placement hire for {title} within the {sector} division at {company}."
+    elif len(role_summary) > 280:
         role_summary = role_summary[:277] + "..."
-        
+
+    # Hiring difficulty rating (1-10)
+    is_c1 = "C1" in tier_cat.upper()
+    is_high_pay = ctc_inr >= 3500000
+    if is_c1 and is_high_pay:
+        diff_score = 9.4
+        diff_tier = "Tier 1 Elite (Day-1 / Dream)"
+    elif is_c1 or is_high_pay:
+        diff_score = 8.6
+        diff_tier = "Tier 1 High Impact"
+    elif "C2" in tier_cat.upper():
+        diff_score = 7.8
+        diff_tier = "Tier 2 Core"
+    else:
+        diff_score = 7.0
+        diff_tier = "Tier 3 Standard"
+
+    # Domain specific resume advice
+    if sector == "Product Management":
+        resume_tip = "Highlight user discovery insights, PRDs written, and measurable North Star metric improvements (e.g. +18% D30 retention, +25% funnel conversion)."
+        hurdle = "Balancing product intuition with rigorous execution metrics, technical feasibility, and user empathy during live case prompts."
+    elif sector == "Finance & Quant":
+        resume_tip = "Emphasize competitive programming ratings (Codeforces/LeetCode), mathematical Olympiads, stochastic calculus, and low-latency C++ projects."
+        hurdle = "Extreme time-pressured mental math, brainteasers from Greenbook/Brainstellar, and high-frequency order-book architecture questions."
+    elif sector == "Consulting & Strategy":
+        resume_tip = "Structure resume with clear PoR leadership impacts, quantifiable business cost reductions or revenue uplifts, and clean MECE bullets."
+        hurdle = "Structuring ambiguous business problems on the fly using MECE frameworks without jumping to premature conclusions."
+    elif sector == "AI, ML & Data Science":
+        resume_tip = "Include production ML deployment metrics (e.g. latency, F1-score, inference throughput) rather than just Kaggle model training."
+        hurdle = "Mathematical depth behind modern architectures (Transformers, attention mechanisms, loss formulations) and live SQL/data pipeline debugging."
+    else:
+        resume_tip = "Feature production-grade code contributions, clean system architecture designs, and causal performance optimizations (latency, TPS, cache hit rates)."
+        hurdle = "Multi-threaded concurrency, clean algorithmic edge-case handling, and scalable distributed system trade-offs."
+
     return {
         "role_summary": role_summary,
-        "skills": extracted_skills[:12],
+        "keywords": {
+            "all": all_keywords[:15],
+            "languages": extracted_languages[:8],
+            "frameworks_and_tools": extracted_frameworks[:10],
+            "core_concepts": extracted_concepts[:10],
+            "leadership": extracted_leadership[:5]
+        },
         "responsibilities": responsibilities,
-        "selection_rounds": selection_rounds
+        "selection_rounds": selection_rounds,
+        "intelligence": {
+            "difficulty_score": diff_score,
+            "difficulty_tier": diff_tier,
+            "key_selection_hurdle": hurdle,
+            "resume_power_tip": resume_tip,
+            "topic_weightage": {
+                "dsa_and_problem_solving": 40 if sector in ["Software & Engineering", "Finance & Quant"] else 20,
+                "system_and_domain_design": 30 if sector in ["Software & Engineering", "Product Management"] else 20,
+                "case_and_business_sense": 40 if sector in ["Consulting & Strategy", "Product Management"] else 10,
+                "resume_and_leadership_fit": 20
+            }
+        }
     }
 
 
@@ -275,7 +441,6 @@ def load_selection_insights(insights_dir: str) -> Dict[str, Any]:
         domain = os.path.basename(f).replace("Selection Insights", "").replace(".xlsx", "").strip()
         try:
             df = pd.read_excel(f)
-            # Standardize columns
             company_col = None
             for col in df.columns:
                 if "company" in col.lower():
@@ -302,7 +467,6 @@ def load_selection_insights(insights_dir: str) -> Dict[str, Any]:
                         courses_projects = str(row.get(col, "")).strip()
                         break
                         
-                # Split questions into clean list
                 q_list = []
                 if raw_questions and raw_questions.lower() != "nan":
                     lines = re.split(r'[\n\•\\*\-]+', raw_questions)
@@ -334,7 +498,7 @@ def ingest_placement_tijori_dataset(
     """
     Main extraction and structuring pipeline.
     """
-    print(f"Starting ingestion from {excel_path}...")
+    print(f"Starting deep ingestion from {excel_path}...")
     xl = pd.ExcelFile(excel_path)
     
     insights_lookup = load_selection_insights(insights_dir)
@@ -367,7 +531,14 @@ def ingest_placement_tijori_dataset(
             
             raw_comp_sector = str(row.get("Company Sector", "IT/Software")).strip()
             raw_job_sector = str(row.get("Job Sector", raw_comp_sector)).strip()
-            standardized_sector = SECTOR_MAPPING.get(raw_job_sector, SECTOR_MAPPING.get(raw_comp_sector, "General & Other"))
+            
+            # Intelligent sector classification
+            standardized_sector = classify_role_intelligently(
+                raw_title,
+                str(row.get("Job Description", "")),
+                raw_job_sector,
+                raw_comp_sector
+            )
             
             currency = str(row.get("Currency", "INR")).strip().upper()
             if not currency or currency == "NAN":
@@ -389,7 +560,14 @@ def ingest_placement_tijori_dataset(
                 location = "India"
                 
             add_info = parse_additional_info_details(str(row.get("Additional Info", "")))
-            jd_info = extract_jd_semantic_structure(str(row.get("Job Description", "")), raw_title, cname)
+            deep_jd_analysis = extract_jd_deep_keywords_and_analysis(
+                str(row.get("Job Description", "")),
+                raw_title,
+                cname,
+                standardized_sector,
+                ctc_inr_equiv,
+                category_tier
+            )
             
             # Formulate single role record
             role_id = f"role_{cslug}_{sheet_name.replace(' ', '_')}_{idx}"
@@ -416,19 +594,20 @@ def ingest_placement_tijori_dataset(
                     "inhand_inr_equivalent": inhand_inr_equiv,
                     "is_international": currency != "INR"
                 },
-                "role_summary": jd_info["role_summary"],
-                "required_skills": jd_info["skills"],
-                "responsibilities": jd_info["responsibilities"],
-                "selection_rounds": jd_info["selection_rounds"],
+                "role_summary": deep_jd_analysis["role_summary"],
+                "required_skills": deep_jd_analysis["keywords"]["all"],
+                "categorized_keywords": deep_jd_analysis["keywords"],
+                "responsibilities": deep_jd_analysis["responsibilities"],
+                "selection_rounds": deep_jd_analysis["selection_rounds"],
                 "perks_and_benefits": add_info["highlights"],
                 "additional_info_raw": add_info.get("raw_summary", ""),
-                "raw_jd": str(row.get("Job Description", ""))[:2000]
+                "raw_jd": str(row.get("Job Description", ""))[:2500],
+                "intelligence": deep_jd_analysis["intelligence"]
             }
             roles_list.append(role_record)
             
             # Update or create Company Master
             if cslug not in companies_dict:
-                # Check selection insights matching
                 insight_data = insights_lookup.get(cname.lower()) or insights_lookup.get(raw_cname.lower()) or {}
                 
                 companies_dict[cslug] = {
@@ -440,32 +619,47 @@ def ingest_placement_tijori_dataset(
                     "is_hiring_24_25": is_24_25,
                     "is_hiring_25_26": is_25_26,
                     "roles_count": 1,
+                    "available_roles": [raw_title],
                     "highest_ctc_inr": ctc_inr_equiv,
                     "highest_inhand_inr": inhand_inr_equiv,
                     "median_ctc_inr": ctc_inr_equiv,
                     "dominant_currency": currency,
                     "has_international_offers": currency != "INR",
                     "locations": [location] if location != "India" else ["Pan India"],
+                    "top_skills": deep_jd_analysis["keywords"]["all"][:8],
                     "roles": [role_id],
                     "selection_insights": insight_data if insight_data else None,
-                    "ai_overview": jd_info["role_summary"]
+                    "ai_overview": deep_jd_analysis["role_summary"],
+                    "difficulty_score": deep_jd_analysis["intelligence"]["difficulty_score"],
+                    "difficulty_tier": deep_jd_analysis["intelligence"]["difficulty_tier"]
                 }
             else:
                 comp = companies_dict[cslug]
                 comp["roles_count"] += 1
                 comp["roles"].append(role_id)
+                if raw_title not in comp["available_roles"] and len(comp["available_roles"]) < 8:
+                    comp["available_roles"].append(raw_title)
                 if is_24_25:
                     comp["is_hiring_24_25"] = True
                 if is_25_26:
                     comp["is_hiring_25_26"] = True
                 if ctc_inr_equiv > comp["highest_ctc_inr"]:
                     comp["highest_ctc_inr"] = ctc_inr_equiv
+                    # If this role is higher tier / PM / Quant, prioritize company sector
+                    if standardized_sector in ["Product Management", "Finance & Quant", "AI, ML & Data Science", "Consulting & Strategy", "Software & Engineering"]:
+                        comp["primary_sector"] = standardized_sector
                 if inhand_inr_equiv > comp["highest_inhand_inr"]:
                     comp["highest_inhand_inr"] = inhand_inr_equiv
                 if currency != "INR":
                     comp["has_international_offers"] = True
                 if location not in comp["locations"] and len(comp["locations"]) < 5:
                     comp["locations"].append(location)
+                for sk in deep_jd_analysis["keywords"]["all"]:
+                    if sk not in comp["top_skills"] and len(comp["top_skills"]) < 12:
+                        comp["top_skills"].append(sk)
+                if deep_jd_analysis["intelligence"]["difficulty_score"] > comp["difficulty_score"]:
+                    comp["difficulty_score"] = deep_jd_analysis["intelligence"]["difficulty_score"]
+                    comp["difficulty_tier"] = deep_jd_analysis["intelligence"]["difficulty_tier"]
 
     # Compute median CTC for companies
     for cslug, comp in companies_dict.items():
@@ -506,7 +700,7 @@ def ingest_placement_tijori_dataset(
 
     dataset_payload = {
         "metadata": {
-            "version": "1.0.0",
+            "version": "2.0.0",
             "extracted_at": "2026-08-20",
             "source_files": ["Placement_tijori.xlsx", "Selection Insights/*.xlsx"]
         },
@@ -519,7 +713,7 @@ def ingest_placement_tijori_dataset(
     with open(output_json_path, "w", encoding="utf-8") as f:
         json.dump(dataset_payload, f, indent=2, ensure_ascii=False)
         
-    print(f"Successfully generated structured placement intelligence dataset at: {output_json_path}")
+    print(f"Successfully generated deep placement intelligence dataset at: {output_json_path}")
     return dataset_payload
 
 
