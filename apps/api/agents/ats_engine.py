@@ -12,9 +12,19 @@ import json_repair
 # ==============================================================================
 # MASSIVE MULTI-DOMAIN COMPETENCY TAXONOMY (25-35 Granular Skills per Domain)
 # ==============================================================================
+# ==============================================================================
+# GRANULAR DOMAIN TAXONOMY & HIGH-YIELD COMPETENCY CLUSTERS
+# ==============================================================================
 DOMAIN_TAXONOMY = {
     "software": {
         "label": "Software Engineering / IT",
+        "sub_tracks": {
+            "sde_generalist": {"label": "Full-Stack / General SDE", "priority_categories": ["Core Languages & Runtimes", "Architecture & Distributed Systems", "Databases & Storage Architecture"]},
+            "frontend": {"label": "Frontend & Web Architecture", "priority_categories": ["Frontend & Modern Web Stack", "Core Languages & Runtimes", "Quality, AppSec & Observability"]},
+            "backend": {"label": "Backend & Distributed Systems", "priority_categories": ["Architecture & Distributed Systems", "Databases & Storage Architecture", "Core Languages & Runtimes"]},
+            "ai_ml": {"label": "AI/ML Engineering & LLMOps", "priority_categories": ["AI/ML Engineering & LLMOps", "Core Languages & Runtimes", "Databases & Storage Architecture"]},
+            "devops": {"label": "DevOps & Cloud Infrastructure", "priority_categories": ["Cloud, DevOps & Production Infrastructure", "Quality, AppSec & Observability", "Architecture & Distributed Systems"]}
+        },
         "categories": {
             "Core Languages & Runtimes": [
                 {"name": "Python & Modern Async", "synonyms": ["python", "asyncio", "pydantic", "fastapi", "pytest", "cython", "poetry", "uv"]},
@@ -22,6 +32,10 @@ DOMAIN_TAXONOMY = {
                 {"name": "Java / Spring Ecosystem", "synonyms": ["java", "spring boot", "spring", "jvm", "hibernate", "maven", "gradle", "junit"]},
                 {"name": "TypeScript & Modern JS", "synonyms": ["typescript", "javascript", "ecmascript", "es6", "node.js", "deno", "bun"]},
                 {"name": "Go (Golang) / Rust", "synonyms": ["golang", "go", "goroutines", "rust", "cargo", "rustlang", "actix", "tokio"]}
+            ],
+            "Frontend & Modern Web Stack": [
+                {"name": "React & Next.js Ecosystem", "synonyms": ["react", "next.js", "nextjs", "react hooks", "server components", "redux", "zustand", "tanstack query", "vue", "tailwind", "styled-components"]},
+                {"name": "Web Performance & Core Web Vitals", "synonyms": ["core web vitals", "lighthouse", "ssr", "ssg", "csr", "code splitting", "tree shaking", "lazy loading", "hydration", "accessibility", "a11y", "wcag"]}
             ],
             "Architecture & Distributed Systems": [
                 {"name": "System Design & Microservices", "synonyms": ["system design", "system architecture", "microservices", "service-oriented", "monolith to microservices", "domain driven design", "scalability"]},
@@ -56,6 +70,12 @@ DOMAIN_TAXONOMY = {
     },
     "consulting": {
         "label": "Management Consulting",
+        "sub_tracks": {
+            "general_strategy": {"label": "General Strategy & Advisory", "priority_categories": ["Core Strategic Frameworks", "Executive Leadership & Alignment"]},
+            "operations": {"label": "Operations & Supply Chain", "priority_categories": ["Operational & Financial Transformation", "Executive Leadership & Alignment"]},
+            "esg": {"label": "ESG & Sustainability", "priority_categories": ["ESG, Risk & Digital Transformation", "Core Strategic Frameworks"]},
+            "digital_ai": {"label": "Digital & AI Strategy", "priority_categories": ["ESG, Risk & Digital Transformation", "Core Strategic Frameworks"]}
+        },
         "categories": {
             "Core Strategic Frameworks": [
                 {"name": "Market Sizing & TAM/SAM/SOM", "synonyms": ["market sizing", "market entry", "market analysis", "tam", "sam", "som", "industry sizing", "market dynamics"]},
@@ -86,6 +106,10 @@ DOMAIN_TAXONOMY = {
     },
     "product_management": {
         "label": "Product Management",
+        "sub_tracks": {
+            "b2b_tech": {"label": "Technical & B2B SaaS PM", "priority_categories": ["Product Discovery & Strategy", "Agile Execution & GTM Delivery"]},
+            "b2c_growth": {"label": "Growth & B2C Product", "priority_categories": ["Metrics, Growth & Experimentation", "Product Discovery & Strategy"]}
+        },
         "categories": {
             "Product Discovery & Strategy": [
                 {"name": "Product Roadmapping & PRDs", "synonyms": ["product roadmap", "roadmapping", "prd", "product requirements", "feature specification", "product vision", "epics"]},
@@ -112,6 +136,10 @@ DOMAIN_TAXONOMY = {
     },
     "finance": {
         "label": "Finance / Investment Banking",
+        "sub_tracks": {
+            "ib_pe": {"label": "Investment Banking & Private Equity", "priority_categories": ["Financial Valuation & Deal Modeling", "Transaction & Corporate Advisory"]},
+            "quant_trading": {"label": "Quantitative Research & Trading", "priority_categories": ["Quantitative & Portfolio Analytics", "Financial Valuation & Deal Modeling"]}
+        },
         "categories": {
             "Financial Valuation & Deal Modeling": [
                 {"name": "DCF & Valuation Methodologies", "synonyms": ["discounted cash flow", "dcf", "valuation", "comparable company analysis", "comps", "precedent transactions", "wacc", "terminal value"]},
@@ -135,6 +163,11 @@ DOMAIN_TAXONOMY = {
     },
     "analytics": {
         "label": "Data Science & Analytics",
+        "sub_tracks": {
+            "ml_ai": {"label": "Machine Learning & AI Modeling", "priority_categories": ["Machine Learning & Statistical Modeling", "Business Intelligence & Impact Evaluation"]},
+            "data_engineering": {"label": "Data Engineering & Big Data", "priority_categories": ["Data Engineering & High-Scale Analytics", "Machine Learning & Statistical Modeling"]},
+            "bi_analytics": {"label": "Business Intelligence & Product Analytics", "priority_categories": ["Business Intelligence & Impact Evaluation", "Data Engineering & High-Scale Analytics"]}
+        },
         "categories": {
             "Machine Learning & Statistical Modeling": [
                 {"name": "Supervised & Unsupervised ML", "synonyms": ["machine learning", "ml", "regression", "classification", "clustering", "random forest", "xgboost", "gradient boosting", "lightgbm", "kmeans"]},
@@ -399,11 +432,13 @@ def evaluate_keyword_match(
     parsed_sections: List[Dict[str, Any]], 
     target_role: str = "consulting", 
     job_description: Optional[str] = None,
-    mode: str = "iitb_placement"
+    mode: str = "iitb_placement",
+    sub_track: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Pillar 2: Deep Semantic & Keyword Competency Engine (0-100).
-    Combines deterministic synonym matching with AI implicit competency discovery.
+    Combines deterministic synonym matching, sub-track category prioritization,
+    and AI implicit competency discovery.
     """
     canonical_role = target_role.lower()
     if "software" in canonical_role or "tech" in canonical_role or "developer" in canonical_role or "sde" in canonical_role:
@@ -420,13 +455,24 @@ def evaluate_keyword_match(
     domain_info = DOMAIN_TAXONOMY.get(role_key, DOMAIN_TAXONOMY["consulting"])
     resume_lower = resume_text.lower()
     
+    # Sub-track priority categories
+    sub_tracks = domain_info.get("sub_tracks", {})
+    active_sub_track_data = sub_tracks.get(sub_track) if sub_track else None
+    priority_categories = active_sub_track_data.get("priority_categories", []) if active_sub_track_data else []
+    
     # 1. Deterministic Multi-Tiered Synonym Match
     explicit_matches = {}
     total_competencies = 0
+    priority_matched_count = 0
+    priority_total_count = 0
     
     for category_name, competencies in domain_info["categories"].items():
+        is_priority_cat = category_name in priority_categories
         for comp in competencies:
             total_competencies += 1
+            if is_priority_cat:
+                priority_total_count += 1
+                
             comp_name = comp["name"]
             synonyms = comp["synonyms"]
             
@@ -437,8 +483,11 @@ def evaluate_keyword_match(
                         "name": comp_name,
                         "matched_via": syn,
                         "category": category_name,
-                        "is_implicit": False
+                        "is_implicit": False,
+                        "is_priority_subtrack": is_priority_cat
                     }
+                    if is_priority_cat:
+                        priority_matched_count += 1
                     break
                     
     # 2. Deep AI Semantic Extractor for Implicit Competencies
@@ -452,12 +501,16 @@ def evaluate_keyword_match(
                 if any(c["name"] == c_name for c in c_list):
                     cat_found = cat_n
                     break
+            is_priority_cat = cat_found in priority_categories
             explicit_matches[c_name] = {
                 "name": c_name,
                 "matched_via": imp.get("inferred_from", "AI Inferred from Technical Stack"),
                 "category": cat_found,
-                "is_implicit": True
+                "is_implicit": True,
+                "is_priority_subtrack": is_priority_cat
             }
+            if is_priority_cat:
+                priority_matched_count += 1
             
     # 3. Categorized Results
     categorized_results = []
@@ -467,6 +520,7 @@ def evaluate_keyword_match(
     for category_name, competencies in domain_info["categories"].items():
         cat_matched = []
         cat_missing = []
+        is_priority_cat = category_name in priority_categories
         
         for comp in competencies:
             comp_name = comp["name"]
@@ -480,18 +534,23 @@ def evaluate_keyword_match(
                 
         categorized_results.append({
             "category": category_name,
+            "is_priority_subtrack": is_priority_cat,
             "matched": cat_matched,
             "missing": cat_missing
         })
         
-    # 4. Custom Job Description Matching if provided
+    # 4. Custom Job Description Matching (Mandatory Core vs Preferred Split)
     jd_match_info = None
     if job_description and len(job_description.strip()) > 50:
         try:
             jd_prompt = f"""
-            Extract top 10 mandatory technical/domain skills from this JD:
+            Extract skills from this JD categorized into Core Mandatory vs Preferred:
             {job_description[:3000]}
-            Return JSON: {{ "critical_skills": ["Skill1", "Skill2", ...] }}
+            Return JSON: 
+            {{ 
+              "core_mandatory_skills": ["Skill1", "Skill2", ...],
+              "preferred_skills": ["Tool1", "Tool2", ...]
+            }}
             """
             try:
                 response_text = cerebras_client.generate_chat_completion(
@@ -509,40 +568,67 @@ def evaluate_keyword_match(
                 response_text = res.text
 
             parsed_jd = json_repair.loads(response_text)
-            if isinstance(parsed_jd, dict) and parsed_jd.get("critical_skills"):
-                jd_skills = parsed_jd.get("critical_skills", [])
-                jd_found = [s for s in jd_skills if s.lower() in resume_lower]
+            if isinstance(parsed_jd, dict):
+                core_skills = parsed_jd.get("core_mandatory_skills", [])
+                pref_skills = parsed_jd.get("preferred_skills", [])
+                
+                core_found = [s for s in core_skills if s.lower() in resume_lower]
+                pref_found = [s for s in pref_skills if s.lower() in resume_lower]
+                
+                core_ratio = (len(core_found) / max(len(core_skills), 1))
+                pref_ratio = (len(pref_found) / max(len(pref_skills), 1))
+                weighted_match_rate = int(round((core_ratio * 0.70 + pref_ratio * 0.30) * 100))
+                
                 jd_match_info = {
-                    "total": len(jd_skills),
-                    "found": len(jd_found),
-                    "match_rate": int(round((len(jd_found) / max(len(jd_skills), 1)) * 100)),
-                    "found_skills": jd_found,
-                    "missing_skills": [s for s in jd_skills if s not in jd_found]
+                    "total_core": len(core_skills),
+                    "found_core": len(core_found),
+                    "total_preferred": len(pref_skills),
+                    "found_preferred": len(pref_found),
+                    "match_rate": weighted_match_rate,
+                    "core_found": core_found,
+                    "core_missing": [s for s in core_skills if s not in core_found],
+                    "pref_found": pref_found,
+                    "pref_missing": [s for s in pref_skills if s not in pref_found]
                 }
         except Exception as e:
             print(f"Custom JD matching error: {e}")
             
-    # Calculate Score
+    # Calculate Score (incorporating sub-track priority weighting if present)
     matched_count = len(all_found)
-    match_ratio = matched_count / max(total_competencies, 1)
+    base_match_ratio = matched_count / max(total_competencies, 1)
     
-    if match_ratio >= 0.65:
-        match_score = int(round(85 + (match_ratio - 0.65) * 42))
-    elif match_ratio >= 0.35:
-        match_score = int(round(65 + (match_ratio - 0.35) * 66))
+    if priority_total_count > 0:
+        priority_ratio = priority_matched_count / priority_total_count
+        effective_match_ratio = (base_match_ratio * 0.4) + (priority_ratio * 0.6)
     else:
-        match_score = int(round(35 + (match_ratio) * 85))
+        effective_match_ratio = base_match_ratio
+    
+    if effective_match_ratio >= 0.65:
+        match_score = int(round(85 + (effective_match_ratio - 0.65) * 42))
+    elif effective_match_ratio >= 0.35:
+        match_score = int(round(65 + (effective_match_ratio - 0.35) * 66))
+    else:
+        match_score = int(round(35 + (effective_match_ratio) * 85))
         
     match_score = max(35, min(100, match_score))
     
     suggestions = []
     if all_missing:
-        for kw in all_missing[:3]:
-            suggestions.append(f"Weave in '{kw}' in relevant experience or project points to strengthen {domain_info['label']} shortlisting.")
+        # Prioritize suggestions from priority sub-track
+        priority_missing = []
+        for cat in categorized_results:
+            if cat.get("is_priority_subtrack"):
+                priority_missing.extend(cat.get("missing", []))
+        
+        target_suggestions = priority_missing[:3] if priority_missing else all_missing[:3]
+        for kw in target_suggestions:
+            sub_label = f" ({active_sub_track_data['label']})" if active_sub_track_data else ""
+            suggestions.append(f"Weave in '{kw}' in relevant experience or project points to strengthen {domain_info['label']}{sub_label} shortlisting.")
             
     return {
         "score": match_score,
         "target_role_label": domain_info["label"],
+        "sub_track_label": active_sub_track_data.get("label") if active_sub_track_data else None,
         "is_custom_jd": bool(job_description and len(job_description.strip()) > 50),
         "found_critical_count": matched_count,
         "total_critical_count": total_competencies,
@@ -557,6 +643,25 @@ def evaluate_keyword_match(
 # ==============================================================================
 # PILLAR 3: GOOGLE X-Y-Z QUANTIFICATION & BULLET ANATOMY
 # ==============================================================================
+def classify_metric_causality(bullet: str) -> Dict[str, Any]:
+    """
+    Classifies metrics into High-Impact Causal Outcomes (e.g. latency, revenue, %, throughput)
+    vs Activity/Scope Indicators (e.g. team size, document counts, project numbers).
+    """
+    b_lower = bullet.lower()
+    is_causal = any(k in b_lower for k in [
+        "%", "faster", "reduced", "increased", "boosted", "saved", "cut", "grew",
+        "latency", "throughput", "roi", "capex", "opex", "ebitda", "revenue", "cost",
+        "0.", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "s", "ms", "x", "X",
+        "cr", "crore", "lakh", "$", "₹", "€", "£", "pass rate", "accuracy", "f1", "auc", "retention",
+        "vulnerabilities", "uptime", "p99", "p95", "queries/sec", "qps", "tps"
+    ])
+    return {
+        "is_causal": is_causal,
+        "classification": "Causal Outcome Metric" if is_causal else "Activity / Scope Metric"
+    }
+
+
 def deconstruct_bullet_xyz_anatomy(bullets: List[str]) -> List[Dict[str, Any]]:
     """
     Deconstructs bullets into Google X-Y-Z components:
@@ -567,18 +672,33 @@ def deconstruct_bullet_xyz_anatomy(bullets: List[str]) -> List[Dict[str, Any]]:
     
     for b in bullets:
         has_metric = bool(metric_regex.search(b))
-        words = b.split()
-        first_word = words[0] if words else ""
+        metric_meta = classify_metric_causality(b)
+        
+        # Clean leading bullet artifacts before analyzing action verb
+        clean_b = re.sub(r"^\s*(?:\\item\s*|\\textbf\{|\*\*|\d+[\.\)]|[-•*–—])\s*", "", b)
+        words = clean_b.split()
+        first_word = words[0].strip(" -•*–,.:;{}*") if words else ""
         has_power_verb = len(first_word) > 3 and not any(first_word.lower().startswith(w) for w in WEAK_VERBS)
         
         # Check mechanism indicators (by doing Z, using, via, through, leveraging)
-        has_mechanism = any(k in b.lower() for k in ["using", "via", "through", "leveraging", "by ", "with ", "implementing", "architecting"])
+        has_mechanism = any(k in b.lower() for k in ["using", "via", "through", "leveraging", "by ", "with ", "implementing", "architecting", "orchestrating", "deploying"])
         
-        xyz_score = 100 if (has_metric and has_power_verb and has_mechanism) else 80 if (has_metric and has_power_verb) else 60 if has_metric else 45
-        
+        if has_metric and metric_meta["is_causal"] and has_power_verb and has_mechanism:
+            xyz_score = 100
+        elif has_metric and has_power_verb and has_mechanism:
+            xyz_score = 88
+        elif has_metric and has_power_verb:
+            xyz_score = 80
+        elif has_metric:
+            xyz_score = 65
+        else:
+            xyz_score = 45
+            
         results.append({
             "bullet_text": b,
             "has_metric_y": has_metric,
+            "metric_type_label": metric_meta["classification"] if has_metric else "Unquantified",
+            "is_causal_metric": metric_meta["is_causal"] if has_metric else False,
             "has_action_verb": has_power_verb,
             "has_mechanism_z": has_mechanism,
             "xyz_score": xyz_score
@@ -603,6 +723,7 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
             "quantified_count": 0,
             "total_bullets": 0,
             "quantification_ratio": 0,
+            "causal_outcomes_count": 0,
             "metric_types_found": [],
             "weak_unquantified_bullets": [],
             "feedback": "No bullet points detected to analyze for metrics."
@@ -612,12 +733,16 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
     
     quantified_bullets = []
     unquantified_bullets = []
+    causal_count = 0
     metric_types = {"Percentages (%)": 0, "Currencies (₹/$)": 0, "Scale & Volume": 0, "Time & Latency": 0, "Rankings & Honors": 0}
     
     for b in all_bullets:
         matches = metric_regex.findall(b)
         if matches:
             quantified_bullets.append(b)
+            if classify_metric_causality(b)["is_causal"]:
+                causal_count += 1
+                
             b_lower = b.lower()
             if "%" in b:
                 metric_types["Percentages (%)"] += 1
@@ -633,27 +758,28 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
             unquantified_bullets.append(b)
             
     quant_ratio = (len(quantified_bullets) / max(len(all_bullets), 1)) * 100
+    causal_ratio = (causal_count / max(len(all_bullets), 1)) * 100
     
-    if quant_ratio >= 75:
-        score = int(round(85 + (quant_ratio - 75) * 0.6))
-    else:
-        score = int(round(50 + (quant_ratio / 75) * 35))
-        
+    # Combined score emphasizing causal outcomes
+    base_score = 85 + (quant_ratio - 75) * 0.6 if quant_ratio >= 75 else 50 + (quant_ratio / 75) * 35
+    causal_bonus = min(8, int(round(causal_ratio * 0.1)))
+    score = int(round(base_score + causal_bonus))
     score = max(30, min(100, score))
-    types_found = [k for k, v in metric_types.items() if v > 0]
     
-    # Deconstruct sample bullets
+    types_found = [k for k, v in metric_types.items() if v > 0]
     xyz_deconstruction = deconstruct_bullet_xyz_anatomy(all_bullets[:8])
     
     return {
         "score": score,
         "quantified_count": len(quantified_bullets),
+        "causal_outcomes_count": causal_count,
         "total_bullets": len(all_bullets),
         "quantification_ratio": int(round(quant_ratio)),
+        "causal_ratio": int(round(causal_ratio)),
         "metric_types_found": types_found,
         "weak_unquantified_bullets": unquantified_bullets[:4],
         "xyz_deconstruction": xyz_deconstruction,
-        "feedback": f"{len(quantified_bullets)} of {len(all_bullets)} ({int(round(quant_ratio))}%) bullets contain hard quantitative metrics."
+        "feedback": f"{len(quantified_bullets)} of {len(all_bullets)} ({int(round(quant_ratio))}%) bullets contain metrics, with {causal_count} hard causal business outcomes."
     }
 
 
@@ -661,7 +787,7 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
 # PILLAR 4: EXECUTIVE ACTION VERBS & VOICE DYNAMICS
 # ==============================================================================
 def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], target_role: str = "consulting") -> Dict[str, Any]:
-    """Pillar 4: Action Verbs & Active Voice (0-100)."""
+    """Pillar 4: Action Verbs & Active Voice (0-100) with LaTeX/Markdown syntax stripping."""
     all_bullets = []
     for sec in parsed_sections:
         for b in sec.get("bullets", []):
@@ -683,10 +809,18 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
     weak_bullets = []
     
     for b in all_bullets:
-        words = b.split()
+        # Sanitize LaTeX formatting (\item, \textbf{...}, \emph{...}, markdown **)
+        clean_b = re.sub(r"\\item\s*", "", b)
+        clean_b = re.sub(r"\\textbf\{([^}]+)\}", r"\1", clean_b)
+        clean_b = re.sub(r"\\emph\{([^}]+)\}", r"\1", clean_b)
+        clean_b = re.sub(r"\*\*([^*]+)\*\*", r"\1", clean_b)
+        clean_b = re.sub(r"^\s*[\d\.\-\•\*\–\—\:]+\s*", "", clean_b)
+        
+        words = clean_b.split()
         if words:
-            fw = words[0].strip(" -•*–,.:;").capitalize()
-            first_words.append(fw)
+            fw = words[0].strip(" -•*–,.:;{}*()").capitalize()
+            if len(fw) > 2:
+                first_words.append(fw)
             
         b_lower = b.lower()
         for wv in WEAK_VERBS:
@@ -1207,6 +1341,21 @@ def audit_sections_with_deep_ai(
     return diagnostics
 
 
+def format_as_latex_item(text: str) -> str:
+    """Formats bullet string into standard LaTeX \\item \\textbf{Action} Rest... format."""
+    cleaned = re.sub(r"^[\s\-\•\*\–\—\\]*(?:item\s*)?", "", text).strip().rstrip(".")
+    # If it has bold tag already, keep clean
+    if cleaned.startswith("\\textbf{"):
+        return f"\\item {cleaned}"
+    
+    words = cleaned.split()
+    if words:
+        verb = words[0].strip(" ,:;{}*")
+        rest = " ".join(words[1:])
+        return f"\\item \\textbf{{{verb}}} {rest}"
+    return f"\\item {cleaned}"
+
+
 # ==============================================================================
 # MASTER ATS EVALUATION ENGINE
 # ==============================================================================
@@ -1215,10 +1364,12 @@ def compute_full_ats_report(
     raw_text: Optional[str] = None,
     target_role: str = "consulting",
     mode: str = "iitb_placement",
-    job_description: Optional[str] = None
+    job_description: Optional[str] = None,
+    sub_track: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Computes Master 5-Pillar ATS & Placement Scorecard with Deep Semantic Intelligence and Section Diagnostics.
+    Computes Master 5-Pillar ATS & Placement Scorecard with Deep Semantic Intelligence,
+    Sub-Track Prioritization, and Multi-Dimensional Section Diagnostics.
     """
     if pdf_bytes and not raw_text:
         raw_text = extract_text_from_pdf_stream(pdf_bytes)
@@ -1238,7 +1389,7 @@ def compute_full_ats_report(
         
     # Evaluate 5 Pillars
     p1 = evaluate_ats_parseability(pdf_bytes, raw_text, parsed_sections, mode=mode)
-    p2 = evaluate_keyword_match(raw_text, parsed_sections, target_role=target_role, job_description=job_description, mode=mode)
+    p2 = evaluate_keyword_match(raw_text, parsed_sections, target_role=target_role, job_description=job_description, mode=mode, sub_track=sub_track)
     p3 = evaluate_quantification_impact(parsed_sections)
     p4 = evaluate_action_verbs_and_voice(parsed_sections, target_role=target_role)
     p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, pdf_bytes=pdf_bytes, mode=mode)
@@ -1311,6 +1462,8 @@ def compute_full_ats_report(
         "tier": tier,
         "mode": mode,
         "target_role": target_role,
+        "sub_track": sub_track,
+        "sub_track_label": p2.get("sub_track_label"),
         "target_role_label": p2.get("target_role_label", target_role.capitalize()),
         "is_custom_jd": p2.get("is_custom_jd", False),
         "raw_text": raw_text,
@@ -1329,7 +1482,7 @@ def compute_full_ats_report(
 
 
 # ==============================================================================
-# CONTEXT-AWARE MULTI-OPTION AI BULLET REFINER (3 Strategic Options)
+# CONTEXT-AWARE MULTI-OPTION AI BULLET REFINER (3 Strategic Options + LaTeX Output)
 # ==============================================================================
 def refine_ats_bullet(
     bullet_text: str,
@@ -1339,7 +1492,7 @@ def refine_ats_bullet(
     missing_keyword: Optional[str] = None,
     target_length: Optional[int] = None
 ) -> Dict[str, Any]:
-    """1-Click AI Bullet Refiner offering 3 distinct strategic rewrite options."""
+    """1-Click AI Bullet Refiner offering 3 distinct strategic rewrite options + LaTeX format."""
     prompt = f"""
     You are an elite IIT Bombay Placement Coach and Technical Resume Architect.
     Refine this single resume bullet point into 3 distinct, high-impact variations for target domain '{target_role}'.
@@ -1409,12 +1562,20 @@ def refine_ats_bullet(
             new_len = len(data["refined_bullet"])
             data["new_length"] = new_len
             data["char_diff"] = new_len - orig_len
+            data["latex_item"] = format_as_latex_item(data["refined_bullet"])
+            
+            if data.get("options"):
+                for opt in data["options"]:
+                    if isinstance(opt, dict) and opt.get("text"):
+                        opt["latex_item"] = format_as_latex_item(opt["text"])
+                        
             return data
     except Exception as e:
         print(f"Refinement error: {e}")
         
     return {
         "refined_bullet": bullet_text,
+        "latex_item": format_as_latex_item(bullet_text),
         "new_length": len(bullet_text),
         "char_diff": 0,
         "explanation": "Preserved original point.",

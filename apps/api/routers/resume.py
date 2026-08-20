@@ -323,6 +323,7 @@ async def ats_check(
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
     target_role: str = Form("consulting"),
+    sub_track: Optional[str] = Form(None),
     mode: str = Form("iitb_placement"),
     job_description: Optional[str] = Form(None),
     resume_id: Optional[str] = Form(None)
@@ -342,7 +343,7 @@ async def ats_check(
                 raw_text = res.data[0].get("raw_text", "")
                 
         if not raw_text and not pdf_bytes:
-            raise HTTPException(status_code=400, detail="Please provide a resume PDF file or text content.")
+            raise HTTPException(status_code=400, detail="Please upload a resume PDF file to perform visual layout, font geometry, and placement ATS evaluation.")
             
         report = await asyncio.to_thread(
             compute_full_ats_report,
@@ -350,10 +351,13 @@ async def ats_check(
             raw_text=raw_text,
             target_role=target_role,
             mode=mode,
-            job_description=job_description
+            job_description=job_description,
+            sub_track=sub_track
         )
         
         return report
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in ats_check: {e}")
         raise HTTPException(status_code=500, detail=f"Error computing ATS report: {str(e)}")

@@ -129,14 +129,43 @@ const CheckRow = ({ name, score, status, passed }: { name: string, score: number
   );
 };
 
+// Sub-Tracks Mapping per Domain
+const SUB_TRACKS_BY_ROLE: Record<string, { id: string; label: string }[]> = {
+  software: [
+    { id: "sde_generalist", label: "Full-Stack / General SDE" },
+    { id: "frontend", label: "Frontend & Web Architecture" },
+    { id: "backend", label: "Backend & Distributed Systems" },
+    { id: "ai_ml", label: "AI/ML Engineering & LLMOps" },
+    { id: "devops", label: "DevOps & Cloud Infrastructure" },
+  ],
+  consulting: [
+    { id: "general_strategy", label: "General Strategy & Advisory" },
+    { id: "operations", label: "Operations & Supply Chain" },
+    { id: "esg", label: "ESG & Sustainability" },
+    { id: "digital_ai", label: "Digital & AI Strategy" },
+  ],
+  product_management: [
+    { id: "b2b_tech", label: "Technical & B2B SaaS PM" },
+    { id: "b2c_growth", label: "Growth & B2C Product" },
+  ],
+  finance: [
+    { id: "ib_pe", label: "Investment Banking & Private Equity" },
+    { id: "quant_trading", label: "Quantitative Research & Trading" },
+  ],
+  analytics: [
+    { id: "ml_ai", label: "Machine Learning & AI Modeling" },
+    { id: "data_engineering", label: "Data Engineering & Big Data" },
+    { id: "bi_analytics", label: "Business Intelligence & Product Analytics" },
+  ],
+};
+
 export default function ATSCheckerPage() {
   const [file, setFile] = useState<File | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [rawText, setRawText] = useState("")
-  const [inputMode, setInputMode] = useState<"file" | "text">("file")
   
   // ATS Config
   const [targetRole, setTargetRole] = useState("software")
+  const [subTrack, setSubTrack] = useState("sde_generalist")
   const [atsMode, setAtsMode] = useState<"iitb_placement" | "global_ats">("iitb_placement")
   const [customJD, setCustomJD] = useState("")
   const [showJDInput, setShowJDInput] = useState(false)
@@ -160,6 +189,14 @@ export default function ATSCheckerPage() {
   const { isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
   const router = useRouter()
 
+  const handleRoleChange = (newRole: string) => {
+    setTargetRole(newRole);
+    const subTracks = SUB_TRACKS_BY_ROLE[newRole] || [];
+    if (subTracks.length > 0) {
+      setSubTrack(subTracks[0].id);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0]
@@ -175,10 +212,8 @@ export default function ATSCheckerPage() {
     }
   }
 
-  const handleRunATS = async (overrideRole?: string, overrideMode?: "iitb_placement" | "global_ats", overrideJD?: string) => {
-    const textAvailable = rawText.trim() || atsReport?.raw_text || atsReport?.pillars?.parseability?.raw_text_preview;
-    if (inputMode === "file" && !file && !textAvailable) return;
-    if (inputMode === "text" && !textAvailable) return;
+  const handleRunATS = async (overrideRole?: string, overrideSubTrack?: string, overrideMode?: "iitb_placement" | "global_ats", overrideJD?: string) => {
+    if (!file && !atsReport) return;
 
     setIsScanning(true);
     setError(null);
@@ -198,11 +233,10 @@ export default function ATSCheckerPage() {
       const formData = new FormData();
       if (file) {
         formData.append("file", file);
-      } else if (textAvailable) {
-        formData.append("raw_text", textAvailable);
       }
 
       formData.append("target_role", overrideRole || targetRole);
+      formData.append("sub_track", overrideSubTrack || subTrack);
       formData.append("mode", overrideMode || atsMode);
       
       const jdToSend = overrideJD !== undefined ? overrideJD : customJD;
@@ -333,7 +367,7 @@ export default function ATSCheckerPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => { setAtsReport(null); setFile(null); setRawText(""); }} 
+                onClick={() => { setAtsReport(null); setFile(null); setPdfUrl(null); }} 
                 className="text-xs font-semibold border-primary/30 text-primary hover:bg-primary/5 h-9"
               >
                 <UploadCloud className="h-4 w-4 mr-1.5" /> Scan Another Resume
@@ -392,24 +426,45 @@ export default function ATSCheckerPage() {
               </div>
             </div>
 
-            {/* Target Role Selector */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Target Role Domain</label>
-              <div className="relative">
-                <select 
-                  className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary outline-none transition-all cursor-pointer text-foreground"
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value)}
-                  disabled={isScanning}
-                >
-                  <option value="software">Software Engineering / IT (Google, Microsoft, Amazon, Uber)</option>
-                  <option value="consulting">Management Consulting (McKinsey, BCG, Bain, Kearney)</option>
-                  <option value="product_management">Product Management (Flipkart, Swiggy, Razorpay, Uber)</option>
-                  <option value="finance">Finance & Quant (Goldman Sachs, Morgan Stanley, Citadel)</option>
-                  <option value="analytics">Data Science & Analytics (Fractal, Tiger, EXL)</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
-                  <ChevronDown className="h-5 w-5 opacity-50" />
+            {/* Target Role & Sub-Track Dual Selector */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Target Role Domain</label>
+                <div className="relative">
+                  <select 
+                    className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary outline-none transition-all cursor-pointer text-foreground"
+                    value={targetRole}
+                    onChange={(e) => handleRoleChange(e.target.value)}
+                    disabled={isScanning}
+                  >
+                    <option value="software">Software Engineering / IT (Google, Microsoft, Uber)</option>
+                    <option value="consulting">Management Consulting (McKinsey, BCG, Bain)</option>
+                    <option value="product_management">Product Management (Flipkart, Swiggy, Uber)</option>
+                    <option value="finance">Finance & Quant (Goldman Sachs, Citadel, MS)</option>
+                    <option value="analytics">Data Science & Analytics (Fractal, Tiger, EXL)</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                    <ChevronDown className="h-5 w-5 opacity-50" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Specialized Sub-Track</label>
+                <div className="relative">
+                  <select 
+                    className="appearance-none flex h-12 w-full items-center justify-between rounded-xl border border-input/60 bg-muted/5 px-4 py-2 text-sm font-medium shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary outline-none transition-all cursor-pointer text-foreground"
+                    value={subTrack}
+                    onChange={(e) => setSubTrack(e.target.value)}
+                    disabled={isScanning}
+                  >
+                    {(SUB_TRACKS_BY_ROLE[targetRole] || []).map((st) => (
+                      <option key={st.id} value={st.id}>{st.label}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-primary">
+                    <ChevronDown className="h-5 w-5 opacity-50" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -433,7 +488,7 @@ export default function ATSCheckerPage() {
               {showJDInput && (
                 <div className="mt-3 space-y-2 animate-in fade-in duration-200">
                   <p className="text-[11px] text-muted-foreground">
-                    Paste the target job description to calculate exact keyword match percentage and uncover missing critical qualifications.
+                    Paste the target job description to calculate exact core vs preferred skill match percentage and uncover missing critical qualifications.
                   </p>
                   <textarea
                     className="w-full h-28 p-3 rounded-xl border border-input/60 bg-background text-xs shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none resize-none text-foreground custom-scrollbar"
@@ -446,61 +501,33 @@ export default function ATSCheckerPage() {
               )}
             </div>
 
-            {/* Input Mode: File vs Text */}
+            {/* 100% PDF-First Resume Dropzone */}
             <div className="pt-2 border-t border-black/5 dark:border-white/5 space-y-4">
-              <div className="flex border-b border-black/5 dark:border-white/5">
-                <button
-                  type="button"
-                  className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                    inputMode === 'file' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                  onClick={() => setInputMode('file')}
-                  disabled={isScanning}
-                >
-                  Upload PDF Resume
-                </button>
-                <button
-                  type="button"
-                  className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-                    inputMode === 'text' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                  onClick={() => setInputMode('text')}
-                  disabled={isScanning}
-                >
-                  Paste Plain Text
-                </button>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Upload Resume PDF</span>
+                <span className="text-[11px] font-mono text-primary flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5" /> PyMuPDF Geometry & Font Inspector
+                </span>
               </div>
 
-              {inputMode === 'file' ? (
-                <div className="relative border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 text-center transition-all bg-primary/5 cursor-pointer">
-                  <UploadCloud className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
-                  <p className="font-semibold text-foreground text-sm mb-1">Click or drag & drop your Resume PDF</p>
-                  <p className="text-xs text-muted-foreground">Supports LaTeX & Word-generated PDFs (1-Page & 2-Page Master Resumes)</p>
-                  <input 
-                    type="file" 
-                    accept="application/pdf" 
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={handleFileChange}
-                    disabled={isScanning}
-                  />
-                  {file && (
-                    <div className="mt-4 px-4 py-2 bg-background rounded-full inline-flex items-center gap-2 text-xs font-mono border border-primary/30 shadow-sm text-foreground">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <textarea
-                    className="w-full h-36 p-4 rounded-xl border border-input/60 bg-muted/5 text-xs shadow-sm hover:bg-muted/20 focus:bg-background focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all resize-none text-foreground custom-scrollbar"
-                    placeholder="Paste full resume text stream here..."
-                    value={rawText}
-                    onChange={(e) => setRawText(e.target.value)}
-                    disabled={isScanning}
-                  />
-                </div>
-              )}
+              <div className="relative border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-2xl p-8 text-center transition-all bg-primary/5 cursor-pointer">
+                <UploadCloud className="h-10 w-10 text-primary mx-auto mb-3 animate-pulse" />
+                <p className="font-semibold text-foreground text-sm mb-1">Click or drag & drop your Resume PDF</p>
+                <p className="text-xs text-muted-foreground">Supports LaTeX & Word-generated PDFs (1-Page & 2-Page Master Resumes)</p>
+                <input 
+                  type="file" 
+                  accept="application/pdf" 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleFileChange}
+                  disabled={isScanning}
+                />
+                {file && (
+                  <div className="mt-4 px-4 py-2 bg-background rounded-full inline-flex items-center gap-2 text-xs font-mono border border-primary/30 shadow-sm text-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <span>{file.name} ({(file.size / 1024).toFixed(0)} KB)</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {error && (
@@ -524,7 +551,7 @@ export default function ATSCheckerPage() {
             <Button 
               className="w-full h-12 text-sm font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-[0_0_25px_rgba(59,130,246,0.35)] transition-all" 
               onClick={() => handleRunATS()} 
-              disabled={(inputMode === 'file' ? !file : !rawText.trim()) || isScanning}
+              disabled={!file || isScanning}
             >
               {isScanning ? "Running Neural Parser & Placement Auditor..." : "Execute Comprehensive ATS Evaluation"}
             </Button>
@@ -558,7 +585,7 @@ export default function ATSCheckerPage() {
                   ) : (
                     <div className="p-6 text-center text-xs text-muted-foreground">
                       <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      Text analysis mode active. PDF visual preview unavailable.
+                      PDF visual preview loading...
                     </div>
                   )}
                 </div>
@@ -573,13 +600,13 @@ export default function ATSCheckerPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">Standard:</span>
                   <button
-                    onClick={() => { setAtsMode("iitb_placement"); handleRunATS(targetRole, "iitb_placement"); }}
+                    onClick={() => { setAtsMode("iitb_placement"); handleRunATS(targetRole, subTrack, "iitb_placement"); }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${atsMode === "iitb_placement" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"}`}
                   >
                     <GraduationCap className="h-3.5 w-3.5" /> IITB Placement Day 1
                   </button>
                   <button
-                    onClick={() => { setAtsMode("global_ats"); handleRunATS(targetRole, "global_ats"); }}
+                    onClick={() => { setAtsMode("global_ats"); handleRunATS(targetRole, subTrack, "global_ats"); }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${atsMode === "global_ats" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"}`}
                   >
                     <Building2 className="h-3.5 w-3.5" /> Corporate ATS Engine
@@ -590,13 +617,33 @@ export default function ATSCheckerPage() {
                   <select 
                     className="h-8 rounded-lg border border-input bg-background px-2 text-xs font-semibold text-foreground outline-none cursor-pointer"
                     value={targetRole}
-                    onChange={(e) => { setTargetRole(e.target.value); handleRunATS(e.target.value, atsMode); }}
+                    onChange={(e) => { 
+                      const newRole = e.target.value;
+                      setTargetRole(newRole); 
+                      const defaultSub = SUB_TRACKS_BY_ROLE[newRole]?.[0]?.id || "";
+                      setSubTrack(defaultSub);
+                      handleRunATS(newRole, defaultSub, atsMode); 
+                    }}
                   >
-                    <option value="software">Software Engineering / IT</option>
+                    <option value="software">Software Engineering</option>
                     <option value="consulting">Management Consulting</option>
                     <option value="product_management">Product Management</option>
                     <option value="finance">Finance / Quant</option>
                     <option value="analytics">Data Science & Analytics</option>
+                  </select>
+
+                  <select 
+                    className="h-8 rounded-lg border border-input bg-background px-2 text-xs font-semibold text-foreground outline-none cursor-pointer"
+                    value={subTrack}
+                    onChange={(e) => { 
+                      const newSub = e.target.value;
+                      setSubTrack(newSub); 
+                      handleRunATS(targetRole, newSub, atsMode); 
+                    }}
+                  >
+                    {(SUB_TRACKS_BY_ROLE[targetRole] || []).map((st) => (
+                      <option key={st.id} value={st.id}>{st.label}</option>
+                    ))}
                   </select>
                   <Button
                     variant="outline"
@@ -629,14 +676,14 @@ export default function ATSCheckerPage() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => { setCustomJD(""); handleRunATS(targetRole, atsMode, ""); }} 
+                      onClick={() => { setCustomJD(""); handleRunATS(targetRole, subTrack, atsMode, ""); }} 
                       className="h-8 text-xs text-muted-foreground"
                     >
                       Reset to Domain Preset
                     </Button>
                     <Button 
                       size="sm" 
-                      onClick={() => handleRunATS(targetRole, atsMode, customJD)} 
+                      onClick={() => handleRunATS(targetRole, subTrack, atsMode, customJD)} 
                       disabled={isScanning || !customJD.trim()}
                       className="h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                     >
@@ -961,15 +1008,21 @@ export default function ATSCheckerPage() {
                         <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                           <Sparkles className="h-3.5 w-3.5 text-primary" /> Google X-Y-Z Bullet Quality Sample:
                         </span>
-                        {atsReport.pillars?.quantification?.xyz_deconstruction.slice(0, 2).map((xyz: any, i: number) => (
+                        {atsReport.pillars?.quantification?.xyz_deconstruction.slice(0, 3).map((xyz: any, i: number) => (
                           <div key={i} className="p-3 rounded-xl bg-background/90 border border-black/5 dark:border-white/5 space-y-1.5">
                             <p className="text-xs font-mono text-foreground line-clamp-1 italic">"{xyz.bullet_text}"</p>
                             <div className="flex flex-wrap gap-1 text-[9px] font-mono">
                               <Badge className={`px-1.5 py-0 ${xyz.has_action_verb ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
                                 {xyz.has_action_verb ? "Action: Strong" : "Action: Weak"}
                               </Badge>
-                              <Badge className={`px-1.5 py-0 ${xyz.has_metric_y ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"}`}>
-                                {xyz.has_metric_y ? "Metric (Y): Quantified" : "Metric (Y): Missing"}
+                              <Badge className={`px-1.5 py-0 ${
+                                xyz.is_causal_metric 
+                                  ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 font-semibold" 
+                                  : xyz.has_metric_y 
+                                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20" 
+                                  : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                              }`}>
+                                {xyz.is_causal_metric ? "Metric: Causal Outcome" : xyz.has_metric_y ? "Metric: Activity / Scope" : "Metric (Y): Missing"}
                               </Badge>
                               <Badge className={`px-1.5 py-0 ${xyz.has_mechanism_z ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
                                 {xyz.has_mechanism_z ? "Mechanism (Z): Clear" : "Mechanism (Z): Add Context"}
@@ -1416,7 +1469,7 @@ export default function ATSCheckerPage() {
                   
                   {/* Custom JD Match Overview if Present */}
                   {atsReport.pillars?.keyword_match?.jd_match_info && (
-                    <div className="p-5 rounded-2xl bg-primary/10 border border-primary/30 space-y-2">
+                    <div className="p-5 rounded-2xl bg-primary/10 border border-primary/30 space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
                           <Target className="h-4 w-4" /> Target Job Description Skill Match: {atsReport.pillars?.keyword_match?.jd_match_info?.match_rate}%
@@ -1425,6 +1478,56 @@ export default function ATSCheckerPage() {
                           {atsReport.pillars?.keyword_match?.jd_match_info?.found} / {atsReport.pillars?.keyword_match?.jd_match_info?.total} Skills
                         </Badge>
                       </div>
+
+                      {atsReport.pillars?.keyword_match?.jd_match_info?.core_skills && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
+                          <div className="p-3 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground flex items-center gap-1.5">
+                                <ShieldCheck className="h-3.5 w-3.5 text-primary" /> Core Mandatory Skills (70% Weight)
+                              </span>
+                              <Badge className="text-[10px] font-mono bg-primary/10 text-primary border-primary/20">
+                                {atsReport.pillars.keyword_match.jd_match_info.core_found?.length || 0} / {atsReport.pillars.keyword_match.jd_match_info.core_skills?.length || 0}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {atsReport.pillars.keyword_match.jd_match_info.core_found?.map((s: string, i: number) => (
+                                <Badge key={i} className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <Check className="h-3 w-3 mr-1" /> {s}
+                                </Badge>
+                              ))}
+                              {atsReport.pillars.keyword_match.jd_match_info.core_missing?.map((s: string, i: number) => (
+                                <Badge key={i} className="text-[10px] bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                  <AlertCircle className="h-3 w-3 mr-1" /> {s}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-background/80 border border-black/5 dark:border-white/5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-foreground flex items-center gap-1.5">
+                                <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Preferred & Secondary Tools (30% Weight)
+                              </span>
+                              <Badge className="text-[10px] font-mono bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                {atsReport.pillars.keyword_match.jd_match_info.pref_found?.length || 0} / {atsReport.pillars.keyword_match.jd_match_info.pref_skills?.length || 0}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {atsReport.pillars.keyword_match.jd_match_info.pref_found?.map((s: string, i: number) => (
+                                <Badge key={i} className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                  <Check className="h-3 w-3 mr-1" /> {s}
+                                </Badge>
+                              ))}
+                              {atsReport.pillars.keyword_match.jd_match_info.pref_missing?.map((s: string, i: number) => (
+                                <Badge key={i} className="text-[10px] bg-muted text-muted-foreground border border-black/5 dark:border-white/10">
+                                  {s}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1458,7 +1561,14 @@ export default function ATSCheckerPage() {
                       {atsReport.pillars?.keyword_match?.categorized_matrix.map((cat: any, idx: number) => (
                         <div key={idx} className="p-4 rounded-2xl bg-muted/15 border border-black/5 dark:border-white/10 space-y-3">
                           <div className="flex items-center justify-between border-b border-black/5 dark:border-white/5 pb-2">
-                            <h5 className="text-xs font-bold text-foreground">{cat.category}</h5>
+                            <h5 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                              {cat.category}
+                              {cat.is_priority_subtrack && (
+                                <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-mono px-1.5 py-0">
+                                  Sub-Track Priority
+                                </Badge>
+                              )}
+                            </h5>
                             <Badge variant="outline" className="text-[10px] font-mono">
                               {cat.matched?.length} / {(cat.matched?.length || 0) + (cat.missing?.length || 0)}
                             </Badge>
@@ -1688,7 +1798,7 @@ export default function ATSCheckerPage() {
         </div>
       )}
 
-      {/* Enhanced 1-Click AI Bullet Optimizer Modal with 3 Strategic Options */}
+      {/* Enhanced 1-Click AI Bullet Optimizer Modal with 3 Strategic Options + LaTeX Copy */}
       {bulletToFix && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="glass-panel dark:bg-neutral-900 rounded-3xl p-6 md:p-8 max-w-2xl w-full border border-black/10 dark:border-white/10 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar animate-in zoom-in-95 duration-200">
@@ -1777,7 +1887,16 @@ export default function ATSCheckerPage() {
                         {opt.text}
                       </p>
 
-                      <div className="flex justify-end">
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(opt.latex_item || `\\item ${opt.text}`, `latex-${optIdx}`)}
+                          className="h-7 text-[11px] text-muted-foreground hover:text-foreground font-mono"
+                        >
+                          {copiedBullet === `latex-${optIdx}` ? <Check className="h-3 w-3 mr-1 text-emerald-500" /> : <FileText className="h-3 w-3 mr-1" />}
+                          {copiedBullet === `latex-${optIdx}` ? "Copied LaTeX!" : "Copy as LaTeX \\item"}
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1785,7 +1904,7 @@ export default function ATSCheckerPage() {
                           className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/5 font-semibold"
                         >
                           {copiedBullet === `opt-${optIdx}` ? <Check className="h-3 w-3 mr-1 text-emerald-500" /> : <Copy className="h-3 w-3 mr-1" />}
-                          {copiedBullet === `opt-${optIdx}` ? "Copied to Clipboard!" : "Copy This Option"}
+                          {copiedBullet === `opt-${optIdx}` ? "Copied Plain Text!" : "Copy Text"}
                         </Button>
                       </div>
                     </div>
