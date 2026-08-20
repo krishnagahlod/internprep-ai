@@ -329,6 +329,8 @@ def load_placement_section_rules(raw_section: str = "") -> Dict[str, Any]:
 
 def get_placement_rag_context(supabase_client, target_role: str, description: str, tags: List[str], section_type: str = "experience") -> str:
     """Fetches relevant placement-tier golden bullets to use as few-shot examples with role and section-type awareness."""
+    if not supabase_client:
+        return ""
     query_embedding = get_query_embedding(description)
     if not query_embedding:
         return ""

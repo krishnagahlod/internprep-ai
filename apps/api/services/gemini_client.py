@@ -15,17 +15,21 @@ class GeminiClient:
         print(f"Initialized GeminiClient with {len(self.keys)} API keys.")
 
     def _discover_keys(self) -> List[str]:
-        keys = []
-        # Support GEMINI_API_KEY, GEMINI_API_KEY_1, GEMINI_API_KEY_2, etc.
+        valid_studio_keys = []
+        
         for key, value in os.environ.items():
             if key.startswith("GEMINI_API_KEY") and value.strip():
-                keys.append(value.strip())
+                val = value.strip()
+                if val.startswith("AIzaSy"):
+                    valid_studio_keys.append(val)
+                elif not val.startswith("AQ.Ab"):
+                    valid_studio_keys.append(val)
         
-        # Fallback if empty (shouldn't happen if env is set)
-        if not keys:
-            keys = ["dummy_key_to_avoid_crash"]
+        discovered = list(dict.fromkeys(valid_studio_keys))
+        if not discovered:
+            discovered = ["dummy_key_to_avoid_crash"]
             
-        return list(set(keys)) # Remove duplicates
+        return discovered
 
     def _get_next_healthy_key(self) -> str:
         now = time.time()
@@ -38,16 +42,14 @@ class GeminiClient:
             if self.key_status[key] < now:
                 return key
                 
-        # If all keys are in cooldown, we have to wait or just pick a random one and try
-        # Let's pick a random one and hope
         return random.choice(self.keys)
 
-    def _mark_key_cooldown(self, key: str):
-        self.key_status[key] = time.time() + self.cooldown_seconds
-        print(f"Rate limit hit. Marked key ending in ...{key[-4:]} for {self.cooldown_seconds}s cooldown.")
+    def _mark_key_cooldown(self, key: str, duration: int = None):
+        cooldown = duration if duration is not None else self.cooldown_seconds
+        self.key_status[key] = time.time() + cooldown
+        print(f"Marked Gemini key ending in ...{key[-4:]} for {cooldown}s cooldown.")
 
     def generate_content(self, model_name: str, prompt: str, generation_config: genai.GenerationConfig = None, max_retries: int = 6, pdf_bytes: bytes = None) -> Any:
-        # Chat-based generation (if prompt is a string) or start_chat
         current_model_name = model_name
         for attempt in range(max_retries):
             key = self._get_next_healthy_key()
@@ -68,18 +70,24 @@ class GeminiClient:
             except Exception as e:
                 error_msg = str(e).lower()
                 if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
-                    self._mark_key_cooldown(key)
+                    self._mark_key_cooldown(key, duration=60)
                     if attempt == max_retries - 1:
                         raise e
-                    # Backoff
-                    time.sleep(2 * (attempt + 1) + random.uniform(0, 1))
-                elif "404" in error_msg or "notfound" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
-                    print(f"Model {current_model_name} not found, falling back to gemini-3.1-flash-lite")
-                    current_model_name = "gemini-3.1-flash-lite"
+                    time.sleep(1.5 * (attempt + 1) + random.uniform(0, 1))
+                elif "api_key_invalid" in error_msg or "api key not valid" in error_msg:
+                    self._mark_key_cooldown(key, duration=3600)
+                    if attempt == max_retries - 1:
+                        raise e
+                elif "404" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
+                    print(f"Model {current_model_name} not found, falling back to gemini-2.5-flash")
+                    current_model_name = "gemini-2.5-flash"
                     if attempt == max_retries - 1:
                         raise e
                 else:
-                    raise e
+                    self._mark_key_cooldown(key, duration=30)
+                    if attempt == max_retries - 1:
+                        raise e
+                    time.sleep(1)
                     
         raise Exception("Max retries exceeded for generate_content")
         
@@ -98,65 +106,73 @@ class GeminiClient:
             except Exception as e:
                 error_msg = str(e).lower()
                 if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
-                    self._mark_key_cooldown(key)
+                    self._mark_key_cooldown(key, duration=60)
                     if attempt == max_retries - 1:
                         raise e
-                    time.sleep(2 * (attempt + 1) + random.uniform(0, 1))
-                elif "404" in error_msg or "notfound" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
-                    print(f"Model {current_model_name} not found, falling back to gemini-3.1-flash-lite")
-                    current_model_name = "gemini-3.1-flash-lite"
+                    time.sleep(1.5 * (attempt + 1) + random.uniform(0, 1))
+                elif "api_key_invalid" in error_msg or "api key not valid" in error_msg:
+                    self._mark_key_cooldown(key, duration=3600)
+                    if attempt == max_retries - 1:
+                        raise e
+                elif "404" in error_msg or "not found" in error_msg or "no longer available" in error_msg:
+                    print(f"Model {current_model_name} not found, falling back to gemini-2.5-flash")
+                    current_model_name = "gemini-2.5-flash"
                     if attempt == max_retries - 1:
                         raise e
                 else:
-                    raise e
+                    self._mark_key_cooldown(key, duration=30)
+                    if attempt == max_retries - 1:
+                        raise e
+                    time.sleep(1)
                     
         raise Exception("Max retries exceeded for generate_content_with_history")
-        
-    def start_chat(self, model_name: str, history: List[Dict[str, Any]] = None) -> Any:
-        # For start_chat, we just configure with a healthy key and return the chat object.
-        # It's less resilient to mid-chat 429s unless we wrap the chat object, but it's acceptable for now.
+
+    def create_chat_session(self, model_name: str, system_instruction: str = None) -> genai.ChatSession:
         key = self._get_next_healthy_key()
         genai.configure(api_key=key)
-        model = genai.GenerativeModel(model_name)
+        
         try:
-            # Test if model exists by instantiating chat
-            chat = model.start_chat(history=history or [])
-            # Make a dummy call? No, start_chat doesn't make an API call immediately.
-            # But if we want to fallback safely, we can just return it. 
-            # If the user wants 2.5-flash everywhere, we'll try it. If start_chat fails later during send_message, that's harder to catch here.
-            # But usually it fails on the first generate_content/send_message.
-            return chat
+            if system_instruction:
+                model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
+            else:
+                model = genai.GenerativeModel(model_name)
+            return model.start_chat(history=[])
         except Exception as e:
-            if "404" in str(e).lower() or "notfound" in str(e).lower() or "not found" in str(e).lower() or "no longer available" in str(e).lower():
-                print(f"Model {model_name} not found, falling back to gemini-3.1-flash-lite")
-                model = genai.GenerativeModel("gemini-3.1-flash-lite")
-                return model.start_chat(history=history or [])
-            raise e
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            return model.start_chat(history=[])
 
-    def embed_text(self, text: str, model_name: str = 'models/gemini-embedding-001', max_retries: int = 3, task_type: str = None) -> List[float]:
+    def embed_text(self, text: str, model_name: str = "models/gemini-embedding-001", max_retries: int = 3, task_type: str = None) -> List[float]:
         for attempt in range(max_retries):
             key = self._get_next_healthy_key()
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": text, "output_dimensionality": 768}
+                kwargs = {"model": model_name, "content": text}
                 if task_type:
                     kwargs["task_type"] = task_type
                 res = genai.embed_content(**kwargs)
-                return res['embedding']
+                return res["embedding"]
             except Exception as e:
                 error_msg = str(e).lower()
                 if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
-                    self._mark_key_cooldown(key)
+                    self._mark_key_cooldown(key, duration=60)
                     if attempt == max_retries - 1:
                         raise e
                     time.sleep(0.5 * (attempt + 1) + random.uniform(0, 0.5))
+                elif "api_key_invalid" in error_msg or "api key not valid" in error_msg:
+                    self._mark_key_cooldown(key, duration=3600)
+                    if attempt == max_retries - 1:
+                        raise e
                 else:
-                    raise e
+                    self._mark_key_cooldown(key, duration=30)
+                    if attempt == max_retries - 1:
+                        # Fallback dummy embedding vector to prevent system crash
+                        return [0.0] * 768
+                    time.sleep(0.5)
                     
-        raise Exception("Max retries exceeded for embed_text")
+        return [0.0] * 768
 
-    def embed_batch(self, texts: List[str], model_name: str = 'models/gemini-embedding-001', max_retries: int = 3, task_type: str = None) -> List[List[float]]:
+    def embed_batch(self, texts: List[str], model_name: str = "models/gemini-embedding-001", max_retries: int = 3, task_type: str = None) -> List[List[float]]:
         if not texts:
             return []
             
@@ -165,23 +181,28 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": texts, "output_dimensionality": 768}
+                kwargs = {"model": model_name, "content": texts}
                 if task_type:
                     kwargs["task_type"] = task_type
-                # Passes a list of strings to embed_content, which returns a list of embeddings
                 res = genai.embed_content(**kwargs)
-                # Google generative AI returns dict with 'embedding' as a list of embeddings when passed a list
-                return res['embedding']
+                return res["embedding"]
             except Exception as e:
                 error_msg = str(e).lower()
                 if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
-                    self._mark_key_cooldown(key)
+                    self._mark_key_cooldown(key, duration=60)
                     if attempt == max_retries - 1:
                         raise e
                     time.sleep(1.0 * (attempt + 1) + random.uniform(0, 0.5))
+                elif "api_key_invalid" in error_msg or "api key not valid" in error_msg:
+                    self._mark_key_cooldown(key, duration=3600)
+                    if attempt == max_retries - 1:
+                        raise e
                 else:
-                    raise e
+                    self._mark_key_cooldown(key, duration=30)
+                    if attempt == max_retries - 1:
+                        return [[0.0] * 768 for _ in texts]
+                    time.sleep(0.5)
                     
-        raise Exception("Max retries exceeded for embed_batch")
+        return [[0.0] * 768 for _ in texts]
 
 gemini_client = GeminiClient()
