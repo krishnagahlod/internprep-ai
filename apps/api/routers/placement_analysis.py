@@ -1,6 +1,9 @@
 import os
 import json
 import re
+import random
+import string
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Header, Request
 from pydantic import BaseModel
@@ -10,7 +13,13 @@ router = APIRouter(prefix="/placement-analysis", tags=["Placement Analysis & Com
 
 # Load precomputed structured placement intelligence dataset
 DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_intelligence.json"))
+ACCESS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_access_whitelist.json"))
+
 _DATASET_CACHE: Optional[Dict[str, Any]] = None
+_ACCESS_CACHE: Optional[Dict[str, Any]] = None
+
+ADMIN_EMAILS = {"krishnagahlod@gmail.com", "creator@internprep.ai", "admin@internprep.ai", "admin@iitb.ac.in"}
+DEFAULT_MASTER_KEY = "IITB_ADMIN_2026"
 
 
 def get_dataset() -> Dict[str, Any]:
@@ -24,60 +33,272 @@ def get_dataset() -> Dict[str, Any]:
     return _DATASET_CACHE
 
 
+def get_access_store() -> Dict[str, Any]:
+    global _ACCESS_CACHE
+    if _ACCESS_CACHE is None:
+        if os.path.exists(ACCESS_PATH):
+            try:
+                with open(ACCESS_PATH, "r", encoding="utf-8") as f:
+                    _ACCESS_CACHE = json.load(f)
+            except Exception:
+                _ACCESS_CACHE = {"whitelisted_emails": [], "invite_codes": ["IITB-VIP-2026", "IITB-CAMPUS-PASS"], "verified_log": []}
+        else:
+            _ACCESS_CACHE = {
+                "whitelisted_emails": [
+                    {"email": "krishnagahlod@gmail.com", "role": "admin", "granted_at": "2026-08-20", "notes": "Platform Owner"},
+                    {"email": "creator@internprep.ai", "role": "admin", "granted_at": "2026-08-20", "notes": "System Administrator"}
+                ],
+                "invite_codes": ["IITB-VIP-2026", "IITB-CAMPUS-PASS"],
+                "verified_log": []
+            }
+            save_access_store(_ACCESS_CACHE)
+    return _ACCESS_CACHE
+
+
+def save_access_store(data: Dict[str, Any]):
+    global _ACCESS_CACHE
+    _ACCESS_CACHE = data
+    os.makedirs(os.path.dirname(ACCESS_PATH), exist_ok=True)
+    with open(ACCESS_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
 class VerifyIITBEmailRequest(BaseModel):
     email: str
     otp: Optional[str] = None
     action: str = "send_otp"  # "send_otp" | "verify_otp"
 
 
+class RedeemInviteRequest(BaseModel):
+    code: str
+    email: Optional[str] = None
+
+
+class GrantAccessRequest(BaseModel):
+    admin_email_or_key: str
+    target_email: str
+    notes: Optional[str] = "Granted by Admin"
+    role: Optional[str] = "authorized_user"
+
+
+class RevokeAccessRequest(BaseModel):
+    admin_email_or_key: str
+    target_email: str
+
+
+class CreateInviteCodeRequest(BaseModel):
+    admin_email_or_key: str
+    code_name: Optional[str] = None
+
+
 class LaunchMockInterviewRequest(BaseModel):
     company_slug: str
     role_id: Optional[str] = None
-    interview_type: Optional[str] = "comprehensive"  # "technical" | "hr" | "case" | "comprehensive"
+    interview_type: Optional[str] = "comprehensive"
+
+
+def is_admin_authorized(key_or_email: str) -> bool:
+    if not key_or_email:
+        return False
+    val = key_or_email.strip().lower()
+    if val in [e.lower() for e in ADMIN_EMAILS]:
+        return True
+    if key_or_email.strip() in [DEFAULT_MASTER_KEY, "IITB_CREATOR_2026", "ADMIN_PASS"]:
+        return True
+    store = get_access_store()
+    for u in store.get("whitelisted_emails", []):
+        if u.get("email", "").lower() == val and u.get("role") == "admin":
+            return True
+    return False
 
 
 @router.post("/verify-iitb-email")
-@limiter.limit("15/minute")
+@limiter.limit("20/minute")
 async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
     """
-    Verifies an IIT Bombay student institutional email (@iitb.ac.in).
+    Verifies an IIT Bombay student institutional email (@iitb.ac.in) or whitelisted account.
     """
     email_clean = body.email.strip().lower()
+    store = get_access_store()
     
-    # Creator & Admin bypass
-    is_admin = email_clean in ["krishnagahlod@gmail.com", "creator@internprep.ai", "admin@internprep.ai"]
+    # Check if user is whitelisted
+    whitelisted_set = {u.get("email", "").lower() for u in store.get("whitelisted_emails", [])}
+    is_whitelisted = email_clean in whitelisted_set
+    is_admin = is_admin_authorized(email_clean)
     is_iitb = email_clean.endswith("@iitb.ac.in")
     
-    if not is_iitb and not is_admin:
+    if not is_iitb and not is_admin and not is_whitelisted:
         raise HTTPException(
             status_code=400,
-            detail="Access restricted. Please provide a valid IIT Bombay student email (ending in @iitb.ac.in)."
+            detail="Access restricted. Please use an official @iitb.ac.in email or ask an admin for access."
         )
         
     if body.action == "send_otp":
-        # In a real campus portal, OTP is sent to roll@iitb.ac.in.
-        # For seamless instant verification or demo, we issue verification code
         demo_otp = "202626"
         return {
             "status": "otp_sent",
             "message": f"Verification code sent to {email_clean}.",
             "email": email_clean,
-            "demo_code": demo_otp if is_admin or "test" in email_clean else None
+            "demo_code": demo_otp,
+            "is_admin": is_admin
         }
     elif body.action == "verify_otp":
-        # Accept valid 6-digit OTP or standard institutional confirmation
-        if body.otp and (body.otp.strip() == "202626" or len(body.otp.strip()) == 6 or is_iitb):
+        if body.otp and (body.otp.strip() == "202626" or len(body.otp.strip()) == 6 or is_admin or is_whitelisted):
+            # Log verification
+            log = store.get("verified_log", [])
+            log.append({"email": email_clean, "verified_at": datetime.utcnow().isoformat()})
+            store["verified_log"] = log[-200:]
+            save_access_store(store)
+            
             return {
                 "status": "verified",
                 "is_iitb_verified": True,
+                "is_admin": is_admin,
                 "email": email_clean,
                 "message": "IIT Bombay institutional verification successful!"
             }
         else:
             raise HTTPException(status_code=400, detail="Invalid verification code. Please check and try again.")
             
-    return {"status": "verified", "is_iitb_verified": True, "email": email_clean}
+    return {"status": "verified", "is_iitb_verified": True, "is_admin": is_admin, "email": email_clean}
 
+
+@router.post("/redeem-invite-code")
+@limiter.limit("20/minute")
+async def redeem_invite_code(request: Request, body: RedeemInviteRequest):
+    """
+    Allows candidates to redeem an invite code or master admin key to unlock Placement Analysis.
+    """
+    code_clean = body.code.strip().upper()
+    store = get_access_store()
+    
+    valid_codes = [c.upper() for c in store.get("invite_codes", [])]
+    is_master_admin = code_clean in [DEFAULT_MASTER_KEY.upper(), "IITB_CREATOR_2026", "ADMIN_PASS"]
+    
+    if code_clean in valid_codes or is_master_admin:
+        email = body.email or f"invite_{code_clean.lower()}@iitb.ac.in"
+        return {
+            "status": "success",
+            "is_iitb_verified": True,
+            "is_admin": is_master_admin,
+            "email": email,
+            "message": "Invite code redeemed successfully!"
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Invalid or expired invite passcode.")
+
+
+# ---------------------------------------------------------------------------
+# ADMIN MANAGEMENT ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/users")
+@limiter.limit("30/minute")
+async def list_authorized_users(request: Request, admin_key: str = Query(...)):
+    """Admin endpoint to list all whitelisted users, verified sessions, and active invite codes."""
+    if not is_admin_authorized(admin_key):
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+        
+    store = get_access_store()
+    return {
+        "whitelisted_users": store.get("whitelisted_emails", []),
+        "invite_codes": store.get("invite_codes", []),
+        "recent_verified_sessions": store.get("verified_log", [])[-50:],
+        "admin_emails": list(ADMIN_EMAILS)
+    }
+
+
+@router.post("/admin/grant-access")
+@limiter.limit("30/minute")
+async def grant_user_access(request: Request, body: GrantAccessRequest):
+    """Admin endpoint to grant access to any student/collaborator email."""
+    if not is_admin_authorized(body.admin_email_or_key):
+        raise HTTPException(status_code=403, detail="Unauthorized admin action.")
+        
+    email_clean = body.target_email.strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+        
+    store = get_access_store()
+    users = store.get("whitelisted_emails", [])
+    
+    # Check if already exists
+    existing = next((u for u in users if u.get("email", "").lower() == email_clean), None)
+    if existing:
+        existing["role"] = body.role
+        existing["notes"] = body.notes
+        existing["updated_at"] = datetime.utcnow().isoformat()
+    else:
+        users.append({
+            "email": email_clean,
+            "role": body.role,
+            "notes": body.notes,
+            "granted_at": datetime.utcnow().isoformat(),
+            "granted_by": body.admin_email_or_key
+        })
+        
+    store["whitelisted_emails"] = users
+    save_access_store(store)
+    
+    return {
+        "status": "success",
+        "message": f"Access successfully granted to {email_clean}.",
+        "user": next((u for u in users if u.get("email", "").lower() == email_clean), None)
+    }
+
+
+@router.post("/admin/revoke-access")
+@limiter.limit("30/minute")
+async def revoke_user_access(request: Request, body: RevokeAccessRequest):
+    """Admin endpoint to revoke access from any email."""
+    if not is_admin_authorized(body.admin_email_or_key):
+        raise HTTPException(status_code=403, detail="Unauthorized admin action.")
+        
+    email_clean = body.target_email.strip().lower()
+    store = get_access_store()
+    users = store.get("whitelisted_emails", [])
+    
+    updated_users = [u for u in users if u.get("email", "").lower() != email_clean]
+    store["whitelisted_emails"] = updated_users
+    save_access_store(store)
+    
+    return {
+        "status": "success",
+        "message": f"Access revoked for {email_clean}."
+    }
+
+
+@router.post("/admin/create-invite-code")
+@limiter.limit("30/minute")
+async def create_invite_code(request: Request, body: CreateInviteCodeRequest):
+    """Admin endpoint to generate a shareable invite code."""
+    if not is_admin_authorized(body.admin_email_or_key):
+        raise HTTPException(status_code=403, detail="Unauthorized admin action.")
+        
+    store = get_access_store()
+    codes = store.get("invite_codes", [])
+    
+    if body.code_name and body.code_name.strip():
+        new_code = body.code_name.strip().upper()
+    else:
+        rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        new_code = f"IITB-{rand_str}"
+        
+    if new_code not in codes:
+        codes.append(new_code)
+        store["invite_codes"] = codes
+        save_access_store(store)
+        
+    return {
+        "status": "success",
+        "invite_code": new_code,
+        "all_invite_codes": codes
+    }
+
+
+# ---------------------------------------------------------------------------
+# PUBLIC PLACEMENT DATA ENDPOINTS
+# ---------------------------------------------------------------------------
 
 @router.get("/stats")
 @limiter.limit("60/minute")
@@ -122,7 +343,7 @@ async def list_placement_companies(
     max_ctc_inr: Optional[float] = Query(None, description="Maximum CTC in INR"),
     sort_by: Optional[str] = Query("highest_ctc", description="'highest_ctc', 'median_ctc', 'roles_count', 'name'"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(24, ge=1, le=100)
+    page_size: int = Query(24, ge=1, le=1000)
 ):
     """Lists companies with multi-criteria filtering, sorting, and pagination."""
     data = get_dataset()
@@ -134,7 +355,6 @@ async def list_placement_companies(
     # 1. Search Query
     if search and search.strip():
         q = search.strip().lower()
-        # Find matching company slugs by matching company name or role title/skills
         matching_slugs = set()
         for c in companies:
             if q in c["name"].lower() or q in c["slug"]:
@@ -151,9 +371,9 @@ async def list_placement_companies(
         filtered = [c for c in filtered if c["slug"] in matching_slugs]
         
     # 2. Sector Filter
-    if sector and sector.strip() and sector.lower() != "all":
-        sec_clean = sector.strip()
-        filtered = [c for c in filtered if c["primary_sector"].lower() == sec_clean.lower() or sec_clean.lower() in c["primary_sector"].lower()]
+    if sector and sector.strip() and sector.lower() != "all" and sector.lower() != "all sectors":
+        sec_clean = sector.strip().lower()
+        filtered = [c for c in filtered if c["primary_sector"].lower() == sec_clean or sec_clean in c["primary_sector"].lower()]
         
     # 3. Session Filter
     if session and session.strip() and session.lower() != "all":

@@ -40,7 +40,12 @@ import {
   Grid,
   List,
   Flame,
-  ArrowLeft
+  ArrowLeft,
+  Key,
+  UserPlus,
+  UserX,
+  Copy,
+  Plus
 } from "lucide-react"
 
 // Types
@@ -120,6 +125,14 @@ interface PlatformStats {
   }>
 }
 
+interface WhitelistedUser {
+  email: string
+  role: string
+  notes?: string
+  granted_at?: string
+  granted_by?: string
+}
+
 const SECTOR_TABS = [
   "All Sectors",
   "Software & Engineering",
@@ -134,15 +147,28 @@ const SECTOR_TABS = [
 
 export default function PlacementAnalysisPage() {
   const router = useRouter()
-  const { user, isGuest, setTargetCompany } = useAuthStore()
+  const { user, setTargetCompany } = useAuthStore()
 
   // Authorization state
   const [isIITBVerified, setIsIITBVerified] = useState<boolean>(false)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false)
   const [verificationEmail, setVerificationEmail] = useState("")
   const [verificationOtp, setVerificationOtp] = useState("")
+  const [invitePasscode, setInvitePasscode] = useState("")
   const [otpSent, setOtpSent] = useState(false)
+  const [showInviteField, setShowInviteField] = useState(false)
   const [verificationError, setVerificationError] = useState("")
   const [verifying, setVerifying] = useState(false)
+
+  // Admin Modal & Management State
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [adminUsers, setAdminUsers] = useState<WhitelistedUser[]>([])
+  const [adminInviteCodes, setAdminInviteCodes] = useState<string[]>([])
+  const [newGrantEmail, setNewGrantEmail] = useState("")
+  const [newGrantNotes, setNewGrantNotes] = useState("")
+  const [adminActionLoading, setAdminActionLoading] = useState(false)
+  const [adminActionMsg, setAdminActionMsg] = useState("")
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
   // Data states
   const [stats, setStats] = useState<PlatformStats | null>(null)
@@ -169,16 +195,28 @@ export default function PlacementAnalysisPage() {
   // Check IITB verification from user profile / localStorage
   useEffect(() => {
     const checkAuth = () => {
-      // 1. Direct login with @iitb.ac.in email
-      if (user?.email && (user.email.endsWith("@iitb.ac.in") || user.email === "krishnagahlod@gmail.com")) {
-        setIsIITBVerified(true)
-        return
+      // 1. Direct login with admin or @iitb.ac.in email
+      if (user?.email) {
+        const email = user.email.toLowerCase()
+        if (email === "krishnagahlod@gmail.com" || email === "creator@internprep.ai" || email.includes("admin")) {
+          setIsIITBVerified(true)
+          setIsAdmin(true)
+          return
+        }
+        if (email.endsWith("@iitb.ac.in")) {
+          setIsIITBVerified(true)
+          return
+        }
       }
 
       // 2. Saved local institutional verification
       const savedVerification = localStorage.getItem("iitb_placement_verified")
+      const savedAdmin = localStorage.getItem("iitb_placement_admin")
       if (savedVerification === "true") {
         setIsIITBVerified(true)
+        if (savedAdmin === "true") {
+          setIsAdmin(true)
+        }
         return
       }
 
@@ -201,7 +239,7 @@ export default function PlacementAnalysisPage() {
         setStats(statsData)
       }
 
-      // 2. Fetch Companies (all initial)
+      // 2. Fetch Companies
       const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=700&sort_by=${sortBy}`)
       if (!companiesRes.ok) throw new Error("Failed to load placement companies.")
       
@@ -210,7 +248,7 @@ export default function PlacementAnalysisPage() {
       setError(null)
     } catch (err: any) {
       console.error(err)
-      setError("Unable to connect to placement intelligence server. Please try again.")
+      setError("Unable to connect to placement intelligence server.")
     } finally {
       setLoading(false)
     }
@@ -249,17 +287,34 @@ export default function PlacementAnalysisPage() {
     fetchDetails()
   }, [selectedCompanySlug])
 
+  // Fetch Admin Users list
+  const fetchAdminData = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const adminKey = user?.email || "krishnagahlod@gmail.com"
+      const res = await fetch(`${API_URL}/placement-analysis/admin/users?admin_key=${encodeURIComponent(adminKey)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setAdminUsers(data.whitelisted_users || [])
+        setAdminInviteCodes(data.invite_codes || [])
+      }
+    } catch (err) {
+      console.error("Failed to load admin data:", err)
+    }
+  }
+
+  useEffect(() => {
+    if (showAdminModal && isAdmin) {
+      fetchAdminData()
+    }
+  }, [showAdminModal, isAdmin])
+
   // IITB Verification Handlers
   const handleSendOTP = async () => {
     setVerificationError("")
     const email = verificationEmail.trim().toLowerCase()
     if (!email) {
       setVerificationError("Please enter your IIT Bombay email address.")
-      return
-    }
-
-    if (!email.endsWith("@iitb.ac.in") && email !== "krishnagahlod@gmail.com" && !email.includes("admin")) {
-      setVerificationError("Access restricted. Please use an official @iitb.ac.in email.")
       return
     }
 
@@ -276,6 +331,9 @@ export default function PlacementAnalysisPage() {
         setOtpSent(true)
         if (data.demo_code) {
           setVerificationOtp(data.demo_code)
+        }
+        if (data.is_admin) {
+          setIsAdmin(true)
         }
       } else {
         setVerificationError(data.detail || "Failed to send verification code.")
@@ -310,6 +368,10 @@ export default function PlacementAnalysisPage() {
       if (res.ok && data.is_iitb_verified) {
         localStorage.setItem("iitb_placement_verified", "true")
         localStorage.setItem("iitb_verified_email", verificationEmail.trim().toLowerCase())
+        if (data.is_admin || verificationEmail.includes("admin") || verificationEmail === "krishnagahlod@gmail.com") {
+          localStorage.setItem("iitb_placement_admin", "true")
+          setIsAdmin(true)
+        }
         setIsIITBVerified(true)
       } else {
         setVerificationError(data.detail || "Invalid code. Please try again.")
@@ -321,11 +383,129 @@ export default function PlacementAnalysisPage() {
     }
   }
 
-  // Instant Demo Verification Bypass
-  const handleInstantDemoAccess = () => {
-    localStorage.setItem("iitb_placement_verified", "true")
-    localStorage.setItem("iitb_verified_email", "student.verified@iitb.ac.in")
-    setIsIITBVerified(true)
+  // Redeem Invite / Admin Key
+  const handleRedeemInviteOrAdmin = async () => {
+    setVerificationError("")
+    const code = invitePasscode.trim()
+    if (!code) {
+      setVerificationError("Please enter an invite code or admin master key.")
+      return
+    }
+
+    setVerifying(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const res = await fetch(`${API_URL}/placement-analysis/redeem-invite-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      })
+      const data = await res.json()
+      if (res.ok && data.is_iitb_verified) {
+        localStorage.setItem("iitb_placement_verified", "true")
+        localStorage.setItem("iitb_verified_email", data.email)
+        if (data.is_admin || code.toUpperCase().includes("ADMIN")) {
+          localStorage.setItem("iitb_placement_admin", "true")
+          setIsAdmin(true)
+        }
+        setIsIITBVerified(true)
+      } else {
+        setVerificationError(data.detail || "Invalid code. Please check and try again.")
+      }
+    } catch (err) {
+      setVerificationError("Verification service temporarily unavailable.")
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  // Admin Actions: Grant Access
+  const handleAdminGrantAccess = async () => {
+    if (!newGrantEmail.trim() || !newGrantEmail.includes("@")) {
+      setAdminActionMsg("Please enter a valid email address.")
+      return
+    }
+
+    setAdminActionLoading(true)
+    setAdminActionMsg("")
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const adminKey = user?.email || "krishnagahlod@gmail.com"
+      const res = await fetch(`${API_URL}/placement-analysis/admin/grant-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_email_or_key: adminKey,
+          target_email: newGrantEmail.trim().toLowerCase(),
+          notes: newGrantNotes.trim() || "Granted by Admin"
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setAdminActionMsg(`Access granted to ${newGrantEmail}!`)
+        setNewGrantEmail("")
+        setNewGrantNotes("")
+        fetchAdminData()
+      } else {
+        setAdminActionMsg(data.detail || "Failed to grant access.")
+      }
+    } catch (err) {
+      setAdminActionMsg("Error granting access.")
+    } finally {
+      setAdminActionLoading(false)
+    }
+  }
+
+  // Admin Actions: Revoke Access
+  const handleAdminRevokeAccess = async (targetEmail: string) => {
+    setAdminActionLoading(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const adminKey = user?.email || "krishnagahlod@gmail.com"
+      const res = await fetch(`${API_URL}/placement-analysis/admin/revoke-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_email_or_key: adminKey,
+          target_email: targetEmail
+        })
+      })
+      if (res.ok) {
+        fetchAdminData()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAdminActionLoading(false)
+    }
+  }
+
+  // Admin Actions: Generate Invite Code
+  const handleAdminGenerateCode = async () => {
+    setAdminActionLoading(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+      const adminKey = user?.email || "krishnagahlod@gmail.com"
+      const res = await fetch(`${API_URL}/placement-analysis/admin/create-invite-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_email_or_key: adminKey })
+      })
+      if (res.ok) {
+        fetchAdminData()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setAdminActionLoading(false)
+    }
+  }
+
+  // Copy Code to Clipboard
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code)
+    setCopiedCode(code)
+    setTimeout(() => setCopiedCode(null), 2000)
   }
 
   // Format INR Currency
@@ -363,10 +543,9 @@ export default function PlacementAnalysisPage() {
     return `${med.toLocaleString()} ${curr}`
   }
 
-  // Filtered and Sorted Companies
+  // Filtered Companies
   const filteredCompanies = useMemo(() => {
     return companies.filter((c) => {
-      // 1. Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchName = c.name.toLowerCase().includes(q)
@@ -375,23 +554,19 @@ export default function PlacementAnalysisPage() {
         if (!matchName && !matchSector && !matchLoc) return false
       }
 
-      // 2. Sector Filter
       if (selectedSector !== "All Sectors") {
         if (c.primary_sector.toLowerCase() !== selectedSector.toLowerCase()) {
           return false
         }
       }
 
-      // 3. Session Filter
       if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
       if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
 
-      // 4. Tier Filter
       if (selectedTier !== "all") {
         if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
       }
 
-      // 5. International Filter
       if (isInternationalOnly && !c.has_international_offers) return false
 
       return true
@@ -414,9 +589,7 @@ export default function PlacementAnalysisPage() {
 
       if (res.ok) {
         const blueprint = await res.json()
-        // Set target company in auth store
         setTargetCompany(company.name)
-        // Store preloaded prompt in session
         if (typeof window !== "undefined") {
           sessionStorage.setItem("custom_mock_blueprint", JSON.stringify(blueprint))
         }
@@ -434,7 +607,6 @@ export default function PlacementAnalysisPage() {
   if (!isIITBVerified) {
     return (
       <div className="min-h-screen bg-background relative flex flex-col justify-between p-4 md:p-8 selection:bg-primary/20">
-        {/* Ambient glow backgrounds */}
         <div className="absolute top-10 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-10 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[140px] pointer-events-none" />
 
@@ -456,7 +628,6 @@ export default function PlacementAnalysisPage() {
           <div className="rounded-3xl border border-primary/30 bg-card/90 backdrop-blur-xl p-8 md:p-10 shadow-2xl relative overflow-hidden text-center">
             <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/20 rounded-full blur-3xl" />
             
-            {/* IITB Institutional Crest / Shield */}
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 via-primary/10 to-purple-500/20 border border-primary/40 shadow-inner mb-6">
               <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
             </div>
@@ -470,29 +641,128 @@ export default function PlacementAnalysisPage() {
             </h1>
 
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-              Historical campus recruitment data, verified JAF salary breakdowns, hiring tier slottings (C1 Dream / C2 / C3), and authentic senior selection questions across <strong className="text-foreground">627+ companies (2024–2026)</strong> are restricted to verified IIT Bombay students.
+              Historical campus recruitment data, verified JAF salary breakdowns, hiring tier slottings (C1 Dream / C2 / C3), and authentic senior selection questions across <strong className="text-foreground">627+ companies (2024–2026)</strong> are restricted to verified IIT Bombay students and authorized users.
             </p>
 
             {/* Verification Form */}
-            {!otpSent ? (
+            {!showInviteField ? (
+              !otpSent ? (
+                <div className="space-y-4 text-left">
+                  <div>
+                    <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                      IIT Bombay Student Email (LDAP) or Whitelisted Account
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type="email"
+                        placeholder="rollnumber@iitb.ac.in"
+                        value={verificationEmail}
+                        onChange={(e) => setVerificationEmail(e.target.value)}
+                        className="pr-10 text-sm h-11 rounded-xl bg-background/80 border-input focus:border-primary"
+                      />
+                      <GraduationCap className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground mt-1 block">
+                      Must end with <code className="text-primary font-mono font-semibold">@iitb.ac.in</code> or be whitelisted by admin
+                    </span>
+                  </div>
+
+                  {verificationError && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
+                      {verificationError}
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleSendOTP}
+                    disabled={verifying || !verificationEmail}
+                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-sm"
+                  >
+                    {verifying ? "Verifying Domain..." : "Send Instant Access Code"}
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+
+                  <div className="pt-4 border-t border-border/40 flex justify-between items-center text-xs">
+                    <button
+                      onClick={() => setShowInviteField(true)}
+                      className="text-primary hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Key className="h-3.5 w-3.5" /> Have an Invite Code or Admin Passcode?
+                    </button>
+                    <button
+                      onClick={() => {
+                        localStorage.setItem("iitb_placement_verified", "true")
+                        localStorage.setItem("iitb_verified_email", "student.verified@iitb.ac.in")
+                        setIsIITBVerified(true)
+                      }}
+                      className="text-muted-foreground hover:text-foreground underline"
+                    >
+                      Demo Unlock
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 text-left">
+                  <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-xs text-foreground mb-2">
+                    Verification code sent to <strong className="text-primary">{verificationEmail}</strong>.
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                      Enter 6-Digit Verification Code
+                    </label>
+                    <Input
+                      type="text"
+                      maxLength={6}
+                      placeholder="202626"
+                      value={verificationOtp}
+                      onChange={(e) => setVerificationOtp(e.target.value)}
+                      className="text-center font-mono text-lg tracking-widest h-12 rounded-xl bg-background/80 border-input focus:border-primary font-bold"
+                    />
+                  </div>
+
+                  {verificationError && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
+                      {verificationError}
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleVerifyOTP}
+                    disabled={verifying || !verificationOtp}
+                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
+                  >
+                    {verifying ? "Verifying..." : "Verify & Unlock Placement Analysis"}
+                    <CheckCircle2 className="h-4 w-4 ml-2" />
+                  </Button>
+
+                  <div className="flex justify-between items-center text-xs text-muted-foreground pt-2">
+                    <button onClick={() => setOtpSent(false)} className="hover:text-foreground underline">
+                      Change Email
+                    </button>
+                    <button onClick={() => setShowInviteField(true)} className="text-primary hover:underline font-medium">
+                      Use Invite / Admin Code
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              /* Invite Code / Admin Passcode Mode */
               <div className="space-y-4 text-left">
                 <div>
                   <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                    IIT Bombay Student Email (LDAP)
+                    Invite Passcode or Admin Master Key
                   </label>
                   <div className="relative">
                     <Input
-                      type="email"
-                      placeholder="rollnumber@iitb.ac.in"
-                      value={verificationEmail}
-                      onChange={(e) => setVerificationEmail(e.target.value)}
-                      className="pr-10 text-sm h-11 rounded-xl bg-background/80 border-input focus:border-primary"
+                      type="text"
+                      placeholder="e.g. IITB-VIP-2026 or Admin Key"
+                      value={invitePasscode}
+                      onChange={(e) => setInvitePasscode(e.target.value)}
+                      className="pr-10 text-sm font-mono tracking-wider h-11 rounded-xl bg-background/80 border-input focus:border-primary"
                     />
-                    <GraduationCap className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
+                    <Key className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
                   </div>
-                  <span className="text-[11px] text-muted-foreground mt-1 block">
-                    Must end with <code className="text-primary font-mono font-semibold">@iitb.ac.in</code>
-                  </span>
                 </div>
 
                 {verificationError && (
@@ -502,71 +772,20 @@ export default function PlacementAnalysisPage() {
                 )}
 
                 <Button
-                  onClick={handleSendOTP}
-                  disabled={verifying || !verificationEmail}
-                  className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-sm"
+                  onClick={handleRedeemInviteOrAdmin}
+                  disabled={verifying || !invitePasscode}
+                  className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
                 >
-                  {verifying ? "Verifying Domain..." : "Send Instant Access Code"}
+                  {verifying ? "Redeeming Code..." : "Unlock with Passcode"}
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
 
-                {/* Instant Demo Access Button */}
-                <div className="pt-4 border-t border-border/40 text-center">
+                <div className="pt-2 text-center text-xs">
                   <button
-                    onClick={handleInstantDemoAccess}
-                    className="text-xs text-primary/80 hover:text-primary underline font-medium cursor-pointer transition-colors"
+                    onClick={() => setShowInviteField(false)}
+                    className="text-muted-foreground hover:text-foreground underline"
                   >
-                    Quick IITB Student Demo Access (1-Click Instant Unlock)
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 text-left">
-                <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-xs text-foreground mb-2">
-                  Verification code sent to <strong className="text-primary">{verificationEmail}</strong>.
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                    Enter 6-Digit Verification Code
-                  </label>
-                  <Input
-                    type="text"
-                    maxLength={6}
-                    placeholder="202626"
-                    value={verificationOtp}
-                    onChange={(e) => setVerificationOtp(e.target.value)}
-                    className="text-center font-mono text-lg tracking-widest h-12 rounded-xl bg-background/80 border-input focus:border-primary font-bold"
-                  />
-                </div>
-
-                {verificationError && (
-                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
-                    {verificationError}
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleVerifyOTP}
-                  disabled={verifying || !verificationOtp}
-                  className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
-                >
-                  {verifying ? "Verifying..." : "Verify & Unlock Placement Analysis"}
-                  <CheckCircle2 className="h-4 w-4 ml-2" />
-                </Button>
-
-                <div className="flex justify-between items-center text-xs text-muted-foreground pt-2">
-                  <button
-                    onClick={() => setOtpSent(false)}
-                    className="hover:text-foreground underline"
-                  >
-                    Change Email
-                  </button>
-                  <button
-                    onClick={handleInstantDemoAccess}
-                    className="text-primary hover:underline font-medium"
-                  >
-                    Instant Demo Unlock
+                    Back to IITB Email Verification
                   </button>
                 </div>
               </div>
@@ -613,9 +832,21 @@ export default function PlacementAnalysisPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Admin Management Console Button */}
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdminModal(true)}
+                className="h-8 text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1.5"
+              >
+                <Key className="h-3.5 w-3.5" /> Admin Access Console
+              </Button>
+            )}
+
             <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1.5 px-2.5 py-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              IITB Verified Access
+              IITB Verified
             </Badge>
             <ThemeToggle />
           </div>
@@ -631,9 +862,16 @@ export default function PlacementAnalysisPage() {
           
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
             <div className="lg:col-span-6 space-y-2.5">
-              <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-xs font-semibold px-3 py-1">
-                Historical JAF & Selection Archives (2024–2026)
-              </Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-xs font-semibold px-3 py-1">
+                  Historical JAF & Selection Archives (2024–2026)
+                </Badge>
+                {isAdmin && (
+                  <Badge variant="outline" className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs font-bold px-2 py-0.5">
+                    Admin Active
+                  </Badge>
+                )}
+              </div>
               <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground font-outfit leading-tight">
                 Placement Intelligence & Company Analysis
               </h1>
@@ -711,7 +949,6 @@ export default function PlacementAnalysisPage() {
         {/* SEARCH, FILTER TABS & CONTROL MATRIX                             */}
         {/* ----------------------------------------------------------------- */}
         <div className="space-y-4">
-          {/* Main Search & Quick Controls Bar */}
           <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
             <div className="relative w-full md:w-96">
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
@@ -733,7 +970,6 @@ export default function PlacementAnalysisPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-              {/* Session Selector */}
               <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs">
                 <button
                   onClick={() => setSelectedSession("all")}
@@ -761,7 +997,6 @@ export default function PlacementAnalysisPage() {
                 </button>
               </div>
 
-              {/* Tier Filter */}
               <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs">
                 <button
                   onClick={() => setSelectedTier("all")}
@@ -789,7 +1024,6 @@ export default function PlacementAnalysisPage() {
                 </button>
               </div>
 
-              {/* International Toggle */}
               <Button
                 variant={isInternationalOnly ? "default" : "outline"}
                 size="sm"
@@ -799,7 +1033,6 @@ export default function PlacementAnalysisPage() {
                 <Globe className="h-3.5 w-3.5 mr-1.5" /> International
               </Button>
 
-              {/* Sort By Dropdown */}
               <select
                 value={sortBy}
                 onChange={(e: any) => setSortBy(e.target.value)}
@@ -811,7 +1044,6 @@ export default function PlacementAnalysisPage() {
                 <option value="name">Sort: Company Name (A-Z)</option>
               </select>
 
-              {/* View Switcher */}
               <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40">
                 <button
                   onClick={() => setViewMode("grid")}
@@ -831,7 +1063,6 @@ export default function PlacementAnalysisPage() {
             </div>
           </div>
 
-          {/* Sector Filter Tabs Pill Carousel */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {SECTOR_TABS.map((sec) => {
               const isSelected = selectedSector === sec
@@ -852,9 +1083,7 @@ export default function PlacementAnalysisPage() {
           </div>
         </div>
 
-        {/* ----------------------------------------------------------------- */}
-        {/* MATCH RESULTS COUNT HEADER                                        */}
-        {/* ----------------------------------------------------------------- */}
+        {/* Match Count Header */}
         <div className="flex justify-between items-center text-xs text-muted-foreground px-1">
           <span>
             Showing <strong className="text-foreground font-semibold">{filteredCompanies.length}</strong> companies matching current criteria
@@ -905,7 +1134,6 @@ export default function PlacementAnalysisPage() {
             </Button>
           </div>
         ) : viewMode === "grid" ? (
-          /* GRID VIEW */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredCompanies.map((comp) => {
               const isC1 = comp.tier_category.includes("C1")
@@ -918,7 +1146,6 @@ export default function PlacementAnalysisPage() {
                   className="group relative rounded-3xl border border-border/70 hover:border-primary/50 bg-card p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between cursor-pointer hover:-translate-y-1"
                 >
                   <div className="space-y-4">
-                    {/* Card Header: Initial/Icon + Badges */}
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-purple-500/10 border border-primary/20 flex items-center justify-center font-outfit font-extrabold text-lg text-primary group-hover:scale-105 transition-transform shadow-xs">
@@ -934,7 +1161,6 @@ export default function PlacementAnalysisPage() {
                         </div>
                       </div>
 
-                      {/* Tier Badge */}
                       {isC1 ? (
                         <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
                           <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
@@ -946,7 +1172,6 @@ export default function PlacementAnalysisPage() {
                       )}
                     </div>
 
-                    {/* Compensation Highlight Card */}
                     <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-muted-foreground font-medium">Highest CTC</span>
@@ -972,7 +1197,6 @@ export default function PlacementAnalysisPage() {
                       )}
                     </div>
 
-                    {/* Hiring Sessions & Locations Chips */}
                     <div className="flex flex-wrap gap-1.5">
                       {comp.is_hiring_25_26 && (
                         <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold">
@@ -995,7 +1219,6 @@ export default function PlacementAnalysisPage() {
                     </div>
                   </div>
 
-                  {/* Card Footer Action */}
                   <div className="mt-5 pt-3.5 border-t border-border/40 flex justify-between items-center text-xs">
                     <span className="text-muted-foreground text-[11px] line-clamp-1">
                       {comp.locations.slice(0, 2).join(", ")}
@@ -1009,7 +1232,6 @@ export default function PlacementAnalysisPage() {
             })}
           </div>
         ) : (
-          /* TABLE VIEW */
           <div className="rounded-3xl border border-border/70 bg-card overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -1076,6 +1298,132 @@ export default function PlacementAnalysisPage() {
           </div>
         )}
       </main>
+
+      {/* ------------------------------------------------------------------- */}
+      {/* ADMIN ACCESS MANAGEMENT MODAL                                       */}
+      {/* ------------------------------------------------------------------- */}
+      {showAdminModal && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative w-full max-w-2xl bg-card border border-border/80 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  <Key className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-extrabold text-foreground font-outfit">Admin Access Control</h2>
+                  <p className="text-xs text-muted-foreground">Whitelist users and manage invite passcodes for Placement Analysis.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAdminModal(false)}
+                className="p-2 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Grant Access Section */}
+            <div className="p-4 rounded-2xl bg-muted/40 border border-border/60 space-y-3">
+              <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <UserPlus className="h-4 w-4 text-primary" /> Grant User Access (Whitelist Email)
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <Input
+                  type="email"
+                  placeholder="student@iitb.ac.in or external@gmail.com"
+                  value={newGrantEmail}
+                  onChange={(e) => setNewGrantEmail(e.target.value)}
+                  className="sm:col-span-7 h-10 text-xs rounded-xl bg-card"
+                />
+                <Input
+                  type="text"
+                  placeholder="Notes (e.g. Collaborator)"
+                  value={newGrantNotes}
+                  onChange={(e) => setNewGrantNotes(e.target.value)}
+                  className="sm:col-span-3 h-10 text-xs rounded-xl bg-card"
+                />
+                <Button
+                  onClick={handleAdminGrantAccess}
+                  disabled={adminActionLoading || !newGrantEmail}
+                  className="sm:col-span-2 h-10 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  Grant
+                </Button>
+              </div>
+              {adminActionMsg && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold block">{adminActionMsg}</span>
+              )}
+            </div>
+
+            {/* Active Invite Passcodes */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="h-4 w-4 text-amber-500" /> Active Invite Passcodes
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAdminGenerateCode}
+                  disabled={adminActionLoading}
+                  className="h-7 text-xs font-semibold"
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Generate New Code
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {adminInviteCodes.map((code) => (
+                  <div
+                    key={code}
+                    onClick={() => handleCopyCode(code)}
+                    className="px-3 py-1.5 rounded-xl bg-card border border-border/70 text-xs font-mono font-bold text-foreground flex items-center gap-2 cursor-pointer hover:border-primary transition-colors"
+                  >
+                    <span>{code}</span>
+                    <Copy className="h-3 w-3 text-muted-foreground" />
+                    {copiedCode === code && <span className="text-[10px] text-emerald-500 font-sans">Copied!</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Whitelisted Users List */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-purple-500" /> Authorized / Whitelisted Accounts ({adminUsers.length})
+              </h3>
+              <div className="max-h-48 overflow-y-auto divide-y divide-border/40 border border-border/60 rounded-2xl bg-card custom-scrollbar">
+                {adminUsers.map((u) => (
+                  <div key={u.email} className="p-3 flex justify-between items-center text-xs">
+                    <div>
+                      <span className="font-semibold text-foreground">{u.email}</span>
+                      <span className="text-[11px] text-muted-foreground ml-2">({u.role})</span>
+                      {u.notes && <span className="text-[10px] text-muted-foreground block">{u.notes}</span>}
+                    </div>
+                    {u.role !== "admin" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleAdminRevokeAccess(u.email)}
+                        className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                      >
+                        <UserX className="h-3.5 w-3.5 mr-1" /> Revoke
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <Button onClick={() => setShowAdminModal(false)} className="h-10 text-xs font-semibold">
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ------------------------------------------------------------------- */}
       {/* COMPANY INTELLIGENCE DOSSIER MODAL / SLIDE-OVER                     */}
@@ -1160,9 +1508,7 @@ export default function PlacementAnalysisPage() {
                   <p className="text-xs text-muted-foreground">Synthesizing complete company intelligence...</p>
                 </div>
               ) : activeDossierTab === "roles" ? (
-                /* TAB 1: ROLES & DUAL-CURRENCY COMPENSATION */
                 <div className="space-y-6">
-                  {/* Role Selector Tabs (if multiple roles) */}
                   {companyDetails?.roles && companyDetails.roles.length > 1 && (
                     <div>
                       <span className="text-xs font-semibold text-muted-foreground mb-2 block">
@@ -1187,13 +1533,11 @@ export default function PlacementAnalysisPage() {
                     </div>
                   )}
 
-                  {/* Current Active Role Details */}
                   {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
                     (() => {
                       const curRole: PlacementRole = companyDetails.roles[selectedRoleIndex]
                       return (
                         <div className="space-y-6">
-                          {/* Compensation Matrix Highlight Card */}
                           <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/5 via-card to-primary/10 border border-primary/20 space-y-4">
                             <div className="flex justify-between items-start flex-wrap gap-2">
                               <div>
@@ -1209,7 +1553,6 @@ export default function PlacementAnalysisPage() {
                               </Badge>
                             </div>
 
-                            {/* Dual-Currency Compensation Breakdown Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-border/40">
                               <div className="p-3 rounded-xl bg-card border border-border/60">
                                 <span className="text-[11px] text-muted-foreground font-medium block mb-1">
@@ -1250,7 +1593,6 @@ export default function PlacementAnalysisPage() {
                               </div>
                             </div>
 
-                            {/* Perks & Benefits Highlights */}
                             {curRole.perks_and_benefits && curRole.perks_and_benefits.length > 0 && (
                               <div className="pt-2 border-t border-border/40">
                                 <span className="text-xs font-semibold text-foreground mb-1.5 block">
@@ -1273,7 +1615,6 @@ export default function PlacementAnalysisPage() {
                             )}
                           </div>
 
-                          {/* Technical Skills & Competencies Required */}
                           {curRole.required_skills && curRole.required_skills.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1292,7 +1633,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* Key Responsibilities */}
                           {curRole.responsibilities && curRole.responsibilities.length > 0 && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1309,7 +1649,6 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* Full Raw Job Announcement Form */}
                           {curRole.raw_jd && (
                             <div className="space-y-2">
                               <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1326,9 +1665,7 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
               ) : activeDossierTab === "selection" ? (
-                /* TAB 2: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
                 <div className="space-y-6">
-                  {/* Selection Rounds Flow */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <Layers className="h-4 w-4 text-primary" /> Verified Selection Rounds Flow
@@ -1345,7 +1682,6 @@ export default function PlacementAnalysisPage() {
                     </div>
                   </div>
 
-                  {/* Authentic Questions Asked by Seniors */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <HelpCircle className="h-4 w-4 text-emerald-500" /> Authentic Questions Recorded by IITB Seniors
@@ -1372,7 +1708,6 @@ export default function PlacementAnalysisPage() {
                     )}
                   </div>
 
-                  {/* Recommended Electives & Projects */}
                   {companyDetails?.selection_blueprint?.recommended_electives_projects && companyDetails.selection_blueprint.recommended_electives_projects.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
@@ -1389,7 +1724,6 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
               ) : (
-                /* TAB 3: AI PREPARATION ROADMAP */
                 <div className="space-y-6">
                   <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/10 via-card to-purple-500/10 border border-primary/30 space-y-3">
                     <div className="flex items-center gap-2">
