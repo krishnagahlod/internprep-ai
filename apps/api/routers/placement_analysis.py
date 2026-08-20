@@ -792,3 +792,156 @@ async def launch_tailored_mock_interview(request: Request, body: LaunchMockInter
         "past_questions": past_questions[:5],
         "custom_interviewer_context": system_prompt_context.strip()
     }
+
+
+@router.get("/analytics/macro-trends")
+@limiter.limit("60/minute")
+async def get_macro_placement_trends(request: Request):
+    """
+    Returns high-level macro analytics, sector compensation distributions,
+    Base vs Bonus splits, and international hiring breakdowns.
+    """
+    data = get_dataset()
+    companies = data.get("companies", [])
+    roles = data.get("roles", [])
+    
+    # 1. Sector Salary Distributions & Base/Bonus Ratios
+    sector_analytics = {}
+    for comp in companies:
+        sec = comp["primary_sector"]
+        if sec not in sector_analytics:
+            sector_analytics[sec] = {
+                "sector_name": sec,
+                "companies_count": 0,
+                "roles_count": 0,
+                "ctc_list": [],
+                "inhand_list": [],
+                "c1_count": 0,
+                "international_count": 0
+            }
+        sector_analytics[sec]["companies_count"] += 1
+        sector_analytics[sec]["roles_count"] += comp.get("roles_count", 1)
+        if comp.get("highest_ctc_inr", 0) > 0:
+            sector_analytics[sec]["ctc_list"].append(comp["highest_ctc_inr"])
+        if comp.get("highest_inhand_inr", 0) > 0:
+            sector_analytics[sec]["inhand_list"].append(comp["highest_inhand_inr"])
+        if "C1" in comp.get("tier_category", "").upper():
+            sector_analytics[sec]["c1_count"] += 1
+        if comp.get("has_international_offers"):
+            sector_analytics[sec]["international_count"] += 1
+
+    sector_benchmarks = []
+    import numpy as np
+    for sec, d in sector_analytics.items():
+        ctcs = d["ctc_list"]
+        inhands = d["inhand_list"]
+        median_ctc = int(np.median(ctcs)) if ctcs else 0
+        p75_ctc = int(np.percentile(ctcs, 75)) if ctcs else 0
+        p90_ctc = int(np.percentile(ctcs, 90)) if ctcs else 0
+        highest_ctc = int(max(ctcs)) if ctcs else 0
+        median_inhand = int(np.median(inhands)) if inhands else int(median_ctc * 0.70)
+        
+        # Estimate Base vs Bonus vs ESOP split ratio
+        base_pct = round((median_inhand / median_ctc * 100)) if median_ctc > 0 else 70
+        base_pct = min(85, max(45, base_pct))
+        bonus_pct = 15 if sec in ["Finance & Quant", "Consulting & Strategy"] else 12
+        esop_pct = max(0, 100 - base_pct - bonus_pct)
+        
+        sector_benchmarks.append({
+            "sector_name": sec,
+            "companies_count": d["companies_count"],
+            "roles_count": d["roles_count"],
+            "median_ctc_inr": median_ctc,
+            "p75_ctc_inr": p75_ctc,
+            "p90_ctc_inr": p90_ctc,
+            "highest_ctc_inr": highest_ctc,
+            "median_inhand_inr": median_inhand,
+            "c1_dream_ratio": round((d["c1_count"] / d["companies_count"] * 100), 1) if d["companies_count"] > 0 else 0,
+            "base_pay_pct": base_pct,
+            "variable_bonus_pct": bonus_pct,
+            "esop_equity_pct": esop_pct,
+            "international_roles": d["international_count"]
+        })
+        
+    sector_benchmarks.sort(key=lambda x: x["median_ctc_inr"], reverse=True)
+
+    # 2. International Offers Breakdown by Country
+    country_distribution = {
+        "Japan (JPY)": {"currency": "JPY", "count": 0, "highest_ctc_inr": 0, "sample_companies": []},
+        "United States (USD)": {"currency": "USD", "count": 0, "highest_ctc_inr": 0, "sample_companies": []},
+        "Europe / UK (EUR/GBP)": {"currency": "EUR", "count": 0, "highest_ctc_inr": 0, "sample_companies": []},
+        "Singapore (SGD)": {"currency": "SGD", "count": 0, "highest_ctc_inr": 0, "sample_companies": []},
+        "Middle East / UAE (AED)": {"currency": "AED", "count": 0, "highest_ctc_inr": 0, "sample_companies": []},
+        "Hong Kong / Taiwan": {"currency": "HKD", "count": 0, "highest_ctc_inr": 0, "sample_companies": []}
+    }
+    
+    for r in roles:
+        curr = r.get("currency", "INR")
+        ctc_inr = r.get("compensation", {}).get("ctc_inr_equivalent", 0)
+        cname = r.get("company_name", "")
+        
+        target_k = None
+        if curr == "JPY":
+            target_k = "Japan (JPY)"
+        elif curr == "USD":
+            target_k = "United States (USD)"
+        elif curr in ["EUR", "GBP"]:
+            target_k = "Europe / UK (EUR/GBP)"
+        elif curr == "SGD":
+            target_k = "Singapore (SGD)"
+        elif curr == "AED":
+            target_k = "Middle East / UAE (AED)"
+        elif curr in ["HKD", "TWD"]:
+            target_k = "Hong Kong / Taiwan"
+            
+        if target_k:
+            country_distribution[target_k]["count"] += 1
+            if ctc_inr > country_distribution[target_k]["highest_ctc_inr"]:
+                country_distribution[target_k]["highest_ctc_inr"] = ctc_inr
+            if cname not in country_distribution[target_k]["sample_companies"] and len(country_distribution[target_k]["sample_companies"]) < 4:
+                country_distribution[target_k]["sample_companies"].append(cname)
+
+    # 3. Top 10 Highest Paying Companies
+    sorted_by_ctc = sorted(companies, key=lambda x: x.get("highest_ctc_inr", 0), reverse=True)
+    top_ctc_companies = []
+    for c in sorted_by_ctc[:12]:
+        top_ctc_companies.append({
+            "name": c["name"],
+            "slug": c["slug"],
+            "sector": c["primary_sector"],
+            "tier": c["tier_category"],
+            "highest_ctc_inr": c["highest_ctc_inr"],
+            "highest_inhand_inr": c["highest_inhand_inr"],
+            "currency": c["dominant_currency"],
+            "difficulty_score": c.get("difficulty_score", 9.0)
+        })
+
+    # 4. Top 10 Bulk Hiring Recruiters by Roles Count
+    sorted_by_roles = sorted(companies, key=lambda x: x.get("roles_count", 0), reverse=True)
+    top_volume_recruiters = []
+    for c in sorted_by_roles[:12]:
+        top_volume_recruiters.append({
+            "name": c["name"],
+            "slug": c["slug"],
+            "sector": c["primary_sector"],
+            "roles_count": c["roles_count"],
+            "highest_ctc_inr": c["highest_ctc_inr"],
+            "median_ctc_inr": c["median_ctc_inr"],
+            "tier": c["tier_category"]
+        })
+
+    return {
+        "status": "success",
+        "overview": {
+            "total_companies": len(companies),
+            "total_roles": len(roles),
+            "median_campus_ctc": int(np.median([c["median_ctc_inr"] for c in companies if c.get("median_ctc_inr", 0) > 0])),
+            "highest_campus_ctc": max([c["highest_ctc_inr"] for c in companies]) if companies else 0,
+            "total_international_roles": sum(c["count"] for c in country_distribution.values())
+        },
+        "sector_benchmarks": sector_benchmarks,
+        "international_breakdown": country_distribution,
+        "top_ctc_companies": top_ctc_companies,
+        "top_volume_recruiters": top_volume_recruiters
+    }
+
