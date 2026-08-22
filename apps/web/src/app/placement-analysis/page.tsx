@@ -102,6 +102,23 @@ interface RoleIntelligence {
   }
 }
 
+interface RoleOffer {
+  id: string
+  job_title: string
+  primary_sector: string
+  raw_job_sector?: string
+  session_sheet: string
+  session_label: string
+  ctc_inr: number
+  inhand_inr: number
+  currency: string
+  is_international: boolean
+  location: string
+  category_tier?: string
+  selection_rounds_count: number
+  required_skills: string[]
+}
+
 interface PlacementRole {
   id: string
   company_name: string
@@ -143,10 +160,17 @@ interface Company {
   tier_category: string
   is_hiring_24_25: boolean
   is_hiring_25_26: boolean
+  has_phase_1?: boolean
+  has_phase_2?: boolean
+  has_24_25?: boolean
   roles_count: number
   available_roles?: string[]
   highest_ctc_inr: number
   highest_inhand_inr: number
+  display_highest_ctc_inr?: number
+  display_highest_inhand_inr?: number
+  sector_roles_count?: number
+  role_offers?: RoleOffer[]
   median_ctc_inr: number
   dominant_currency: string
   has_international_offers: boolean
@@ -302,7 +326,7 @@ export default function PlacementAnalysisPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSector, setSelectedSector] = useState("All Sectors")
   const [selectedSkill, setSelectedSkill] = useState("All Skills")
-  const [selectedSession, setSelectedSession] = useState<"all" | "25-26" | "24-25">("all")
+  const [selectedSession, setSelectedSession] = useState<"all" | "25-26_p1" | "25-26_p2" | "25-26" | "24-25">("all")
   const [selectedTier, setSelectedTier] = useState<"all" | "C1" | "C2" | "C3">("all")
   const [isInternationalOnly, setIsInternationalOnly] = useState(false)
   const [sortBy, setSortBy] = useState<"highest_ctc" | "median_ctc" | "roles_count" | "name">("highest_ctc")
@@ -366,12 +390,13 @@ export default function PlacementAnalysisPage() {
       const updated = crmItems.filter((x) => x.slug !== comp.slug)
       saveCrmItems(updated)
     } else {
+      const effectiveCTC = comp.display_highest_ctc_inr || comp.highest_ctc_inr
       const newItem: CRMCompanyItem = {
         slug: comp.slug,
         company_name: comp.name,
         sector: comp.primary_sector,
         tier: comp.tier_category,
-        highest_ctc_inr: comp.highest_ctc_inr,
+        highest_ctc_inr: effectiveCTC,
         priority: priority,
         milestone: "interested",
         notes: "",
@@ -442,13 +467,16 @@ export default function PlacementAnalysisPage() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       
-      const statsRes = await fetch(`${API_URL}/placement-analysis/stats`)
+      const sectorQuery = selectedSector !== "All Sectors" ? `&sector=${encodeURIComponent(selectedSector)}` : ""
+      const sessionQuery = selectedSession !== "all" ? `&session=${encodeURIComponent(selectedSession)}` : ""
+      
+      const statsRes = await fetch(`${API_URL}/placement-analysis/stats?${sectorQuery}${sessionQuery}`)
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
       }
 
-      const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=700&sort_by=${sortBy}`)
+      const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=700&sort_by=${sortBy}${sectorQuery}${sessionQuery}`)
       if (!companiesRes.ok) throw new Error("Failed to load placement companies.")
       
       const compData = await companiesRes.json()
@@ -486,7 +514,7 @@ export default function PlacementAnalysisPage() {
         fetchMacroAnalytics()
       }
     }
-  }, [isIITBVerified, sortBy, activeMainTab])
+  }, [isIITBVerified, sortBy, selectedSector, selectedSession, activeMainTab])
 
   // Fetch Company Dossier when modal opens
   useEffect(() => {
@@ -872,34 +900,23 @@ export default function PlacementAnalysisPage() {
     return companies.filter((c) => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
-        const matchName = c.name.toLowerCase().includes(q)
+        const matchName = c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
         const matchSector = c.primary_sector.toLowerCase().includes(q)
         const matchLoc = c.locations.some((l) => l.toLowerCase().includes(q))
-        const matchRole = c.available_roles?.some((r) => r.toLowerCase().includes(q))
-        const matchSkill = c.top_skills?.some((s) => s.toLowerCase().includes(q))
+        const matchRole = (c.role_offers || []).some((r) => r.job_title.toLowerCase().includes(q) || r.location.toLowerCase().includes(q)) ||
+                          (c.available_roles || []).some((r) => r.toLowerCase().includes(q))
+        const matchSkill = c.top_skills?.some((s) => s.toLowerCase().includes(q)) ||
+                           (c.role_offers || []).some((r) => r.required_skills?.some((sk) => sk.toLowerCase().includes(q)))
         if (!matchName && !matchSector && !matchLoc && !matchRole && !matchSkill) return false
-      }
-
-      if (selectedSector !== "All Sectors") {
-        const sec = selectedSector.toLowerCase()
-        const matchSector = c.primary_sector.toLowerCase() === sec
-        const matchAvailable = c.available_roles?.some((r) => {
-          if (sec.includes("product")) return r.toLowerCase().includes("product") || r.toLowerCase().includes("apm")
-          if (sec.includes("quant")) return r.toLowerCase().includes("quant") || r.toLowerCase().includes("trader")
-          return false
-        })
-        if (!matchSector && !matchAvailable) return false
       }
 
       if (selectedSkill !== "All Skills") {
         const sk = selectedSkill.toLowerCase()
         const hasSkill = c.top_skills?.some((s) => s.toLowerCase().includes(sk))
+        const inRoleSkills = (c.role_offers || []).some((r) => r.required_skills?.some((rsk) => rsk.toLowerCase().includes(sk)))
         const inOverview = c.ai_overview?.toLowerCase().includes(sk)
-        if (!hasSkill && !inOverview) return false
+        if (!hasSkill && !inRoleSkills && !inOverview) return false
       }
-
-      if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
-      if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
 
       if (selectedTier !== "all") {
         if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
@@ -909,7 +926,7 @@ export default function PlacementAnalysisPage() {
 
       return true
     })
-  }, [companies, searchQuery, selectedSector, selectedSkill, selectedSession, selectedTier, isInternationalOnly])
+  }, [companies, searchQuery, selectedSkill, selectedTier, isInternationalOnly])
 
   // Filtered CRM Items
   const filteredCrmItems = useMemo(() => {
@@ -1256,37 +1273,45 @@ export default function PlacementAnalysisPage() {
             {/* Metric Counters Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">Total Companies</span>
+                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                  {selectedSector !== "All Sectors" ? `${selectedSector} Companies` : "Total Companies"}
+                </span>
                 <span className="text-xl font-extrabold text-foreground font-outfit">
                   {stats ? stats.total_companies : "627+"}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">Total JAF Roles</span>
+                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                  {selectedSector !== "All Sectors" ? `${selectedSector} Roles` : "Total JAF Roles"}
+                </span>
                 <span className="text-xl font-extrabold text-primary font-outfit">
                   {stats ? stats.total_roles.toLocaleString() : "2,246"}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">Highest CTC Offer</span>
+                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                  {selectedSector !== "All Sectors" ? "Sector Highest CTC" : "Highest CTC Offer"}
+                </span>
                 <span className="text-xl font-extrabold text-amber-500 font-outfit">
-                  ₹2.51 Cr
+                  {stats?.highest_ctc_inr ? formatINRAmount(stats.highest_ctc_inr) : "₹2.51 Cr"}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">Median Campus CTC</span>
+                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
+                  {selectedSector !== "All Sectors" ? "Sector Median CTC" : "Median Campus CTC"}
+                </span>
                 <span className="text-xl font-extrabold text-foreground font-outfit">
-                  ₹18.0 LPA
+                  {stats?.median_ctc_inr ? formatINRAmount(stats.median_ctc_inr) : "₹18.0 LPA"}
                 </span>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
                 <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">International Roles</span>
                 <span className="text-xl font-extrabold text-purple-500 font-outfit">
-                  182 Offers
+                  {stats ? `${stats.international_offers_count} Offers` : "182 Offers"}
                 </span>
               </div>
 
@@ -1328,7 +1353,8 @@ export default function PlacementAnalysisPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-                  <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs">
+                  {/* Descending Chronology Year & Phase Selector */}
+                  <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs flex-wrap gap-0.5">
                     <button
                       onClick={() => setSelectedSession("all")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
@@ -1338,20 +1364,33 @@ export default function PlacementAnalysisPage() {
                       All Sessions
                     </button>
                     <button
-                      onClick={() => setSelectedSession("25-26")}
-                      className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedSession === "25-26" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                      onClick={() => setSelectedSession("25-26_p1")}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        selectedSession === "25-26_p1" ? "bg-purple-600 text-white shadow-xs font-bold" : "text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
                       }`}
+                      title="2025–26 Phase 1 (December Day 1–7 Placements)"
                     >
-                      2025–26
+                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p1" ? "bg-white" : "bg-purple-500"} animate-pulse`} />
+                      2025–26 Phase 1
+                    </button>
+                    <button
+                      onClick={() => setSelectedSession("25-26_p2")}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                        selectedSession === "25-26_p2" ? "bg-blue-600 text-white shadow-xs font-bold" : "text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                      }`}
+                      title="2025–26 Phase 2 (Spring Placement Cycle)"
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p2" ? "bg-white" : "bg-blue-500"}`} />
+                      2025–26 Phase 2
                     </button>
                     <button
                       onClick={() => setSelectedSession("24-25")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                         selectedSession === "24-25" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
                       }`}
+                      title="2024–25 Complete Master Cycle"
                     >
-                      2024–25
+                      2024–25 Master
                     </button>
                   </div>
 
@@ -1522,6 +1561,8 @@ export default function PlacementAnalysisPage() {
                   const hasInsights = !!comp.selection_insights
                   const isCompared = comparedSlugs.includes(comp.slug)
                   const isBookmarked = crmItems.some((x) => x.slug === comp.slug)
+                  const effectiveCTC = comp.display_highest_ctc_inr || comp.highest_ctc_inr
+                  const effectiveInHand = comp.display_highest_inhand_inr || comp.highest_inhand_inr
 
                   return (
                     <div
@@ -1529,6 +1570,7 @@ export default function PlacementAnalysisPage() {
                       className="group relative rounded-3xl border border-border/70 hover:border-primary/50 bg-card p-6 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between hover:-translate-y-1"
                     >
                       <div className="space-y-4">
+                        {/* Company Header Row */}
                         <div className="flex justify-between items-start gap-3">
                           <div
                             onClick={() => setSelectedCompanySlug(comp.slug)}
@@ -1596,27 +1638,30 @@ export default function PlacementAnalysisPage() {
                           </div>
                         </div>
 
-                        {/* Compensation Highlight Card */}
+                        {/* Sector-Segregated Compensation Highlight Card */}
                         <div
                           onClick={() => setSelectedCompanySlug(comp.slug)}
-                          className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5 cursor-pointer"
+                          className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5 cursor-pointer hover:bg-muted/60 transition-colors"
                         >
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-muted-foreground font-medium">Highest CTC</span>
+                            <span className="text-muted-foreground font-medium flex items-center gap-1">
+                              <DollarSign className="h-3.5 w-3.5 text-primary" />
+                              {selectedSector !== "All Sectors" ? `${selectedSector} Highest CTC` : "Highest CTC"}
+                            </span>
                             <span className="font-extrabold text-foreground font-outfit text-sm">
-                              {formatINRAmount(comp.highest_ctc_inr)}
+                              {formatINRAmount(effectiveCTC)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-muted-foreground">Highest In-Hand</span>
+                            <span className="text-muted-foreground">Guaranteed Base / In-Hand</span>
                             <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard Pay"}
+                              {effectiveInHand > 0 ? formatINRAmount(effectiveInHand) : "Standard Fixed Pay"}
                             </span>
                           </div>
                           {comp.dominant_currency !== "INR" && (
                             <div className="pt-1 border-t border-border/40 flex justify-between items-center text-[10px]">
                               <span className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
-                                <Globe className="h-3 w-3" /> International Offer
+                                <Globe className="h-3 w-3" /> International Compensation
                               </span>
                               <span className="text-muted-foreground font-mono font-medium">
                                 {comp.dominant_currency} Currency
@@ -1625,7 +1670,62 @@ export default function PlacementAnalysisPage() {
                           )}
                         </div>
 
-                        {/* Key Competencies Badges */}
+                        {/* Role-Specific CTC Chips Container */}
+                        {comp.role_offers && comp.role_offers.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                              {selectedSector !== "All Sectors" ? `${selectedSector} Offers & Packages:` : "Roles & Compensation Packages:"}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {comp.role_offers.slice(0, 3).map((role, rIdx) => {
+                                const isMatchSector = selectedSector !== "All Sectors" && (role.primary_sector.toLowerCase() === selectedSector.toLowerCase() || selectedSector.toLowerCase().includes(role.primary_sector.toLowerCase()))
+                                const isPhase1 = role.session_sheet.includes("25-26 s1") || role.session_label.toLowerCase().includes("phase 1")
+                                const isPhase2 = role.session_sheet.includes("25-26 s2") || role.session_label.toLowerCase().includes("phase 2")
+                                
+                                return (
+                                  <div
+                                    key={role.id || rIdx}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedCompanySlug(comp.slug)
+                                    }}
+                                    className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                                      isMatchSector
+                                        ? "bg-primary/15 text-primary border-primary/40 shadow-xs scale-[1.01]"
+                                        : "bg-muted/50 hover:bg-muted text-foreground border-border/60"
+                                    }`}
+                                    title={`${role.job_title} | CTC: ${formatINRAmount(role.ctc_inr)} | Base: ${formatINRAmount(role.inhand_inr)} | ${role.session_label}`}
+                                  >
+                                    <span className="truncate max-w-[130px]">{role.job_title}</span>
+                                    <span className="font-extrabold font-outfit text-foreground shrink-0">
+                                      {formatINRAmount(role.ctc_inr)}
+                                    </span>
+                                    <span className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold shrink-0 ${
+                                      isPhase1 ? "bg-purple-500/20 text-purple-600 dark:text-purple-300" :
+                                      isPhase2 ? "bg-blue-500/20 text-blue-600 dark:text-blue-300" :
+                                      "bg-muted text-muted-foreground"
+                                    }`}>
+                                      {isPhase1 ? "P1" : isPhase2 ? "P2" : "24-25"}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                              {comp.role_offers.length > 3 && (
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedCompanySlug(comp.slug)
+                                  }}
+                                  className="px-2 py-1 rounded-xl text-[10px] font-bold bg-muted/40 hover:bg-muted text-primary cursor-pointer border border-border/40 self-center"
+                                >
+                                  +{comp.role_offers.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* In-Demand Skills Badges */}
                         {comp.top_skills && comp.top_skills.length > 0 && (
                           <div className="space-y-1">
                             <div className="flex flex-wrap gap-1">
@@ -1643,30 +1743,30 @@ export default function PlacementAnalysisPage() {
                           </div>
                         )}
 
-                        {/* Roles Tagline */}
-                        {comp.available_roles && comp.available_roles.length > 0 && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-1">
-                            <strong className="text-foreground">Roles:</strong> {comp.available_roles.slice(0, 2).join(", ")}
-                          </p>
-                        )}
-
-                        {/* Hiring Sessions Chips */}
+                        {/* Chronological Phase Timeline Pills & Student Data */}
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                          {comp.is_hiring_25_26 && (
-                            <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold">
-                              2025–26 Hiring
+                          {comp.has_phase_1 && (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[10px] font-bold border border-purple-500/20 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />
+                              2025–26 Phase 1
                             </span>
                           )}
-                          {comp.is_hiring_24_25 && (
-                            <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-medium">
-                              2024–25 Hiring
+                          {comp.has_phase_2 && (
+                            <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold border border-blue-500/20 flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                              2025–26 Phase 2
+                            </span>
+                          )}
+                          {comp.has_24_25 && (
+                            <span className="px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-medium border border-border/60">
+                              2024–25 Master
                             </span>
                           )}
                           <span className="px-2 py-0.5 rounded-md bg-muted/60 text-muted-foreground text-[10px] font-medium flex items-center gap-1">
-                            <Briefcase className="h-2.5 w-2.5" /> {comp.roles_count} {comp.roles_count === 1 ? "Role" : "Roles"}
+                            <Briefcase className="h-2.5 w-2.5" /> {comp.sector_roles_count || comp.roles_count} {comp.roles_count === 1 ? "Role" : "Roles"}
                           </span>
                           {hasInsights && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold flex items-center gap-1">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-semibold flex items-center gap-1 border border-emerald-500/20">
                               <BookOpen className="h-2.5 w-2.5" /> Student Q&A
                             </span>
                           )}
@@ -1697,11 +1797,10 @@ export default function PlacementAnalysisPage() {
                         <th className="p-4">Company Name</th>
                         <th className="p-4">Sector</th>
                         <th className="p-4">Hiring Tier</th>
-                        <th className="p-4">Highest CTC (INR)</th>
-                        <th className="p-4">In-Hand Salary</th>
-                        <th className="p-4">Key In-Demand Skills</th>
-                        <th className="p-4">Sessions</th>
-                        <th className="p-4">Roles</th>
+                        <th className="p-4">{selectedSector !== "All Sectors" ? `${selectedSector} Highest CTC` : "Highest CTC"}</th>
+                        <th className="p-4">Base / In-Hand</th>
+                        <th className="p-4">Role Offers & Packages</th>
+                        <th className="p-4">Hiring Phases</th>
                         <th className="p-4 text-right">Action</th>
                       </tr>
                     </thead>
@@ -1709,6 +1808,8 @@ export default function PlacementAnalysisPage() {
                       {filteredCompanies.map((comp) => {
                         const isCompared = comparedSlugs.includes(comp.slug)
                         const isBookmarked = crmItems.some((x) => x.slug === comp.slug)
+                        const effectiveCTC = comp.display_highest_ctc_inr || comp.highest_ctc_inr
+                        const effectiveInHand = comp.display_highest_inhand_inr || comp.highest_inhand_inr
 
                         return (
                           <tr
@@ -1725,11 +1826,9 @@ export default function PlacementAnalysisPage() {
                                 </div>
                                 <div>
                                   <span className="block">{comp.name}</span>
-                                  {comp.available_roles && (
-                                    <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
-                                      {comp.available_roles.slice(0, 2).join(", ")}
-                                    </span>
-                                  )}
+                                  <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
+                                    {comp.locations.slice(0, 2).join(", ")}
+                                  </span>
                                 </div>
                               </div>
                             </td>
@@ -1740,31 +1839,39 @@ export default function PlacementAnalysisPage() {
                               </Badge>
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-extrabold text-foreground font-outfit">
-                              {formatINRAmount(comp.highest_ctc_inr)}
+                              {formatINRAmount(effectiveCTC)}
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
+                              {effectiveInHand > 0 ? formatINRAmount(effectiveInHand) : "Standard"}
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
-                              <div className="flex flex-wrap gap-1 max-w-[200px]">
-                                {comp.top_skills?.slice(0, 3).map((s, idx) => (
-                                  <span key={idx} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium">
-                                    {s}
+                              <div className="flex flex-wrap gap-1 max-w-[260px]">
+                                {comp.role_offers?.slice(0, 2).map((r, idx) => (
+                                  <span key={idx} className="px-1.5 py-0.5 rounded bg-muted/80 text-[10px] font-semibold text-foreground flex items-center gap-1 border border-border/40">
+                                    <span>{r.job_title}</span>
+                                    <span className="font-bold text-primary font-outfit">{formatINRAmount(r.ctc_inr)}</span>
                                   </span>
                                 ))}
+                                {comp.role_offers && comp.role_offers.length > 2 && (
+                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                    +{comp.role_offers.length - 2} more
+                                  </span>
+                                )}
                               </div>
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
-                              <div className="flex gap-1">
-                                {comp.is_hiring_25_26 && (
-                                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-bold">25-26</span>
+                              <div className="flex flex-wrap gap-1">
+                                {comp.has_phase_1 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 text-[9px] font-bold border border-purple-500/20">25–26 P1</span>
                                 )}
-                                {comp.is_hiring_24_25 && (
-                                  <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">24-25</span>
+                                {comp.has_phase_2 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[9px] font-bold border border-blue-500/20">25–26 P2</span>
+                                )}
+                                {comp.has_24_25 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px] border border-border/40">24–25</span>
                                 )}
                               </div>
                             </td>
-                            <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-muted-foreground">{comp.roles_count}</td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -1800,7 +1907,7 @@ export default function PlacementAnalysisPage() {
                                   onClick={() => setSelectedCompanySlug(comp.slug)}
                                   className="h-8 text-xs font-semibold text-primary"
                                 >
-                                  Explore <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                  View <ChevronRight className="h-3 w-3 ml-1" />
                                 </Button>
                               </div>
                             </td>

@@ -383,25 +383,129 @@ async def create_invite_code(request: Request, body: CreateInviteCodeRequest):
     }
 
 
+_ROLES_BY_COMPANY: Optional[Dict[str, List[Dict[str, Any]]]] = None
+
+
+def get_roles_by_company() -> Dict[str, List[Dict[str, Any]]]:
+    global _ROLES_BY_COMPANY
+    if _ROLES_BY_COMPANY is None:
+        data = get_dataset()
+        mapping = {}
+        for r in data.get("roles", []):
+            slug = r.get("company_slug", "")
+            mapping.setdefault(slug, []).append(r)
+        _ROLES_BY_COMPANY = mapping
+    return _ROLES_BY_COMPANY
+
+
+def serialize_role_offer(r: Dict[str, Any]) -> Dict[str, Any]:
+    comp = r.get("compensation", {})
+    ctc = comp.get("ctc_inr_equivalent", 0) or comp.get("ctc_max", 0) or comp.get("ctc_median", 0)
+    inhand = comp.get("inhand_inr_equivalent", 0) or comp.get("inhand_median", 0)
+    return {
+        "id": r.get("id"),
+        "job_title": r.get("job_title", "Role"),
+        "primary_sector": r.get("primary_sector", "General"),
+        "raw_job_sector": r.get("raw_job_sector", ""),
+        "session_sheet": r.get("session_sheet", ""),
+        "session_label": r.get("session_label", ""),
+        "ctc_inr": ctc,
+        "inhand_inr": inhand,
+        "currency": r.get("currency", "INR"),
+        "is_international": comp.get("is_international", False),
+        "location": r.get("location", ""),
+        "category_tier": r.get("category_tier", ""),
+        "selection_rounds_count": len(r.get("selection_rounds", [])) or 3,
+        "required_skills": r.get("required_skills", [])[:6]
+    }
+
+
 # ---------------------------------------------------------------------------
 # PUBLIC PLACEMENT DATA ENDPOINTS
 # ---------------------------------------------------------------------------
 
 @router.get("/stats")
 @limiter.limit("60/minute")
-async def get_placement_stats(request: Request):
-    """Returns platform-level placement benchmarks and aggregate metrics."""
+async def get_placement_stats(
+    request: Request,
+    session: Optional[str] = Query(None, description="'all', '25-26_p1', '25-26_p2', '25-26', '24-25'"),
+    sector: Optional[str] = Query(None, description="Filter by sector")
+):
+    """Returns dynamic platform-level placement benchmarks and aggregate metrics."""
     data = get_dataset()
-    return data.get("stats", {})
+    roles = data.get("roles", [])
+    companies = data.get("companies", [])
+    
+    # Filter roles by session if specified
+    filtered_roles = roles
+    if session and session.strip() and session.lower() != "all":
+        s_clean = session.strip().lower()
+        if s_clean in ["25-26_p1", "25-26 s1", "phase 1"]:
+            filtered_roles = [r for r in filtered_roles if "25-26 s1" in r.get("session_sheet", "") or "phase 1" in r.get("session_label", "").lower()]
+        elif s_clean in ["25-26_p2", "25-26 s2", "phase 2"]:
+            filtered_roles = [r for r in filtered_roles if "25-26 s2" in r.get("session_sheet", "") or "phase 2" in r.get("session_label", "").lower()]
+        elif s_clean in ["25-26", "2025-26"]:
+            filtered_roles = [r for r in filtered_roles if "25-26" in r.get("session_sheet", "")]
+        elif s_clean in ["24-25", "2024-25"]:
+            filtered_roles = [r for r in filtered_roles if "24-25" in r.get("session_sheet", "")]
+
+    if sector and sector.strip() and sector.lower() != "all" and sector.lower() != "all sectors":
+        sec_clean = sector.strip().lower()
+        filtered_roles = [r for r in filtered_roles if r.get("primary_sector", "").lower() == sec_clean or sec_clean in r.get("primary_sector", "").lower()]
+
+    unique_comp_slugs = set(r.get("company_slug") for r in filtered_roles if r.get("company_slug"))
+    ctc_list = [r.get("compensation", {}).get("ctc_inr_equivalent", 0) for r in filtered_roles if r.get("compensation", {}).get("ctc_inr_equivalent", 0) > 0]
+    
+    highest_ctc = max(ctc_list) if ctc_list else 0
+    median_ctc = sorted(ctc_list)[len(ctc_list) // 2] if ctc_list else 0
+    intl_count = sum(1 for r in filtered_roles if r.get("compensation", {}).get("is_international"))
+
+    # Sectors breakdown
+    sectors_breakdown: Dict[str, Dict[str, Any]] = {}
+    for r in filtered_roles:
+        sec = r.get("primary_sector", "General & Other")
+        if sec not in sectors_breakdown:
+            sectors_breakdown[sec] = {
+                "companies_set": set(),
+                "roles_count": 0,
+                "ctc_list": []
+            }
+        sectors_breakdown[sec]["companies_set"].add(r.get("company_slug"))
+        sectors_breakdown[sec]["roles_count"] += 1
+        ctc_val = r.get("compensation", {}).get("ctc_inr_equivalent", 0)
+        if ctc_val > 0:
+            sectors_breakdown[sec]["ctc_list"].append(ctc_val)
+
+    formatted_sectors = {}
+    for sec, val in sectors_breakdown.items():
+        c_list = val["ctc_list"]
+        formatted_sectors[sec] = {
+            "companies_count": len(val["companies_set"]),
+            "roles_count": val["roles_count"],
+            "highest_ctc_inr": max(c_list) if c_list else 0,
+            "median_ctc_inr": sorted(c_list)[len(c_list) // 2] if c_list else 0
+        }
+
+    return {
+        "total_companies": len(unique_comp_slugs) or len(companies),
+        "total_roles": len(filtered_roles),
+        "total_sessions": 3,
+        "highest_ctc_inr": highest_ctc,
+        "median_ctc_inr": median_ctc,
+        "international_offers_count": intl_count,
+        "sectors_breakdown": formatted_sectors
+    }
 
 
 @router.get("/sectors")
 @limiter.limit("60/minute")
-async def get_placement_sectors(request: Request):
+async def get_placement_sectors(
+    request: Request,
+    session: Optional[str] = Query(None, description="Filter by session")
+):
     """Returns list of available sectors with company and role counts."""
-    data = get_dataset()
-    stats = data.get("stats", {})
-    breakdown = stats.get("sectors_breakdown", {})
+    stats_data = await get_placement_stats(request, session=session)
+    breakdown = stats_data.get("sectors_breakdown", {})
     
     sectors_list = []
     for s_name, s_data in breakdown.items():
@@ -413,7 +517,7 @@ async def get_placement_sectors(request: Request):
             "highest_ctc_inr": s_data.get("highest_ctc_inr", 0)
         })
         
-    sectors_list.sort(key=lambda x: x["companies_count"], reverse=True)
+    sectors_list.sort(key=lambda x: x["roles_count"], reverse=True)
     return {"sectors": sectors_list}
 
 
@@ -423,7 +527,7 @@ async def list_placement_companies(
     request: Request,
     search: Optional[str] = Query(None, description="Search company name, role, or skills"),
     sector: Optional[str] = Query(None, description="Filter by primary sector"),
-    session: Optional[str] = Query(None, description="'all', '24-25', '25-26'"),
+    session: Optional[str] = Query(None, description="'all', '25-26_p1', '25-26_p2', '25-26', '24-25'"),
     tier: Optional[str] = Query(None, description="'C1', 'C2', 'C3', etc."),
     is_international: Optional[bool] = Query(None, description="Filter international offers only"),
     min_ctc_inr: Optional[float] = Query(None, description="Minimum CTC in INR"),
@@ -432,75 +536,130 @@ async def list_placement_companies(
     page: int = Query(1, ge=1),
     page_size: int = Query(700, ge=1, le=1000)
 ):
-    """Lists companies with multi-criteria filtering, sorting, and pagination."""
+    """Lists companies with multi-criteria filtering, role offers enrichment, and sector-specific CTC calculation."""
     data = get_dataset()
     companies = data.get("companies", [])
-    roles = data.get("roles", [])
+    roles_by_comp = get_roles_by_company()
     
-    filtered = companies
+    # 1. Enrich and compute sector-specific metrics for each company
+    enriched_companies = []
+    has_sector_filter = bool(sector and sector.strip() and sector.lower() != "all" and sector.lower() != "all sectors")
+    target_sector_lower = sector.strip().lower() if has_sector_filter else ""
     
-    # 1. Search Query
+    for c in companies:
+        c_roles = roles_by_comp.get(c.get("slug", ""), [])
+        if not c_roles:
+            c_copy = dict(c)
+            c_copy["role_offers"] = []
+            c_copy["display_highest_ctc_inr"] = c.get("highest_ctc_inr", 0)
+            c_copy["display_highest_inhand_inr"] = c.get("highest_inhand_inr", 0)
+            c_copy["sector_roles_count"] = c.get("roles_count", 0)
+            c_copy["has_phase_1"] = c.get("is_hiring_25_26", False)
+            c_copy["has_phase_2"] = c.get("is_hiring_25_26", False)
+            c_copy["has_24_25"] = c.get("is_hiring_24_25", False)
+            enriched_companies.append(c_copy)
+            continue
+            
+        # Serialize roles
+        serialized_roles = [serialize_role_offer(r) for r in c_roles]
+        
+        # Check hiring phases
+        has_p1 = any("25-26 s1" in r["session_sheet"] or "phase 1" in r["session_label"].lower() for r in serialized_roles)
+        has_p2 = any("25-26 s2" in r["session_sheet"] or "phase 2" in r["session_label"].lower() for r in serialized_roles)
+        has_24 = any("24-25" in r["session_sheet"] for r in serialized_roles)
+        
+        # Sector-specific CTC calculation
+        sector_matching_roles = []
+        if has_sector_filter:
+            sector_matching_roles = [
+                r for r in serialized_roles 
+                if r["primary_sector"].lower() == target_sector_lower or target_sector_lower in r["primary_sector"].lower()
+            ]
+            
+        if sector_matching_roles:
+            sec_ctc_list = [r["ctc_inr"] for r in sector_matching_roles if r["ctc_inr"] > 0]
+            sec_inhand_list = [r["inhand_inr"] for r in sector_matching_roles if r["inhand_inr"] > 0]
+            display_ctc = max(sec_ctc_list) if sec_ctc_list else c.get("highest_ctc_inr", 0)
+            display_inhand = max(sec_inhand_list) if sec_inhand_list else c.get("highest_inhand_inr", 0)
+            sector_role_count = len(sector_matching_roles)
+            
+            # Sort role offers: sector-matching first, then descending by session and CTC
+            other_roles = [r for r in serialized_roles if r not in sector_matching_roles]
+            sorted_role_offers = sorted(sector_matching_roles, key=lambda x: (x["session_sheet"], x["ctc_inr"]), reverse=True) + \
+                                 sorted(other_roles, key=lambda x: (x["session_sheet"], x["ctc_inr"]), reverse=True)
+        else:
+            display_ctc = c.get("highest_ctc_inr", 0)
+            display_inhand = c.get("highest_inhand_inr", 0)
+            sector_role_count = len(serialized_roles)
+            sorted_role_offers = sorted(serialized_roles, key=lambda x: (x["session_sheet"], x["ctc_inr"]), reverse=True)
+            
+        c_copy = dict(c)
+        c_copy["role_offers"] = sorted_role_offers
+        c_copy["display_highest_ctc_inr"] = display_ctc
+        c_copy["display_highest_inhand_inr"] = display_inhand
+        c_copy["sector_roles_count"] = sector_role_count
+        c_copy["has_phase_1"] = has_p1
+        c_copy["has_phase_2"] = has_p2
+        c_copy["has_24_25"] = has_24
+        enriched_companies.append(c_copy)
+        
+    filtered = enriched_companies
+    
+    # 2. Search Query
     if search and search.strip():
         q = search.strip().lower()
-        matching_slugs = set()
-        for c in companies:
-            if (
-                q in c["name"].lower() or 
-                q in c["slug"] or
-                any(q in str(r).lower() for r in c.get("available_roles", [])) or
-                any(q in str(s).lower() for s in c.get("top_skills", []))
-            ):
-                matching_slugs.add(c["slug"])
-                
-        for r in roles:
-            if (
-                q in r["job_title"].lower() or 
-                any(q in str(sk).lower() for sk in r.get("required_skills", [])) or
-                q in r["location"].lower()
-            ):
-                matching_slugs.add(r["company_slug"])
-                
-        filtered = [c for c in filtered if c["slug"] in matching_slugs]
+        matching_filtered = []
+        for c in filtered:
+            name_match = q in c["name"].lower() or q in c["slug"]
+            role_match = any(q in r["job_title"].lower() or q in r["location"].lower() for r in c.get("role_offers", []))
+            skill_match = any(q in str(s).lower() for s in c.get("top_skills", []))
+            if name_match or role_match or skill_match:
+                matching_filtered.append(c)
+        filtered = matching_filtered
         
-    # 2. Sector Filter
-    if sector and sector.strip() and sector.lower() != "all" and sector.lower() != "all sectors":
-        sec_clean = sector.strip().lower()
+    # 3. Sector Filter
+    if has_sector_filter:
         filtered = [
             c for c in filtered 
-            if c["primary_sector"].lower() == sec_clean or 
-            sec_clean in c["primary_sector"].lower() or
-            any(sec_clean in str(r).lower() for r in c.get("available_roles", []))
+            if c["primary_sector"].lower() == target_sector_lower or 
+            target_sector_lower in c["primary_sector"].lower() or
+            any(target_sector_lower in r["primary_sector"].lower() for r in c.get("role_offers", []))
         ]
         
-    # 3. Session Filter
+    # 4. Session / Phase Filter
     if session and session.strip() and session.lower() != "all":
-        if session == "24-25":
-            filtered = [c for c in filtered if c.get("is_hiring_24_25")]
-        elif session == "25-26":
-            filtered = [c for c in filtered if c.get("is_hiring_25_26")]
+        s_clean = session.strip().lower()
+        if s_clean in ["25-26_p1", "25-26 s1", "phase 1"]:
+            filtered = [c for c in filtered if c.get("has_phase_1")]
+        elif s_clean in ["25-26_p2", "25-26 s2", "phase 2"]:
+            filtered = [c for c in filtered if c.get("has_phase_2")]
+        elif s_clean in ["25-26", "2025-26"]:
+            filtered = [c for c in filtered if c.get("has_phase_1") or c.get("has_phase_2") or c.get("is_hiring_25_26")]
+        elif s_clean in ["24-25", "2024-25"]:
+            filtered = [c for c in filtered if c.get("has_24_25") or c.get("is_hiring_24_25")]
             
-    # 4. Tier Filter
+    # 5. Tier Filter
     if tier and tier.strip() and tier.lower() != "all":
         t_clean = tier.strip().upper()
         filtered = [c for c in filtered if t_clean in c.get("tier_category", "").upper()]
         
-    # 5. International Filter
+    # 6. International Filter
     if is_international is not None:
         filtered = [c for c in filtered if c.get("has_international_offers") == is_international]
         
-    # 6. CTC Range Filter
+    # 7. CTC Range Filter
     if min_ctc_inr is not None and min_ctc_inr > 0:
-        filtered = [c for c in filtered if c.get("highest_ctc_inr", 0) >= min_ctc_inr]
+        filtered = [c for c in filtered if c.get("display_highest_ctc_inr", 0) >= min_ctc_inr]
     if max_ctc_inr is not None and max_ctc_inr > 0:
-        filtered = [c for c in filtered if c.get("highest_ctc_inr", 0) <= max_ctc_inr]
+        filtered = [c for c in filtered if c.get("display_highest_ctc_inr", 0) <= max_ctc_inr]
         
-    # 7. Sorting
+    # 8. Sorting (Respecting Sector-Specific CTC)
     if sort_by == "highest_ctc":
-        filtered.sort(key=lambda x: x.get("highest_ctc_inr", 0), reverse=True)
+        filtered.sort(key=lambda x: x.get("display_highest_ctc_inr", 0), reverse=True)
     elif sort_by == "median_ctc":
         filtered.sort(key=lambda x: x.get("median_ctc_inr", 0), reverse=True)
     elif sort_by == "roles_count":
-        filtered.sort(key=lambda x: x.get("roles_count", 0), reverse=True)
+        filtered.sort(key=lambda x: x.get("sector_roles_count", 0), reverse=True)
     elif sort_by == "name":
         filtered.sort(key=lambda x: x.get("name", "").lower())
         
