@@ -10,9 +10,6 @@ import google.generativeai as genai
 import json_repair
 
 # ==============================================================================
-# MASSIVE MULTI-DOMAIN COMPETENCY TAXONOMY (25-35 Granular Skills per Domain)
-# ==============================================================================
-# ==============================================================================
 # GRANULAR DOMAIN TAXONOMY & HIGH-YIELD COMPETENCY CLUSTERS
 # ==============================================================================
 DOMAIN_TAXONOMY = {
@@ -38,7 +35,7 @@ DOMAIN_TAXONOMY = {
                 {"name": "Web Performance & Core Web Vitals", "synonyms": ["core web vitals", "lighthouse", "ssr", "ssg", "csr", "code splitting", "tree shaking", "lazy loading", "hydration", "accessibility", "a11y", "wcag"]}
             ],
             "Architecture & Distributed Systems": [
-                {"name": "System Design & Microservices", "synonyms": ["system design", "system architecture", "microservices", "service-oriented", "monolith to microservices", "domain driven design", "scalability"]},
+                {"name": "System Design & Microservices", "synonyms": ["system design", "system architecture", "microservices", "service-oriented", "domain driven design", "scalability"]},
                 {"name": "Distributed Concurrency & Messaging", "synonyms": ["distributed systems", "kafka", "rabbitmq", "pub/sub", "message queue", "event-driven", "sqs", "concurrency", "multithreading", "celery"]},
                 {"name": "REST, GraphQL & gRPC APIs", "synonyms": ["rest api", "restful", "graphql", "grpc", "protobuf", "api design", "openapi", "swagger", "webhook"]},
                 {"name": "Caching & High Availability", "synonyms": ["redis", "memcached", "caching", "cache invalidation", "cdn", "load balancing", "failover", "replication", "high availability"]}
@@ -50,7 +47,7 @@ DOMAIN_TAXONOMY = {
             ],
             "AI/ML Engineering & LLMOps": [
                 {"name": "RAG Pipelines & Agent Orchestration", "synonyms": ["rag", "retrieval augmented", "langchain", "llamaindex", "agent architecture", "ai agents", "multi-agent", "prompt engineering"]},
-                {"name": "Model Serving & Edge Inference", "synonyms": ["onnx", "tensorrt", "vllm", "ollama", "model serving", "huggingface", "transformers", "pytorch", "quantization"]}
+                {"name": "Model Serving & Deep Learning", "synonyms": ["pytorch", "tensorflow", "onnx", "tensorrt", "vllm", "huggingface", "transformers", "model serving", "quantization"]}
             ],
             "Cloud, DevOps & Production Infrastructure": [
                 {"name": "Containerization & Kubernetes (K8s)", "synonyms": ["docker", "docker-compose", "kubernetes", "k8s", "helm", "containerized"]},
@@ -213,10 +210,10 @@ PROHIBITED_RANK_PATTERNS = [
 # SECTION PARSER & HELPERS
 # ==============================================================================
 def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]:
-    """Deterministic fallback parser extracting sections and bullets when LLM is offline."""
+    """Deterministic parser extracting sections and bullets from resume text."""
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     sections = []
-    current_sec = {"section_type": "Experience", "bullets": [], "overview_line": ""}
+    current_sec = {"section_type": "experience", "bullets": [], "overview_line": ""}
     
     header_patterns = {
         "experience": ["PROFESSIONAL EXPERIENCE", "WORK EXPERIENCE", "EXPERIENCE", "INTERNSHIPS"],
@@ -242,7 +239,7 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
             b_text = line.lstrip("-•*– ").strip()
             if len(b_text) > 10:
                 current_sec["bullets"].append({"bullet_text": b_text, "original_bullet": b_text})
-        elif len(line) > 20 and not line.startswith("Page") and not upper in ["IIT BOMBAY", "INDIAN INSTITUTE OF TECHNOLOGY"]:
+        elif len(line) > 20 and not line.startswith("Page") and upper not in ["IIT BOMBAY", "INDIAN INSTITUTE OF TECHNOLOGY"]:
             if not current_sec["overview_line"] and len(current_sec["bullets"]) == 0:
                 current_sec["overview_line"] = line
             else:
@@ -255,112 +252,91 @@ def fallback_extract_sections_and_bullets(raw_text: str) -> List[Dict[str, Any]]
 
 
 def extract_text_from_pdf_stream(pdf_bytes: bytes) -> str:
-    """Extract raw text from PDF bytes using PyMuPDF / pypdf."""
+    """Extracts raw text stream from PDF bytes using PyMuPDF / pdfminer."""
     try:
         import fitz
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        text = ""
-        for page in doc:
-            text += page.get_text() + "\n"
+        text = "\n".join([page.get_text() for page in doc])
         doc.close()
         if text.strip():
             return text
     except Exception as e:
-        print(f"PyMuPDF stream error: {e}")
-
-    try:
-        from pypdf import PdfReader
-        import io
-        reader = PdfReader(io.BytesIO(pdf_bytes))
-        text = ""
-        for page in reader.pages:
-            t = page.extract_text()
-            if t:
-                text += t + "\n"
-        if text.strip():
-            return text
-    except Exception as e:
-        print(f"pypdf stream error: {e}")
+        print(f"PyMuPDF extract failed: {e}")
         
-    return ""
+    try:
+        from pdfminer.high_level import extract_text
+        import io
+        return extract_text(io.BytesIO(pdf_bytes))
+    except Exception as e:
+        print(f"pdfminer fallback failed: {e}")
+        return ""
 
 
 # ==============================================================================
-# PILLAR 1: TECHNICAL & PARSEABILITY
+# PILLAR 1: ATS PARSEABILITY & SECTION INTEGRITY
 # ==============================================================================
 def evaluate_ats_parseability(
     pdf_bytes: Optional[bytes], 
     raw_text: str, 
-    parsed_sections: List[Dict[str, Any]],
+    parsed_sections: List[Dict[str, Any]], 
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
-    """Pillar 1: Technical & Layout Parseability (0-100)."""
+    """Pillar 1: ATS Parseability & Contact Integrity (0-100)."""
     checks = []
     issues = []
     
-    # 1. OCR / Extractable Text Layer (30%)
     char_count = len(raw_text.strip())
-    text_score = 100 if char_count > 600 else 80 if char_count > 250 else 40
+    text_score = 100 if char_count >= 800 else 75 if char_count >= 400 else 40
     checks.append({
         "name": "Extractable Text Layer",
-        "passed": char_count > 300,
+        "passed": char_count >= 400,
         "score": text_score,
-        "status": "Optimal" if text_score == 100 else "Partial" if text_score >= 70 else "Warning"
+        "status": "Optimal" if text_score == 100 else "Acceptable" if text_score >= 70 else "Warning"
     })
     
-    # 2. Section Hierarchy Integrity (30%)
     standard_headers = ["experience", "project", "por", "scholastic", "extracurricular", "skills", "education"]
     raw_lower = raw_text.lower()
     found_headers = [h for h in standard_headers if h in raw_lower or any(h in s.get("section_type", "").lower() for s in parsed_sections)]
-    hierarchy_score = 100 if len(found_headers) >= 4 else 85 if len(found_headers) >= 3 else 60
+    
+    hierarchy_score = 95 if len(found_headers) >= 4 else 80 if len(found_headers) == 3 else 60 if len(found_headers) == 2 else 40
     checks.append({
         "name": "Standard Section Hierarchy",
         "passed": len(found_headers) >= 3,
         "score": hierarchy_score,
-        "status": "Optimal" if hierarchy_score == 100 else "Acceptable" if hierarchy_score >= 75 else "Needs Structure"
+        "status": "Optimal" if hierarchy_score >= 90 else "Acceptable" if hierarchy_score >= 75 else "Needs Structure"
     })
     
-    # 3. Layout Flow & Dual/Single Column Processing (20%)
-    table_indicators = ["|", "\t\t", "Accenture", "Chemical Engineering", "B.Tech", "202"]
-    has_structure = any(ind.lower() in raw_text.lower() for ind in table_indicators)
-    flow_score = 100 if has_structure else 85
-    checks.append({
-        "name": "Single-Column / LaTeX Parsing Flow",
-        "passed": True,
-        "score": flow_score,
-        "status": "Optimal"
-    })
+    # Contact Extraction
+    has_email = bool(re.search(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text))
+    has_phone = bool(re.search(r"(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}|\b\d{10}\b", raw_text))
     
-    # 4. Mode-Specific Check: Placement Header vs Corporate Contact Header (20%)
     if mode == "iitb_placement":
         iitb_header_keywords = ["indian institute of technology", "iit bombay", "chemical engineering", "computer science", "mechanical", "electrical", "b.tech", "dual degree", "m.tech", "cpi", "roll"]
         has_iitb_header = any(kw in raw_lower for kw in iitb_header_keywords)
-        portal_score = 100 if has_iitb_header else 90
+        portal_score = 95 if (has_iitb_header and (has_email or has_phone)) else 80 if has_iitb_header else 60
         checks.append({
             "name": "Placement Portal Header Standard",
-            "passed": True,
+            "passed": portal_score >= 80,
             "score": portal_score,
-            "status": "Verified"
+            "status": "Verified" if portal_score >= 90 else "Partial"
         })
-        final_score = int(round((text_score * 0.30) + (hierarchy_score * 0.30) + (flow_score * 0.20) + (portal_score * 0.20)))
+        final_score = int(round((text_score * 0.35) + (hierarchy_score * 0.35) + (portal_score * 0.30)))
     else:
-        has_email = bool(re.search(r"[\w\.-]+@[\w\.-]+\.\w+", raw_text))
-        has_phone = bool(re.search(r"(?:\+?\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}|\b\d{10}\b", raw_text))
-        contact_score = 100 if (has_email and has_phone) else 65 if (has_email or has_phone) else 40
+        contact_score = 95 if (has_email and has_phone) else 65 if (has_email or has_phone) else 40
         checks.append({
             "name": "Contact Header Extraction",
             "passed": contact_score >= 65,
             "score": contact_score,
-            "status": "Optimal" if contact_score == 100 else "Partial" if contact_score >= 60 else "Missing"
+            "status": "Optimal" if contact_score >= 90 else "Partial" if contact_score >= 60 else "Missing"
         })
-        final_score = int(round((text_score * 0.25) + (hierarchy_score * 0.25) + (flow_score * 0.25) + (contact_score * 0.25)))
+        final_score = int(round((text_score * 0.35) + (hierarchy_score * 0.35) + (contact_score * 0.30)))
         
-    final_score = max(40, min(100, final_score))
+    final_score = max(35, min(100, final_score))
     
     return {
         "score": final_score,
         "status": "Optimal" if final_score >= 85 else "Strong" if final_score >= 70 else "Needs Polish",
-        "reasoning": f"Evaluates extractable text layer integrity, standard category naming ({len(found_headers)} identified), and single-column layout parsing hygiene.",
+        "reasoning": f"Evaluates extractable text layer, standard category naming ({len(found_headers)} identified), and header hygiene.",
         "checks": checks,
         "issues": issues,
         "raw_text_preview": raw_text[:1200] + ("..." if len(raw_text) > 1200 else "")
@@ -368,63 +344,116 @@ def evaluate_ats_parseability(
 
 
 # ==============================================================================
-# PILLAR 2: DEEP SEMANTIC & IMPLICIT COMPETENCY ENGINE
+# PILLAR 2: GROUND-TRUTH KEYWORD & COMPETENCY MATCHER
 # ==============================================================================
-def extract_implicit_competencies_with_ai(
-    resume_text: str,
-    target_role: str,
-    domain_info: Dict[str, Any]
-) -> List[Dict[str, Any]]:
-    """
-    Deep AI Semantic Analyzer: Discovers implicit competencies embedded in technical & strategic narratives.
-    e.g., 'pgvector + RAG' -> Vector Databases & Semantic Search
-    e.g., 'Supabase RLS' -> Application Security (OWASP & Auth)
-    """
+# Standard Alias and Equivalent Tech Terms Mapping
+KEYWORD_ALIASES = {
+    "distributed systems": ["distributed systems", "distributed architecture", "distributed services", "distributed computing", "distributed pipeline", "distributed"],
+    "microservices architecture": ["microservices architecture", "microservices", "microservice", "micro-services", "service-oriented"],
+    "microservices": ["microservices architecture", "microservices", "microservice", "micro-services"],
+    "system design": ["system design", "system architecture", "high-level design", "low-level design", "hld", "lld"],
+    "ci/cd": ["ci/cd", "cicd", "continuous integration", "continuous deployment", "github actions", "gitlab ci", "jenkins"],
+    "kubernetes": ["kubernetes", "k8s"],
+    "k8s": ["kubernetes", "k8s"],
+    "postgresql": ["postgresql", "postgres", "psql"],
+    "postgres": ["postgresql", "postgres", "psql"],
+    "aws": ["aws", "amazon web services", "ec2", "s3", "lambda", "ecs", "eks", "cloudwatch", "dynamodb"],
+    "gcp": ["gcp", "google cloud", "google cloud platform", "bigquery", "cloud run", "gcs"],
+    "azure": ["azure", "microsoft azure", "azure devops", "blob storage"],
+    "react": ["react", "react.js", "reactjs"],
+    "next.js": ["next.js", "nextjs", "next"],
+    "node.js": ["node.js", "nodejs", "node"],
+    "c++": ["c++", "cpp", "c++17", "c++20"],
+    "c#": ["c#", "csharp", ".net"],
+    "golang": ["golang", "go", "goroutines"],
+    "go": ["golang", "go language", "in go", "with go", "using go", "go/"],
+    "docker": ["docker", "dockerfile", "containerized", "containers"],
+    "rest api": ["rest api", "restful", "rest apis", "rest endpoints"],
+    "nosql": ["nosql", "mongodb", "dynamodb", "cassandra", "couchbase", "documentdb"],
+    "relational database": ["relational database", "rdbms", "sql", "postgresql", "mysql", "postgres"],
+    "message queue": ["message queue", "kafka", "rabbitmq", "pub/sub", "sqs", "event streaming"],
+    "machine learning": ["machine learning", "ml", "supervised learning", "unsupervised learning", "xgboost", "scikit-learn"],
+    "deep learning": ["deep learning", "dl", "pytorch", "tensorflow", "neural networks", "transformers"],
+    "data science": ["data science", "data analysis", "pandas", "numpy", "eda"],
+    "product management": ["product management", "product strategy", "product roadmap", "prd"],
+    "market sizing": ["market sizing", "tam", "sam", "som", "market entry"],
+    "financial modeling": ["financial modeling", "financial model", "dcf", "three-statement", "lbo", "valuation"]
+}
+
+def check_keyword_in_text(keyword: str, text_lower: str) -> bool:
+    """Accurate word-boundary check with alias awareness preventing false positive substrings."""
+    kw = keyword.strip().lower()
+    if not kw:
+        return False
+    
+    # Check if keyword has predefined alias expansions
+    aliases = KEYWORD_ALIASES.get(kw, [kw])
+    if kw not in aliases:
+        aliases.append(kw)
+        
+    for alias in aliases:
+        a_clean = alias.strip().lower()
+        if a_clean in ["c++", "cpp"]:
+            if bool(re.search(r"\b(c\+\+|cpp)\b", text_lower)): return True
+        elif a_clean in ["c#", "csharp"]:
+            if bool(re.search(r"\b(c#|csharp)\b", text_lower)): return True
+        elif a_clean in [".net", "dotnet"]:
+            if bool(re.search(r"\b(\.net|dotnet)\b", text_lower)): return True
+        elif a_clean in ["ci/cd", "cicd"]:
+            if bool(re.search(r"\b(ci/cd|cicd)\b", text_lower)): return True
+        elif a_clean == "go":
+            if bool(re.search(r"\b(golang|go language|in go|with go|using go)\b", text_lower) or re.search(r"(?:\b|/)(go)(?:/|,|\b)", text_lower)): return True
+        elif a_clean == "r":
+            if bool(re.search(r"\b(r language|in r|with r|using r|r script)\b", text_lower)): return True
+        elif a_clean == "c":
+            if bool(re.search(r"\b(c language|c programming|c/c\+\+|c,)\b", text_lower)): return True
+        else:
+            escaped = re.escape(a_clean)
+            if bool(re.search(rf"\b{escaped}\b", text_lower)):
+                return True
+                
+    return False
+
+
+def extract_skills_from_jd_with_llm(jd_text: str) -> Dict[str, List[str]]:
+    """Extracts atomic, normalized skill requirements from a Job Description."""
     prompt = f"""
-    You are an expert technical interviewer and placement auditor.
-    Analyze this resume text and discover implicit or applied competencies that demonstrate domain mastery for '{domain_info['label']}'.
-    
-    RESUME TEXT:
-    \"\"\"{resume_text[:3500]}\"\"\"
-    
-    DOMAIN COMPETENCY LIST:
-    {json.dumps([comp['name'] for cat in domain_info['categories'].values() for comp in cat])}
-    
-    Extract up to 6 implicit competencies proven by real engineering/consulting work in the text.
-    Return JSON format:
-    {{
-      "inferred_competencies": [
-        {{
-          "name": "Exact Competency Name from list",
-          "inferred_from": "Short snippet or evidence from bullet",
-          "confidence": "high"
-        }}
-      ]
-    }}
+    You are an expert ATS parser. Extract all technical skills, frameworks, tools, and domain requirements from this Job Description.
+    Split them strictly into:
+    1. "core_mandatory_skills": 6 to 12 must-have required skills.
+    2. "preferred_skills": 3 to 8 nice-to-have or preferred tools/technologies.
+
+    RULES:
+    - Each skill must be an atomic short name (e.g. "Kafka", "PostgreSQL", "Go", "Docker", "Kubernetes", "AWS", "Distributed Systems").
+    - Do NOT include full sentences.
+    - OUTPUT STRICTLY VALID JSON.
+
+    JOB DESCRIPTION:
+    {jd_text[:3000]}
     """
     try:
-        try:
-            response_text = cerebras_client.generate_chat_completion(
-                model="gpt-oss-120b",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-                max_tokens=600
-            )
-        except Exception:
-            res = gemini_client.generate_content(
-                model_name="gemini-1.5-flash",
-                prompt=prompt,
-                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-            )
-            response_text = res.text
-            
+        response_text = cerebras_client.generate_chat_completion(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=400
+        )
         data = json_repair.loads(response_text)
-        if isinstance(data, dict) and data.get("inferred_competencies"):
-            return data["inferred_competencies"]
+        if isinstance(data, dict):
+            core = data.get("core_mandatory_skills", [])
+            pref = data.get("preferred_skills", [])
+            if isinstance(core, list) and isinstance(pref, list):
+                return {
+                    "core_mandatory_skills": [str(s).strip() for s in core if str(s).strip()],
+                    "preferred_skills": [str(s).strip() for s in pref if str(s).strip()]
+                }
     except Exception as e:
-        print(f"Implicit competency extraction fallback: {e}")
+        print(f"JD skills extraction fallback: {e}")
         
-    return []
+    return {
+        "core_mandatory_skills": ["Python", "SQL", "Git", "System Design", "Problem Solving"],
+        "preferred_skills": ["Docker", "Cloud", "Agile"]
+    }
 
 
 def evaluate_keyword_match(
@@ -436,18 +465,17 @@ def evaluate_keyword_match(
     sub_track: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Pillar 2: Deep Semantic & Keyword Competency Engine (0-100).
-    Combines deterministic synonym matching, sub-track category prioritization,
-    and AI implicit competency discovery.
+    Pillar 2: Deep Ground-Truth Keyword & Competency Alignment (0-100).
+    Calibrated with zero hallucinations and realistic enterprise scoring.
     """
     canonical_role = target_role.lower()
-    if "software" in canonical_role or "tech" in canonical_role or "developer" in canonical_role or "sde" in canonical_role:
+    if any(k in canonical_role for k in ["software", "tech", "developer", "sde", "engineering"]):
         role_key = "software"
-    elif "prod" in canonical_role or "pm" in canonical_role:
+    elif any(k in canonical_role for k in ["prod", "pm"]):
         role_key = "product_management"
-    elif "fin" in canonical_role or "ib" in canonical_role or "pe" in canonical_role:
+    elif any(k in canonical_role for k in ["fin", "ib", "pe", "banking"]):
         role_key = "finance"
-    elif "data" in canonical_role or "analy" in canonical_role or "ml" in canonical_role or "ai" in canonical_role:
+    elif any(k in canonical_role for k in ["data", "analy", "ml", "ai"]):
         role_key = "analytics"
     else:
         role_key = "consulting"
@@ -460,7 +488,7 @@ def evaluate_keyword_match(
     active_sub_track_data = sub_tracks.get(sub_track) if sub_track else None
     priority_categories = active_sub_track_data.get("priority_categories", []) if active_sub_track_data else []
     
-    # 1. Deterministic Multi-Tiered Synonym Match
+    # 1. Deterministic Domain Taxonomy Match
     explicit_matches = {}
     total_competencies = 0
     priority_matched_count = 0
@@ -476,43 +504,23 @@ def evaluate_keyword_match(
             comp_name = comp["name"]
             synonyms = comp["synonyms"]
             
+            matched_synonym = None
             for syn in synonyms:
-                pattern = re.escape(syn.lower())
-                if re.search(rf"\b{pattern}\b", resume_lower) or syn.lower() in resume_lower:
-                    explicit_matches[comp_name] = {
-                        "name": comp_name,
-                        "matched_via": syn,
-                        "category": category_name,
-                        "is_implicit": False,
-                        "is_priority_subtrack": is_priority_cat
-                    }
-                    if is_priority_cat:
-                        priority_matched_count += 1
+                if check_keyword_in_text(syn, resume_lower):
+                    matched_synonym = syn
                     break
                     
-    # 2. Deep AI Semantic Extractor for Implicit Competencies
-    implicit_inferred = extract_implicit_competencies_with_ai(resume_text, target_role, domain_info)
-    for imp in implicit_inferred:
-        c_name = imp.get("name")
-        if c_name and c_name not in explicit_matches:
-            # Locate category
-            cat_found = "Core Methodologies"
-            for cat_n, c_list in domain_info["categories"].items():
-                if any(c["name"] == c_name for c in c_list):
-                    cat_found = cat_n
-                    break
-            is_priority_cat = cat_found in priority_categories
-            explicit_matches[c_name] = {
-                "name": c_name,
-                "matched_via": imp.get("inferred_from", "AI Inferred from Technical Stack"),
-                "category": cat_found,
-                "is_implicit": True,
-                "is_priority_subtrack": is_priority_cat
-            }
-            if is_priority_cat:
-                priority_matched_count += 1
-            
-    # 3. Categorized Results
+            if matched_synonym:
+                explicit_matches[comp_name] = {
+                    "name": comp_name,
+                    "matched_via": matched_synonym,
+                    "category": category_name,
+                    "is_implicit": False,
+                    "is_priority_subtrack": is_priority_cat
+                }
+                if is_priority_cat:
+                    priority_matched_count += 1
+                    
     categorized_results = []
     all_found = []
     all_missing = []
@@ -525,8 +533,7 @@ def evaluate_keyword_match(
         for comp in competencies:
             comp_name = comp["name"]
             if comp_name in explicit_matches:
-                m_info = explicit_matches[comp_name]
-                cat_matched.append(m_info)
+                cat_matched.append(explicit_matches[comp_name])
                 all_found.append(comp_name)
             else:
                 cat_missing.append(comp_name)
@@ -539,98 +546,79 @@ def evaluate_keyword_match(
             "missing": cat_missing
         })
         
-    # 4. Custom Job Description Matching (Mandatory Core vs Preferred Split)
+    # 2. Custom Job Description Matching (if provided)
     jd_match_info = None
-    if job_description and len(job_description.strip()) > 50:
+    is_custom_jd = bool(job_description and len(job_description.strip()) > 50)
+    
+    if is_custom_jd:
         try:
-            jd_prompt = f"""
-            Extract skills from this JD categorized into Core Mandatory vs Preferred:
-            {job_description[:3000]}
-            Return JSON: 
-            {{ 
-              "core_mandatory_skills": ["Skill1", "Skill2", ...],
-              "preferred_skills": ["Tool1", "Tool2", ...]
-            }}
-            """
-            try:
-                response_text = cerebras_client.generate_chat_completion(
-                    model="gpt-oss-120b",
-                    messages=[{"role": "user", "content": jd_prompt}],
-                    temperature=0.1,
-                    max_tokens=400
-                )
-            except Exception:
-                res = gemini_client.generate_content(
-                    model_name="gemini-1.5-flash",
-                    prompt=jd_prompt,
-                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-                )
-                response_text = res.text
-
-            parsed_jd = json_repair.loads(response_text)
-            if isinstance(parsed_jd, dict):
-                core_skills = parsed_jd.get("core_mandatory_skills", [])
-                pref_skills = parsed_jd.get("preferred_skills", [])
-                
-                core_found = [s for s in core_skills if s.lower() in resume_lower]
-                pref_found = [s for s in pref_skills if s.lower() in resume_lower]
-                
-                core_ratio = (len(core_found) / max(len(core_skills), 1))
-                pref_ratio = (len(pref_found) / max(len(pref_skills), 1))
-                weighted_match_rate = int(round((core_ratio * 0.70 + pref_ratio * 0.30) * 100))
-                
-                jd_match_info = {
-                    "total_core": len(core_skills),
-                    "found_core": len(core_found),
-                    "total_preferred": len(pref_skills),
-                    "found_preferred": len(pref_found),
-                    "match_rate": weighted_match_rate,
-                    "core_found": core_found,
-                    "core_missing": [s for s in core_skills if s not in core_found],
-                    "pref_found": pref_found,
-                    "pref_missing": [s for s in pref_skills if s not in pref_found]
-                }
-        except Exception as e:
-            print(f"Custom JD matching error: {e}")
+            extracted_jd = extract_skills_from_jd_with_llm(job_description)
+            core_skills = extracted_jd.get("core_mandatory_skills", [])
+            pref_skills = extracted_jd.get("preferred_skills", [])
             
-    # Calculate Score (incorporating sub-track priority weighting if present)
-    matched_count = len(all_found)
-    base_match_ratio = matched_count / max(total_competencies, 1)
-    
-    if priority_total_count > 0:
-        priority_ratio = priority_matched_count / priority_total_count
-        effective_match_ratio = (base_match_ratio * 0.4) + (priority_ratio * 0.6)
+            core_found = [s for s in core_skills if check_keyword_in_text(s, resume_lower)]
+            pref_found = [s for s in pref_skills if check_keyword_in_text(s, resume_lower)]
+            
+            core_ratio = (len(core_found) / max(len(core_skills), 1))
+            pref_ratio = (len(pref_found) / max(len(pref_skills), 1))
+            
+            # Calibrated realistic match score (75% core + 25% preferred)
+            weighted_match_rate = int(round((core_ratio * 0.75 + pref_ratio * 0.25) * 100))
+            
+            jd_match_info = {
+                "total_core": len(core_skills),
+                "found_core": len(core_found),
+                "total_preferred": len(pref_skills),
+                "found_preferred": len(pref_found),
+                "match_rate": weighted_match_rate,
+                "core_found": core_found,
+                "core_missing": [s for s in core_skills if s not in core_found],
+                "pref_found": pref_found,
+                "pref_missing": [s for s in pref_skills if s not in pref_found]
+            }
+        except Exception as e:
+            print(f"JD matching calculation error: {e}")
+            
+    # 3. Calibrated Score Computation
+    if is_custom_jd and jd_match_info:
+        # JD Mode: Strictly driven by the Job Description alignment
+        match_score = jd_match_info["match_rate"]
     else:
-        effective_match_ratio = base_match_ratio
-    
-    if effective_match_ratio >= 0.65:
-        match_score = int(round(85 + (effective_match_ratio - 0.65) * 42))
-    elif effective_match_ratio >= 0.35:
-        match_score = int(round(65 + (effective_match_ratio - 0.35) * 66))
-    else:
-        match_score = int(round(35 + (effective_match_ratio) * 85))
+        # Domain Mode: True coverage ratio across the domain's skills
+        matched_count = len(all_found)
+        base_match_ratio = matched_count / max(total_competencies, 1)
         
-    match_score = max(35, min(100, match_score))
+        if priority_total_count > 0:
+            priority_ratio = priority_matched_count / priority_total_count
+            effective_ratio = (base_match_ratio * 0.4) + (priority_ratio * 0.6)
+        else:
+            effective_ratio = base_match_ratio
+            
+        # Realistic calibration curve without 35% free floor
+        match_score = int(round(effective_ratio * 100))
+        
+    match_score = max(20, min(98, match_score))
     
+    # 4. Actionable Suggestions
     suggestions = []
-    if all_missing:
-        # Prioritize suggestions from priority sub-track
+    if is_custom_jd and jd_match_info and jd_match_info.get("core_missing"):
+        for kw in jd_match_info["core_missing"][:3]:
+            suggestions.append(f"Weave in mandatory requirement '{kw}' into your relevant project or work experience bullets.")
+    elif all_missing:
         priority_missing = []
         for cat in categorized_results:
             if cat.get("is_priority_subtrack"):
                 priority_missing.extend(cat.get("missing", []))
-        
         target_suggestions = priority_missing[:3] if priority_missing else all_missing[:3]
         for kw in target_suggestions:
-            sub_label = f" ({active_sub_track_data['label']})" if active_sub_track_data else ""
-            suggestions.append(f"Weave in '{kw}' in relevant experience or project points to strengthen {domain_info['label']}{sub_label} shortlisting.")
+            suggestions.append(f"Incorporate '{kw}' in technical or strategic points to strengthen {domain_info['label']} shortlisting.")
             
     return {
         "score": match_score,
         "target_role_label": domain_info["label"],
         "sub_track_label": active_sub_track_data.get("label") if active_sub_track_data else None,
-        "is_custom_jd": bool(job_description and len(job_description.strip()) > 50),
-        "found_critical_count": matched_count,
+        "is_custom_jd": is_custom_jd,
+        "found_critical_count": len(all_found),
         "total_critical_count": total_competencies,
         "categorized_matrix": categorized_results,
         "found_keywords": all_found,
@@ -641,20 +629,16 @@ def evaluate_keyword_match(
 
 
 # ==============================================================================
-# PILLAR 3: GOOGLE X-Y-Z QUANTIFICATION & BULLET ANATOMY
+# PILLAR 3: GOOGLE X-Y-Z QUANTIFICATION & CAUSALITY
 # ==============================================================================
 def classify_metric_causality(bullet: str) -> Dict[str, Any]:
-    """
-    Classifies metrics into High-Impact Causal Outcomes (e.g. latency, revenue, %, throughput)
-    vs Activity/Scope Indicators (e.g. team size, document counts, project numbers).
-    """
+    """Classifies metrics into High-Impact Causal Outcomes vs Activity Scope."""
     b_lower = bullet.lower()
     is_causal = any(k in b_lower for k in [
         "%", "faster", "reduced", "increased", "boosted", "saved", "cut", "grew",
         "latency", "throughput", "roi", "capex", "opex", "ebitda", "revenue", "cost",
-        "0.", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "s", "ms", "x", "X",
-        "cr", "crore", "lakh", "$", "₹", "€", "£", "pass rate", "accuracy", "f1", "auc", "retention",
-        "vulnerabilities", "uptime", "p99", "p95", "queries/sec", "qps", "tps"
+        "cr", "crore", "lakh", "$", "₹", "€", "£", "accuracy", "f1", "retention",
+        "uptime", "p99", "p95", "qps", "tps", "ms", "queries/sec"
     ])
     return {
         "is_causal": is_causal,
@@ -663,10 +647,7 @@ def classify_metric_causality(bullet: str) -> Dict[str, Any]:
 
 
 def deconstruct_bullet_xyz_anatomy(bullets: List[str]) -> List[Dict[str, Any]]:
-    """
-    Deconstructs bullets into Google X-Y-Z components:
-    Accomplished [X] as measured by [Y], by doing [Z].
-    """
+    """Deconstructs bullets into Google X-Y-Z components."""
     results = []
     metric_regex = re.compile(r"((?:[\$€£₹]\s*)?\d+(?:,\d+)*(?:\.\d+)?(?:[kKmMbB]|k\+|M\+|\+|Cr|L|s|ms|x|X)?(?:%|x|X)?|\b(?:first|1st|2nd|3rd|top\s*\d+%?|rank\s*\d+|bronze|silver|gold)\b)", re.IGNORECASE)
     
@@ -674,25 +655,22 @@ def deconstruct_bullet_xyz_anatomy(bullets: List[str]) -> List[Dict[str, Any]]:
         has_metric = bool(metric_regex.search(b))
         metric_meta = classify_metric_causality(b)
         
-        # Clean leading bullet artifacts before analyzing action verb
         clean_b = re.sub(r"^\s*(?:\\item\s*|\\textbf\{|\*\*|\d+[\.\)]|[-•*–—])\s*", "", b)
         words = clean_b.split()
         first_word = words[0].strip(" -•*–,.:;{}*") if words else ""
         has_power_verb = len(first_word) > 3 and not any(first_word.lower().startswith(w) for w in WEAK_VERBS)
-        
-        # Check mechanism indicators (by doing Z, using, via, through, leveraging)
         has_mechanism = any(k in b.lower() for k in ["using", "via", "through", "leveraging", "by ", "with ", "implementing", "architecting", "orchestrating", "deploying"])
         
         if has_metric and metric_meta["is_causal"] and has_power_verb and has_mechanism:
-            xyz_score = 100
+            xyz_score = 96
         elif has_metric and has_power_verb and has_mechanism:
-            xyz_score = 88
+            xyz_score = 85
         elif has_metric and has_power_verb:
-            xyz_score = 80
+            xyz_score = 75
         elif has_metric:
-            xyz_score = 65
+            xyz_score = 60
         else:
-            xyz_score = 45
+            xyz_score = 35
             
         results.append({
             "bullet_text": b,
@@ -719,7 +697,7 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
                 
     if not all_bullets:
         return {
-            "score": 60,
+            "score": 40,
             "quantified_count": 0,
             "total_bullets": 0,
             "quantification_ratio": 0,
@@ -757,14 +735,12 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
         else:
             unquantified_bullets.append(b)
             
-    quant_ratio = (len(quantified_bullets) / max(len(all_bullets), 1)) * 100
-    causal_ratio = (causal_count / max(len(all_bullets), 1)) * 100
+    quant_ratio = len(quantified_bullets) / max(len(all_bullets), 1)
+    causal_ratio = causal_count / max(len(all_bullets), 1)
     
-    # Combined score emphasizing causal outcomes
-    base_score = 85 + (quant_ratio - 75) * 0.6 if quant_ratio >= 75 else 50 + (quant_ratio / 75) * 35
-    causal_bonus = min(8, int(round(causal_ratio * 0.1)))
-    score = int(round(base_score + causal_bonus))
-    score = max(30, min(100, score))
+    # Realistic linear score: Base quantification (75%) + Causal impact bonus (25%)
+    score = int(round((quant_ratio * 75) + (causal_ratio * 25)))
+    score = max(25, min(98, score))
     
     types_found = [k for k, v in metric_types.items() if v > 0]
     xyz_deconstruction = deconstruct_bullet_xyz_anatomy(all_bullets[:8])
@@ -774,20 +750,20 @@ def evaluate_quantification_impact(parsed_sections: List[Dict[str, Any]]) -> Dic
         "quantified_count": len(quantified_bullets),
         "causal_outcomes_count": causal_count,
         "total_bullets": len(all_bullets),
-        "quantification_ratio": int(round(quant_ratio)),
-        "causal_ratio": int(round(causal_ratio)),
+        "quantification_ratio": int(round(quant_ratio * 100)),
+        "causal_ratio": int(round(causal_ratio * 100)),
         "metric_types_found": types_found,
         "weak_unquantified_bullets": unquantified_bullets[:4],
         "xyz_deconstruction": xyz_deconstruction,
-        "feedback": f"{len(quantified_bullets)} of {len(all_bullets)} ({int(round(quant_ratio))}%) bullets contain metrics, with {causal_count} hard causal business outcomes."
+        "feedback": f"{len(quantified_bullets)} of {len(all_bullets)} ({int(round(quant_ratio * 100))}%) bullets contain metrics, with {causal_count} causal business/system outcomes."
     }
 
 
 # ==============================================================================
-# PILLAR 4: EXECUTIVE ACTION VERBS & VOICE DYNAMICS
+# PILLAR 4: EXECUTIVE ACTION VERBS & ACTIVE VOICE
 # ==============================================================================
 def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], target_role: str = "consulting") -> Dict[str, Any]:
-    """Pillar 4: Action Verbs & Active Voice (0-100) with LaTeX/Markdown syntax stripping."""
+    """Pillar 4: Action Verbs & Active Voice (0-100)."""
     all_bullets = []
     for sec in parsed_sections:
         for b in sec.get("bullets", []):
@@ -798,8 +774,8 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
                 
     if not all_bullets:
         return {
-            "score": 70,
-            "power_verb_ratio": 80,
+            "score": 50,
+            "power_verb_ratio": 50,
             "weak_verb_count": 0,
             "repetitive_verbs": [],
             "weak_bullets": []
@@ -809,7 +785,6 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
     weak_bullets = []
     
     for b in all_bullets:
-        # Sanitize LaTeX formatting (\item, \textbf{...}, \emph{...}, markdown **)
         clean_b = re.sub(r"\\item\s*", "", b)
         clean_b = re.sub(r"\\textbf\{([^}]+)\}", r"\1", clean_b)
         clean_b = re.sub(r"\\emph\{([^}]+)\}", r"\1", clean_b)
@@ -834,14 +809,14 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
     
     weak_count = len(weak_bullets)
     total = max(len(all_bullets), 1)
-    strong_ratio = max(0, int(round(((total - weak_count) / total) * 100)))
+    strong_ratio = max(0.0, (total - weak_count) / total)
     
-    score = int(round((strong_ratio * 0.85) - (len(repetitive) * 4)))
-    score = max(40, min(100, score))
+    score = int(round((strong_ratio * 88) - (len(repetitive) * 5)))
+    score = max(30, min(98, score))
     
     return {
         "score": score,
-        "power_verb_ratio": strong_ratio,
+        "power_verb_ratio": int(round(strong_ratio * 100)),
         "weak_verb_count": weak_count,
         "repetitive_verbs": repetitive,
         "weak_bullets": weak_bullets[:3]
@@ -849,208 +824,51 @@ def evaluate_action_verbs_and_voice(parsed_sections: List[Dict[str, Any]], targe
 
 
 # ==============================================================================
-# PILLAR 5: VISUAL GEOMETRY & LINE BUDGET
+# PILLAR 5: FORMATTING, LINE BUDGET & PLACEMENT POLICY
 # ==============================================================================
-def is_header_or_non_bullet_metadata(text: str) -> bool:
-    """Detects and filters out header tables, dates, and non-bullet metadata."""
-    t = text.strip()
-    t_lower = t.lower()
-    if len(t) < 20:
-        return True
-    if any(k in t_lower for k in [
-        'dob:', 'gender:', 'cpi:', 'cpi /', 'credits', 'roll no', 'examination', 
-        'passing year', 'board', 'b.tech', 'm.tech', 'dual degree', 'gender: male', 'gender: female'
-    ]):
-        return True
-    if t_lower in [
-        'key projects', 'professional experience', 'extracurriculars', 
-        'positions of responsibility', 'scholastic achievements', 'education', 'technical skills'
-    ]:
-        return True
-    if re.match(r"^\[?[a-z]{3}[\'\’]\d{2}\s*-\s*(?:present|[a-z]{3}[\'\’]\d{2})\]?$", t_lower):
-        return True
-    if t_lower in [
-        "self project (deployed)", "self project", "course project", "b.tech. project", "renewathon"
-    ]:
-        return True
-    return False
-
-
-def is_bullet_unit_start(text: str) -> bool:
-    """Checks if a text line starts a bullet point."""
-    t = text.strip()
-    if not t:
-        return False
-    if t[0] in ["•", "-", "*", "–", "—", "▪", "▫", "‣", "·", "\u2022", "\u2013", "\u2014"]:
-        return True
-    if re.match(r"^(\d+[\.\)]|\([a-z\d]\))\s+", t):
-        return True
-    return False
-
-
-def inspect_pdf_visual_geometry_and_hazards(
-    pdf_bytes: Optional[bytes], 
-    raw_text: str, 
-    parsed_sections: List[Dict[str, Any]]
-) -> Dict[str, Any]:
-    """
-    Visual OCR & Column-Aware Layout Analyzer using PyMuPDF.
-    Accurately detects page count and true visual orphan word spills on rendered PDF lines
-    while strictly filtering out headers, roll numbers, left-column dates, and labels.
-    """
-    page_count = 1
-    hazards = []
-    
-    if pdf_bytes:
-        try:
-            import fitz
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            page_count = len(doc)
-            
-            bullet_section_map = {}
-            for sec in parsed_sections:
-                stype = sec.get("section_type", "Experience")
-                for b in sec.get("bullets", []):
-                    bt = b if isinstance(b, str) else b.get("bullet_text", "")
-                    if bt and not is_header_or_non_bullet_metadata(bt):
-                        bullet_section_map[re.sub(r"\s+", " ", bt.strip()).lower()] = (stype, bt)
-
-            for page in doc:
-                doc_dict = page.get_text("dict")
-                blocks = doc_dict.get("blocks", [])
-                
-                for block in blocks:
-                    if "lines" not in block:
-                        continue
-                    
-                    lines = block["lines"]
-                    if not lines:
-                        continue
-                    
-                    content_lines = []
-                    for l in lines:
-                        l_text = "".join([s.get("text", "") for s in l.get("spans", [])]).strip()
-                        bbox = l.get("bbox", (0, 0, 0, 0))
-                        
-                        if is_header_or_non_bullet_metadata(l_text):
-                            continue
-                            
-                        if bbox[0] >= 110 or (bbox[2] - bbox[0]) >= 220:
-                            content_lines.append({
-                                "text": l_text,
-                                "bbox": bbox,
-                                "width": bbox[2] - bbox[0],
-                                "y0": bbox[1],
-                                "y1": bbox[3]
-                            })
-                            
-                    if not content_lines:
-                        continue
-                        
-                    bullet_units = []
-                    curr_unit = []
-                    
-                    for cl in content_lines:
-                        txt = cl["text"]
-                        if is_bullet_unit_start(txt) and curr_unit:
-                            bullet_units.append(curr_unit)
-                            curr_unit = [cl]
-                        elif curr_unit and (cl["y0"] - curr_unit[-1]["y1"] > 3.5):
-                            bullet_units.append(curr_unit)
-                            curr_unit = [cl]
-                        else:
-                            curr_unit.append(cl)
-                            
-                    if curr_unit:
-                        bullet_units.append(curr_unit)
-                        
-                    for bu in bullet_units:
-                        full_bullet_text = " ".join([l["text"] for l in bu])
-                        clean_bullet_text = re.sub(r"\s+", " ", full_bullet_text).strip()
-                        
-                        if is_header_or_non_bullet_metadata(clean_bullet_text) or len(clean_bullet_text) < 35:
-                            continue
-                            
-                        if len(bu) == 1:
-                            continue
-                            
-                        widths = [l["width"] for l in bu]
-                        max_w = max(widths) if widths else 1
-                        last_w = widths[-1]
-                        last_text = bu[-1]["text"].strip()
-                        last_words = last_text.split()
-                        
-                        width_ratio = last_w / max(max_w, 1)
-                        is_orphan = (width_ratio < 0.25 and len(last_words) <= 3) or (len(last_words) <= 2 and len(last_text) < 16)
-                        
-                        if is_orphan:
-                            matched_stype = "Experience"
-                            matched_bullet_full = clean_bullet_text
-                            
-                            for b_key, (st, orig_b) in bullet_section_map.items():
-                                if b_key in clean_bullet_text.lower() or clean_bullet_text.lower() in b_key:
-                                    matched_stype = st
-                                    matched_bullet_full = orig_b
-                                    break
-                                    
-                            hazards.append({
-                                "section": matched_stype,
-                                "bullet_text": matched_bullet_full,
-                                "char_length": len(matched_bullet_full),
-                                "visual_lines": len(bu),
-                                "orphan_words": last_text,
-                                "target_trim_chars": len(last_text) + 2,
-                                "chars_to_trim": len(last_text) + 2,
-                                "reason": f"Visual {len(bu)}-line wrap: '{last_text}' spilled as an orphan on the last line."
-                            })
-                            
-            doc.close()
-        except Exception as e:
-            print(f"Visual geometry analysis error: {e}")
-
-    return {
-        "page_count": page_count,
-        "hazards": hazards
-    }
-
-
 def evaluate_formatting_and_iitb_rules(
     raw_text: str, 
     parsed_sections: List[Dict[str, Any]], 
     pdf_bytes: Optional[bytes] = None,
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
-    """Pillar 5: Line Budget, Visual Geometry Density & Placement Rules (0-100)."""
+    """Pillar 5: Line Budget, Word Density & Policy Compliance (0-100)."""
     words = raw_text.split()
     word_count = len(words)
     
-    visual_analysis = inspect_pdf_visual_geometry_and_hazards(pdf_bytes, raw_text, parsed_sections)
-    page_count = visual_analysis["page_count"]
-    hazards = visual_analysis["hazards"]
-    
-    if page_count == 1:
-        if 380 <= word_count <= 650:
-            word_density_score = 100
-            density_status = f"Optimal for 1-Page ({word_count} words)"
-        elif 280 <= word_count < 380 or 650 < word_count <= 850:
-            word_density_score = 85
-            density_status = f"Dense ({word_count} words)" if word_count > 650 else f"Light ({word_count} words)"
-        else:
-            word_density_score = 70
-            density_status = f"Very Dense ({word_count} words)"
+    page_count = 1
+    if pdf_bytes:
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            page_count = len(doc)
+            doc.close()
+        except Exception:
+            page_count = 1 if word_count <= 750 else 2
     else:
-        if 850 <= word_count <= 1650:
-            word_density_score = 100
-            density_status = f"Optimal for 2-Page Master ({word_count} words)"
-        elif 700 <= word_count < 850 or 1650 < word_count <= 1950:
-            word_density_score = 88
-            density_status = f"Dense ({word_count} words)" if word_count > 1650 else f"Light ({word_count} words)"
+        page_count = 1 if word_count <= 750 else 2
+        
+    if page_count == 1:
+        if 420 <= word_count <= 640:
+            word_density_score = 95
+            density_status = f"Optimal for 1-Page ({word_count} words)"
+        elif 320 <= word_count < 420 or 640 < word_count <= 780:
+            word_density_score = 78
+            density_status = f"Dense ({word_count} words)" if word_count > 640 else f"Light ({word_count} words)"
         else:
-            word_density_score = 75
-            density_status = f"Very Dense ({word_count} words)"
+            word_density_score = 55
+            density_status = f"Very Dense ({word_count} words)" if word_count > 780 else f"Too Brief ({word_count} words)"
+    else:
+        if 850 <= word_count <= 1450:
+            word_density_score = 95
+            density_status = f"Optimal for 2-Page Master ({word_count} words)"
+        elif 700 <= word_count < 850 or 1450 < word_count <= 1750:
+            word_density_score = 80
+            density_status = f"Dense ({word_count} words)" if word_count > 1450 else f"Light ({word_count} words)"
+        else:
+            word_density_score = 60
+            density_status = f"Overloaded ({word_count} words)"
             
-    wrap_score = max(50, 100 - (len(hazards) * 8))
-    
     policy_alerts = []
     if mode == "iitb_placement":
         for pattern, violation_title in PROHIBITED_RANK_PATTERNS:
@@ -1065,41 +883,38 @@ def evaluate_formatting_and_iitb_rules(
     layout_checks = [
         {
             "name": f"{page_count}-Page Word Count Density",
-            "passed": word_density_score >= 80,
+            "passed": word_density_score >= 75,
             "score": word_density_score,
             "status": density_status
-        },
-        {
-            "name": "Visual Line-Wrap & Margin Budget",
-            "passed": len(hazards) <= 2,
-            "score": wrap_score,
-            "status": "Optimal (0 Overflow)" if len(hazards) == 0 else f"{len(hazards)} Visual Wrap Flags"
         }
     ]
     
     if mode == "iitb_placement":
+        policy_score = 95 if len(policy_alerts) == 0 else 40
         layout_checks.append({
             "name": "IITB Prohibited Rank Compliance",
             "passed": len(policy_alerts) == 0,
-            "score": 100 if len(policy_alerts) == 0 else 40,
+            "score": policy_score,
             "status": "Compliant" if len(policy_alerts) == 0 else "Violation Flagged"
         })
+        final_score = int(round((word_density_score * 0.6) + (policy_score * 0.4)))
+    else:
+        final_score = word_density_score
         
-    final_score = int(round((word_density_score * 0.4) + (wrap_score * 0.4) + ((100 if len(policy_alerts) == 0 else 40) * 0.2)))
-    final_score = max(40, min(100, final_score))
+    final_score = max(35, min(98, final_score))
     
     return {
         "score": final_score,
         "page_count": page_count,
         "word_count": word_count,
-        "line_wrap_hazards": hazards,
+        "line_wrap_hazards": [],
         "policy_alerts": policy_alerts,
         "layout_checks": layout_checks
     }
 
 
 # ==============================================================================
-# SECTION-BY-SECTION MULTI-DIMENSIONAL SCORING & AI AUDITOR ENGINE
+# SECTION-BY-SECTION HEALTH DIAGNOSTICS
 # ==============================================================================
 def audit_sections_with_deep_ai(
     parsed_sections: List[Dict[str, Any]], 
@@ -1107,14 +922,9 @@ def audit_sections_with_deep_ai(
     target_role: str = "software",
     mode: str = "iitb_placement"
 ) -> Dict[str, Any]:
-    """
-    Comprehensive Section-Wise Scoring Framework & Deep AI Diagnostics.
-    Audits 5 key sections across 4 standardized benchmark dimensions (weighted 25% each)
-    with realistic score calibration (compressed to 50-88 range).
-    """
+    """Section-Wise Scoring Framework & Deep Diagnostics."""
     raw_lower = raw_text.lower()
     
-    # 1. Extract Bullets and Content by Section Type
     exp_bullets = []
     proj_bullets = []
     por_bullets = []
@@ -1138,67 +948,58 @@ def audit_sections_with_deep_ai(
             elif any(k in stype for k in ["skill", "coursework"]):
                 skills_lines.append(t)
                 
-    # Deterministic Multi-Dimensional Rubric Baseline
-    # --- A. WORK EXPERIENCE ---
+    # A. Work Experience
     exp_metrics = sum(1 for b in exp_bullets if re.search(r"\d+%|\d+x|\$[\d,]+|₹[\d,]+|\b\d+\b", b))
     m_ratio = (exp_metrics / max(len(exp_bullets), 1))
-    exp_d1 = min(88, max(52, int(round(50 + m_ratio * 38))))
+    exp_d1 = min(92, max(40, int(round(40 + m_ratio * 52))))
     
-    weak_verbs = sum(1 for b in exp_bullets if any(w in b.lower() for w in ["worked on", "helped", "assisted", "responsible for"]))
-    exp_d2 = min(90, max(52, int(round(88 - (weak_verbs / max(len(exp_bullets), 1)) * 36))))
+    weak_verbs = sum(1 for b in exp_bullets if any(w in b.lower() for w in WEAK_VERBS))
+    exp_d2 = min(92, max(45, int(round(90 - (weak_verbs / max(len(exp_bullets), 1)) * 45))))
+    exp_d3 = min(90, max(45, int(round(50 + (min(len(exp_bullets), 6) / 6) * 38))))
+    exp_d4 = 88 if len(exp_bullets) >= 3 else 55
+    exp_score = int(round(exp_d1 * 0.30 + exp_d2 * 0.25 + exp_d3 * 0.25 + exp_d4 * 0.20))
     
-    exp_d3 = min(88, max(55, int(round(60 + (min(len(exp_bullets), 6) / 6) * 26))))
-    exp_d4 = 85 if len(exp_bullets) >= 3 else 62
-    exp_score = int(round(exp_d1 * 0.25 + exp_d2 * 0.25 + exp_d3 * 0.25 + exp_d4 * 0.25))
-    
-    # --- B. TECHNICAL PROJECTS ---
+    # B. Projects
     has_live_proof = any(k in raw_lower for k in ["deployed", "live", "active users", "production", "github", "hosted", "users", "http", "api"])
-    proj_d1 = 86 if has_live_proof else 64
+    proj_d1 = 88 if has_live_proof else 58
+    proj_tech_matches = sum(1 for k in ["api", "database", "sql", "model", "pipeline", "docker", "react", "fastapi", "postgres", "redis", "cloud", "aws"] if k in raw_lower)
+    proj_d2 = min(92, max(45, int(round(45 + min(proj_tech_matches, 8) * 5.8))))
+    proj_d3 = min(88, max(45, int(round(50 + min(len(proj_bullets), 6) * 6.0))))
+    proj_d4 = 85 if len(proj_bullets) >= 2 else 55
+    proj_score = int(round(proj_d1 * 0.25 + proj_d2 * 0.30 + proj_d3 * 0.25 + proj_d4 * 0.20))
     
-    proj_tech_matches = sum(1 for k in ["api", "database", "sql", "model", "pipeline", "docker", "react", "fastapi", "postgres", "redis", "cloud"] if k in raw_lower)
-    proj_d2 = min(88, max(54, int(round(55 + min(proj_tech_matches, 7) * 4.6))))
-    
-    proj_d3 = min(86, max(55, int(round(58 + min(len(proj_bullets), 6) * 4.5))))
-    proj_d4 = 84 if len(proj_bullets) >= 3 else 65
-    proj_score = int(round(proj_d1 * 0.25 + proj_d2 * 0.25 + proj_d3 * 0.25 + proj_d4 * 0.25))
-    
-    # --- C. SCHOLASTIC ACHIEVEMENTS & EDUCATION ---
-    has_cpi = bool(re.search(r"\bcpi\b|\bgpa\b|\bcredits\b|\bcredits completed\b|\bdepartment of\b|\bb\.tech\b|\bdual degree\b", raw_lower))
-    edu_d1 = 88 if has_cpi else 65
-    
-    has_honors = any(k in raw_lower for k in ["ap grade", "scholar", "kvpy", "olympiad", "top", "medal", "fellowship", "merit", "hackathon", "icpc", "podium"])
-    edu_d2 = 86 if has_honors else 68
-    
-    # Policy check (AIR / batch rank)
+    # C. Education
+    has_cpi = bool(re.search(r"\bcpi\b|\bgpa\b|\bcredits\b|\bb\.tech\b|\bdual degree\b|\bdepartment\b", raw_lower))
+    edu_d1 = 90 if has_cpi else 60
+    has_honors = any(k in raw_lower for k in ["ap grade", "scholar", "kvpy", "olympiad", "top", "medal", "fellowship", "merit", "hackathon", "icpc"])
+    edu_d2 = 88 if has_honors else 60
     has_banned_rank = any(re.search(pat, raw_text, re.IGNORECASE) for pat, _ in PROHIBITED_RANK_PATTERNS)
-    edu_d3 = 50 if has_banned_rank else 88
+    edu_d3 = 40 if has_banned_rank else 92
     edu_d4 = 85
-    edu_score = int(round(edu_d1 * 0.25 + edu_d2 * 0.25 + edu_d3 * 0.25 + edu_d4 * 0.25))
+    edu_score = int(round(edu_d1 * 0.30 + edu_d2 * 0.30 + edu_d3 * 0.25 + edu_d4 * 0.15))
     
-    # --- D. TECHNICAL SKILLS MATRIX ---
+    # D. Skills Matrix
     has_skills_table = any(k in raw_lower for k in ["languages:", "frameworks:", "databases:", "tools:", "libraries:", "developer tools:", "cloud:"])
-    skills_d1 = 88 if has_skills_table else 62
-    
-    skills_d2 = 86 if any(k in raw_lower for k in ["python", "typescript", "docker", "postgres", "fastapi", "react", "pytorch", "next.js", "kubernetes"]) else 68
-    skills_d3 = 84 if (has_skills_table or len(skills_lines) > 0) else 65
+    skills_d1 = 90 if has_skills_table else 55
+    skills_d2 = 88 if any(k in raw_lower for k in ["python", "typescript", "docker", "postgres", "fastapi", "react", "pytorch", "next.js", "kubernetes", "sql"]) else 55
+    skills_d3 = 85 if (has_skills_table or len(skills_lines) > 0) else 55
     skills_d4 = 85
-    skills_score = int(round(skills_d1 * 0.25 + skills_d2 * 0.25 + skills_d3 * 0.25 + skills_d4 * 0.25))
+    skills_score = int(round(skills_d1 * 0.30 + skills_d2 * 0.30 + skills_d3 * 0.25 + skills_d4 * 0.15))
     
-    # --- E. POSITIONS OF RESPONSIBILITY (POR) ---
+    # E. Leadership / POR
     por_present = any(k in raw_lower for k in ["position of responsibility", "positions of responsibility", "convenor", "head", "manager", "lead", "coordinator", "secretary", "core team"])
-    por_d1 = 85 if por_present else 60
-    por_d2 = 82 if any(k in raw_lower for k in ["team of", "budget", "participants", "footfall", "organized", "spearheaded", "managed"]) else 65
-    por_d3 = 84 if por_present else 60
-    por_d4 = 85 if por_present else 65
-    por_score = int(round(por_d1 * 0.25 + por_d2 * 0.25 + por_d3 * 0.25 + por_d4 * 0.25))
+    por_d1 = 88 if por_present else 45
+    por_d2 = 85 if any(k in raw_lower for k in ["team of", "budget", "participants", "footfall", "organized", "spearheaded", "managed"]) else 50
+    por_d3 = 84 if por_present else 45
+    por_d4 = 85 if por_present else 50
+    por_score = int(round(por_d1 * 0.30 + por_d2 * 0.30 + por_d3 * 0.25 + por_d4 * 0.15))
     
-    # Build default structured diagnostics
     diagnostics = {
         "experience": {
             "name": "Work Experience & Internships",
             "score": exp_score,
             "bullets_count": len(exp_bullets),
-            "status": "Elite Impact" if exp_score >= 82 else "Strong Fit" if exp_score >= 72 else "Needs Polish",
+            "status": "Elite Impact" if exp_score >= 82 else "Strong Fit" if exp_score >= 70 else "Needs Polish",
             "dimensions": [
                 {"name": "Metric Density & Impact", "score": exp_d1, "benchmark": "≥75% with metrics"},
                 {"name": "Action Verbs & Voice", "score": exp_d2, "benchmark": "Executive action verbs"},
@@ -1206,37 +1007,37 @@ def audit_sections_with_deep_ai(
                 {"name": "Structural Hygiene & Budget", "score": exp_d4, "benchmark": "3-5 bullets per role"}
             ],
             "strengths": [
-                f"{int(round(m_ratio * 100))}% of experience bullets contain hard business/engineering metrics",
-                "High ownership verbs utilized across key delivery points"
+                f"{int(round(m_ratio * 100))}% of experience bullets contain metrics" if m_ratio > 0 else "Clear experience timeline",
+                "Action-oriented bullet phrasing"
             ],
             "gaps": [
-                "Quantify secondary engineering achievements with latency or efficiency gains"
+                "Quantify secondary achievements with latency, throughput, or business outcome gains" if m_ratio < 0.75 else "Maintain consistent STAR structure across all roles"
             ]
         },
         "projects": {
             "name": "Key Technical / Domain Projects",
             "score": proj_score,
             "bullets_count": len(proj_bullets),
-            "status": "Production Caliber" if proj_score >= 82 else "Strong Depth" if proj_score >= 72 else "Needs Polish",
+            "status": "Production Caliber" if proj_score >= 82 else "Strong Depth" if proj_score >= 70 else "Needs Polish",
             "dimensions": [
                 {"name": "Production & Live Deployment", "score": proj_d1, "benchmark": "Live links or repo proof"},
                 {"name": "Stack Depth & Completeness", "score": proj_d2, "benchmark": "Full-stack / Cloud / DB"},
                 {"name": "Problem Scale & Originality", "score": proj_d3, "benchmark": "Non-trivial engineering"},
-                {"name": "IITB Presentation Standard", "score": proj_d4, "benchmark": "Overview line + bullets"}
+                {"name": "Presentation Standard", "score": proj_d4, "benchmark": "Overview line + bullets"}
             ],
             "strengths": [
-                "Demonstrates live production proof and active deployment workflows" if has_live_proof else "Clear problem statements across major project points",
-                "Broad multi-tier technology stack utilized"
+                "Demonstrates live production proof and active deployment" if has_live_proof else "Clear problem definitions across technical projects",
+                "Multi-tier technology stack utilized"
             ],
             "gaps": [
-                "Ensure every project features an initial single-line overview sentence" if not has_live_proof else "Add direct user scale or performance benchmark metrics"
+                "Include live deployment links or architecture scale indicators" if not has_live_proof else "Add performance benchmarks or user scale"
             ]
         },
         "education": {
             "name": "Scholastic Achievements & Education",
             "score": edu_score,
             "bullets_count": len(scholastic_bullets),
-            "status": "Placement Compliant" if edu_score >= 80 else "Acceptable" if edu_score >= 68 else "Policy Alert",
+            "status": "Placement Compliant" if edu_score >= 80 else "Acceptable" if edu_score >= 65 else "Policy Alert",
             "dimensions": [
                 {"name": "Academic Baseline Clarity", "score": edu_d1, "benchmark": "CPI / Degree properly formatted"},
                 {"name": "Competitive Honors & Distinctions", "score": edu_d2, "benchmark": "Olympiads / Scholarships / AP"},
@@ -1244,18 +1045,18 @@ def audit_sections_with_deep_ai(
                 {"name": "Formatting & Chronology", "score": edu_d4, "benchmark": "Reverse chronological hierarchy"}
             ],
             "strengths": [
-                "Standard Institute academic identifiers verified" if has_cpi else "Clear educational progression",
-                "Distinctions and academic honors clearly highlighted" if has_honors else "Standard academic standing"
+                "Academic identifiers and degree status verified" if has_cpi else "Clear educational progression",
+                "Distinctions and academic honors highlighted" if has_honors else "Standard academic standing"
             ],
             "gaps": [
-                "Ensure compliance with placement policy by strictly omitting All India Ranks" if has_banned_rank else "Include national scholarships or academic recognitions if applicable"
+                "Strictly omit prohibited All India Ranks per placement policy" if has_banned_rank else "Include national scholarships or academic recognitions if applicable"
             ]
         },
         "skills": {
             "name": "Technical & Domain Skills Matrix",
             "score": skills_score,
             "bullets_count": len(skills_lines),
-            "status": "Structured Stack" if skills_score >= 80 else "Uncategorized",
+            "status": "Structured Stack" if skills_score >= 78 else "Uncategorized",
             "dimensions": [
                 {"name": "Taxonomic Categorization", "score": skills_d1, "benchmark": "Languages / Frameworks / DBs"},
                 {"name": "Stack Modernity & Currency", "score": skills_d2, "benchmark": "Industry-standard tools"},
@@ -1264,17 +1065,17 @@ def audit_sections_with_deep_ai(
             ],
             "strengths": [
                 "Structured under distinct functional categories" if has_skills_table else "Comprehensive tool inventory",
-                "Strong alignment with modern software engineering expectations"
+                "Alignment with modern engineering practices"
             ],
             "gaps": [
-                "Group flat skill lists into distinct categories (Languages, Frameworks, Databases, Tools)" if not has_skills_table else "Ensure secondary frameworks are supported by evidence in project points"
+                "Group flat skill lists into distinct categories (Languages, Frameworks, Databases, Tools)" if not has_skills_table else "Ensure listed technologies are supported by evidence in project points"
             ]
         },
         "leadership": {
             "name": "Positions of Responsibility & Leadership",
             "score": por_score,
             "bullets_count": len(por_bullets),
-            "status": "Verified Leadership" if por_score >= 80 else "Standard Participation",
+            "status": "Verified Leadership" if por_score >= 78 else "Standard Participation",
             "dimensions": [
                 {"name": "Leadership Scope & Footprint", "score": por_d1, "benchmark": "Team size & event scale"},
                 {"name": "Administrative Impact", "score": por_d2, "benchmark": "Process & growth metrics"},
@@ -1282,82 +1083,20 @@ def audit_sections_with_deep_ai(
                 {"name": "Hierarchy & Title Standard", "score": por_d4, "benchmark": "Role | Organization | Date"}
             ],
             "strengths": [
-                "Demonstrates formal leadership ownership and institutional impact" if por_present else "Well-rounded extracurricular participation",
-                "Shows cross-functional teamwork and initiative"
+                "Demonstrates formal leadership ownership and footprint" if por_present else "Extracurricular participation",
+                "Cross-functional collaboration and initiative"
             ],
             "gaps": [
-                "Quantify leadership footprint with team size, budget, or event footfall numbers" if por_present else "Consider adding a Position of Responsibility to strengthen leadership evaluation"
+                "Quantify leadership scope with team size or budget managed" if por_present else "Consider highlighting formal responsibility roles"
             ]
         }
     }
     
-    # Deep AI Semantic Enrichment via Cerebras / Gemini (Fast Structured Polish)
-    try:
-        sample_bullets = (exp_bullets[:4] + proj_bullets[:3])
-        if sample_bullets:
-            ai_prompt = f"""
-            You are an elite IIT Bombay Placement Coach.
-            Review these sample resume bullets for '{target_role}' and generate 2 specific strengths and 2 actionable improvement recommendations for the candidate's Experience and Projects.
-            
-            BULLETS:
-            {json.dumps(sample_bullets)}
-            
-            Return JSON format:
-            {{
-              "exp_strengths": ["string", "string"],
-              "exp_gaps": ["string"],
-              "proj_strengths": ["string"],
-              "proj_gaps": ["string"]
-            }}
-            """
-            try:
-                ai_res = cerebras_client.generate_chat_completion(
-                    model="gpt-oss-120b",
-                    messages=[{"role": "user", "content": ai_prompt}],
-                    temperature=0.1,
-                    max_tokens=400
-                )
-            except Exception:
-                res = gemini_client.generate_content(
-                    model_name="gemini-1.5-flash",
-                    prompt=ai_prompt,
-                    generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-                )
-                ai_res = res.text
-
-            ai_data = json_repair.loads(ai_res)
-            if isinstance(ai_data, dict):
-                if ai_data.get("exp_strengths"):
-                    diagnostics["experience"]["strengths"] = ai_data["exp_strengths"][:2]
-                if ai_data.get("exp_gaps"):
-                    diagnostics["experience"]["gaps"] = ai_data["exp_gaps"][:1]
-                if ai_data.get("proj_strengths"):
-                    diagnostics["projects"]["strengths"] = ai_data["proj_strengths"][:2]
-                if ai_data.get("proj_gaps"):
-                    diagnostics["projects"]["gaps"] = ai_data["proj_gaps"][:1]
-    except Exception as e:
-        print(f"Deep AI section audit enrichment fallback: {e}")
-        
     return diagnostics
 
 
-def format_as_latex_item(text: str) -> str:
-    """Formats bullet string into standard LaTeX \\item \\textbf{Action} Rest... format."""
-    cleaned = re.sub(r"^[\s\-\•\*\–\—\\]*(?:item\s*)?", "", text).strip().rstrip(".")
-    # If it has bold tag already, keep clean
-    if cleaned.startswith("\\textbf{"):
-        return f"\\item {cleaned}"
-    
-    words = cleaned.split()
-    if words:
-        verb = words[0].strip(" ,:;{}*")
-        rest = " ".join(words[1:])
-        return f"\\item \\textbf{{{verb}}} {rest}"
-    return f"\\item {cleaned}"
-
-
 # ==============================================================================
-# MASTER ATS EVALUATION ENGINE
+# MASTER ATS REPORT GENERATOR
 # ==============================================================================
 def compute_full_ats_report(
     pdf_bytes: Optional[bytes] = None,
@@ -1368,8 +1107,8 @@ def compute_full_ats_report(
     sub_track: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Computes Master 5-Pillar ATS & Placement Scorecard with Deep Semantic Intelligence,
-    Sub-Track Prioritization, and Multi-Dimensional Section Diagnostics.
+    Computes Master 5-Pillar ATS & Placement Scorecard with Calibrated Ground-Truth
+    Scoring, Strict Word-Boundary Keyword Matching, and Multi-Dimensional Diagnostics.
     """
     if pdf_bytes and not raw_text:
         raw_text = extract_text_from_pdf_stream(pdf_bytes)
@@ -1377,49 +1116,55 @@ def compute_full_ats_report(
     if not raw_text or not raw_text.strip():
         raw_text = "No extractable text found in resume."
         
-    parsed_sections = []
-    try:
-        from agents.achievement_engine import extract_final_resume_bullets
-        parsed_sections = extract_final_resume_bullets(raw_text)
-    except Exception as e:
-        print(f"Fallback to deterministic section parser: {e}")
-        
-    if not parsed_sections:
-        parsed_sections = fallback_extract_sections_and_bullets(raw_text)
-        
-    # Evaluate 5 Pillars
+    parsed_sections = fallback_extract_sections_and_bullets(raw_text)
+    
+    # Evaluate 5 Calibrated Pillars
     p1 = evaluate_ats_parseability(pdf_bytes, raw_text, parsed_sections, mode=mode)
     p2 = evaluate_keyword_match(raw_text, parsed_sections, target_role=target_role, job_description=job_description, mode=mode, sub_track=sub_track)
     p3 = evaluate_quantification_impact(parsed_sections)
     p4 = evaluate_action_verbs_and_voice(parsed_sections, target_role=target_role)
     p5 = evaluate_formatting_and_iitb_rules(raw_text, parsed_sections, pdf_bytes=pdf_bytes, mode=mode)
     
-    # Section-Wise Multi-Dimensional Health Diagnostics
     section_health = audit_sections_with_deep_ai(parsed_sections, raw_text, target_role=target_role, mode=mode)
     
     # Master Weighted Score (0-100)
+    # Parseability: 15%, Keyword Alignment: 35%, Quantification: 25%, Action Verbs: 15%, Layout: 10%
     overall_score = int(round(
         (p1["score"] * 0.15) +
-        (p2["score"] * 0.30) +
+        (p2["score"] * 0.35) +
         (p3["score"] * 0.25) +
         (p4["score"] * 0.15) +
-        (p5["score"] * 0.15)
+        (p5["score"] * 0.10)
     ))
-    overall_score = max(0, min(100, overall_score))
+    overall_score = max(20, min(98, overall_score))
     
-    tier = "Placement Ready" if overall_score >= 85 else "Strong Shortlist" if overall_score >= 72 else "Needs Polish" if overall_score >= 58 else "Critical Gaps"
+    tier = (
+        "Placement Ready" if overall_score >= 85 
+        else "Strong Shortlist" if overall_score >= 72 
+        else "Moderate Alignment — Key Gaps" if overall_score >= 58 
+        else "Critical Gaps"
+    )
     
-    # Top 3 Actionable Quick Wins
+    # Actionable Quick Wins
     quick_wins = []
     
-    if p2.get("missing_critical") and len(p2["missing_critical"]) > 0:
-        missing_top = p2["missing_critical"][:3]
+    if p2.get("is_custom_jd") and p2.get("jd_match_info") and p2["jd_match_info"].get("core_missing"):
+        missing_top = p2["jd_match_info"]["core_missing"][:3]
         quick_wins.append({
-            "title": f"Weave in {len(missing_top)} High-Yield Competencies",
-            "impact_pts": "+12 pts",
+            "title": f"Integrate {len(missing_top)} Mandatory JD Skills",
+            "impact_pts": "+14 pts",
             "category": "Keyword Match",
             "action_type": "inject_keyword",
-            "hint": f"Add {', '.join(missing_top)} into your experience or project points."
+            "hint": f"Explicitly add required tools: {', '.join(missing_top)}."
+        })
+    elif p2.get("missing_critical") and len(p2["missing_critical"]) > 0:
+        missing_top = p2["missing_critical"][:3]
+        quick_wins.append({
+            "title": f"Weave in {len(missing_top)} Key Domain Competencies",
+            "impact_pts": "+10 pts",
+            "category": "Keyword Match",
+            "action_type": "inject_keyword",
+            "hint": f"Add {', '.join(missing_top)} into relevant experience or project points."
         })
         
     if p3.get("weak_unquantified_bullets") and len(p3["weak_unquantified_bullets"]) > 0:
@@ -1428,18 +1173,10 @@ def compute_full_ats_report(
             "impact_pts": "+8 pts",
             "category": "Quantification",
             "action_type": "quantify",
-            "hint": "Incorporate metrics (percentages, volume scale, latencies, or revenue)."
+            "hint": "Incorporate percentages, volume scale, latencies, or revenue outcomes."
         })
         
-    if p5.get("line_wrap_hazards") and len(p5["line_wrap_hazards"]) > 0:
-        quick_wins.append({
-            "title": f"Trim {len(p5['line_wrap_hazards'])} Orphan Line-Wrap Hazards",
-            "impact_pts": "+5 pts",
-            "category": "Line Budget",
-            "action_type": "trim_line_wrap",
-            "hint": "Tighten 5–15 characters to prevent single words spilling onto a second line."
-        })
-    elif p4.get("repetitive_verbs") and len(p4["repetitive_verbs"]) > 0:
+    if p4.get("repetitive_verbs") and len(p4["repetitive_verbs"]) > 0:
         quick_wins.append({
             "title": "Diversify Repetitive Action Verbs",
             "impact_pts": "+4 pts",
@@ -1454,7 +1191,7 @@ def compute_full_ats_report(
             "impact_pts": "Max Score",
             "category": "Placement Ready",
             "action_type": "none",
-            "hint": "Your resume satisfies all primary IIT Bombay placement & ATS criteria."
+            "hint": "Your resume satisfies all primary placement & ATS criteria."
         })
         
     return {
@@ -1477,12 +1214,12 @@ def compute_full_ats_report(
             "formatting_layout": p5
         },
         "policy_alerts": p5.get("policy_alerts", []),
-        "quick_fixes_count": len(p5.get("line_wrap_hazards", [])) + len(p4.get("weak_bullets", [])) + len(p3.get("weak_unquantified_bullets", []))
+        "quick_fixes_count": len(p4.get("weak_bullets", [])) + len(p3.get("weak_unquantified_bullets", []))
     }
 
 
 # ==============================================================================
-# CONTEXT-AWARE MULTI-OPTION AI BULLET REFINER (3 Strategic Options + LaTeX Output)
+# CONTEXT-AWARE MULTI-OPTION AI BULLET REFINER
 # ==============================================================================
 def refine_ats_bullet(
     bullet_text: str,
@@ -1492,7 +1229,7 @@ def refine_ats_bullet(
     missing_keyword: Optional[str] = None,
     target_length: Optional[int] = None
 ) -> Dict[str, Any]:
-    """1-Click AI Bullet Refiner offering 3 distinct strategic rewrite options + LaTeX format."""
+    """1-Click AI Bullet Refiner offering 3 distinct strategic rewrite options."""
     prompt = f"""
     You are an elite IIT Bombay Placement Coach and Technical Resume Architect.
     Refine this single resume bullet point into 3 distinct, high-impact variations for target domain '{target_role}'.
@@ -1506,11 +1243,12 @@ def refine_ats_bullet(
     Generate 3 distinct options:
     1. "executive_impact": Google X-Y-Z framework with strong action verb, clear mechanism, and quantifiable business outcome.
     2. "competency_weave": High-density competency injection naturally weaving in relevant frameworks, tools, or '{missing_keyword}'.
-    3. "line_budget_trim": Concise, tight phrasing optimized to eliminate orphan line wrap (1-line fit).
+    3. "line_budget_trim": Concise, tight phrasing optimized for 1-line fit.
     
     RULES:
     - Never invent fictitious degrees or false facts; enhance the phrasing of the existing accomplishment.
     - No period at the end.
+    - OUTPUT STRICTLY VALID JSON.
     
     Return JSON format:
     {{
@@ -1541,43 +1279,22 @@ def refine_ats_bullet(
     }}
     """
     try:
-        try:
-            response_text = cerebras_client.generate_chat_completion(
-                model="gpt-oss-120b",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=700
-            )
-        except Exception:
-            res = gemini_client.generate_content(
-                model_name="gemini-1.5-flash",
-                prompt=prompt,
-                generation_config=genai.GenerationConfig(response_mime_type="application/json", temperature=0.2)
-            )
-            response_text = res.text
-            
+        response_text = cerebras_client.generate_chat_completion(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=450
+        )
         data = json_repair.loads(response_text)
         if isinstance(data, dict) and data.get("refined_bullet"):
-            orig_len = len(bullet_text)
-            new_len = len(data["refined_bullet"])
-            data["new_length"] = new_len
-            data["char_diff"] = new_len - orig_len
-            data["latex_item"] = format_as_latex_item(data["refined_bullet"])
-            
-            if data.get("options"):
-                for opt in data["options"]:
-                    if isinstance(opt, dict) and opt.get("text"):
-                        opt["latex_item"] = format_as_latex_item(opt["text"])
-                        
             return data
     except Exception as e:
-        print(f"Refinement error: {e}")
+        print(f"AI bullet refiner fallback: {e}")
         
     return {
         "refined_bullet": bullet_text,
-        "latex_item": format_as_latex_item(bullet_text),
         "new_length": len(bullet_text),
         "char_diff": 0,
-        "explanation": "Preserved original point.",
+        "explanation": "Maintained existing bullet phrasing.",
         "options": []
     }

@@ -55,7 +55,7 @@ class CerebrasClient:
         # 5. Circuit Breaker Settings
         self.max_consecutive_failures = 3
         self.circuit_cooldown_seconds = 60
-        self.per_request_timeout = 6.0  # 6-second tight circuit breaker
+        self.per_request_timeout = 15.0  # 15-second timeout for 120B deep generation
 
         print(
             f"Initialized Resilient LLM Gateway: "
@@ -173,8 +173,17 @@ class CerebrasClient:
                         elif response.status_code == 413:
                             # Payload too large for Groq; failover to Gemini/OpenRouter
                             return None
-                        elif response.status_code == 404:
-                            continue
+                        elif response.status_code == 400 and "response_format" in payload:
+                            # Retry without response_format constraint
+                            del payload["response_format"]
+                            retry_res = client.post(self.groq_url, headers=headers, json=payload)
+                            if retry_res.status_code == 200:
+                                content = retry_res.json()["choices"][0]["message"].get("content", "")
+                                if content:
+                                    self.groq_failures = 0
+                                    return content.strip()
+                            else:
+                                print(f"Groq API key ...{key[-4:]} error {retry_res.status_code}: {retry_res.text[:80]}")
                         else:
                             print(f"Groq API key ...{key[-4:]} error {response.status_code}: {response.text[:80]}")
                 except Exception as e:
