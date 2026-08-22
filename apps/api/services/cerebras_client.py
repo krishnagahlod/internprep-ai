@@ -148,7 +148,7 @@ class CerebrasClient:
                 "Content-Type": "application/json"
             }
             
-            models_to_try = ["openai/gpt-oss-20b", "groq/compound", "groq/compound-mini"]
+            models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini"]
             for model_candidate in models_to_try:
                 payload = {
                     "model": model_candidate,

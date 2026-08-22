@@ -147,7 +147,11 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": text}
+                kwargs = {
+                    "model": model_name,
+                    "content": text,
+                    "output_dimensionality": 768
+                }
                 if task_type:
                     kwargs["task_type"] = task_type
                 res = genai.embed_content(**kwargs)
@@ -166,7 +170,6 @@ class GeminiClient:
                 else:
                     self._mark_key_cooldown(key, duration=30)
                     if attempt == max_retries - 1:
-                        # Fallback dummy embedding vector to prevent system crash
                         return [0.0] * 768
                     time.sleep(0.5)
                     
@@ -181,7 +184,11 @@ class GeminiClient:
             genai.configure(api_key=key)
             
             try:
-                kwargs = {"model": model_name, "content": texts}
+                kwargs = {
+                    "model": model_name,
+                    "content": texts,
+                    "output_dimensionality": 768
+                }
                 if task_type:
                     kwargs["task_type"] = task_type
                 res = genai.embed_content(**kwargs)

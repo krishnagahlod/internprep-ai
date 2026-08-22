@@ -100,7 +100,7 @@ def extract_user_bullets(resume_text: str) -> List[Dict[str, str]]:
     """
     try:
         config = genai.GenerationConfig(response_mime_type="application/json", temperature=0.1)
-        res = gemini_client.generate_content(os.getenv("PREPROCESSING_MODEL", "gemini-3.1-flash-lite"), prompt, generation_config=config)
+        res = gemini_client.generate_content(os.getenv("PREPROCESSING_MODEL", "gemini-2.5-flash"), prompt, generation_config=config)
         data = json.loads(clean_json(res.text))
         if isinstance(data, list): return data
         if "bullets" in data: return data["bullets"]
@@ -123,7 +123,7 @@ CRITICAL INSTRUCTIONS:
 4. Do NOT output anything other than the extracted Markdown. No conversational filler.
 """
         
-        response = gemini_client.generate_content("gemini-1.5-flash", prompt, pdf_bytes=pdf_bytes)
+        response = gemini_client.generate_content(os.getenv("PARSING_MODEL", "gemini-2.5-flash"), prompt, pdf_bytes=pdf_bytes)
         
         text = response.text
         # Strip markdown fences if they exist
@@ -357,7 +357,7 @@ def analyze_resume_text(resume_text: str, target_role: str = "consult", resume_p
         response_mime_type="application/json", 
         temperature=0.0
     )
-    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-3.1-flash-lite"), final_prompt, generation_config=config)
+    response = gemini_client.generate_content(os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"), final_prompt, generation_config=config)
     
     return clean_json(response.text)
 
