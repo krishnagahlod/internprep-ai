@@ -386,34 +386,50 @@ class EntitlementService:
                     "metadata": metadata or {}
                 }).execute()
                 # Record admin audit log if applicable
-                if admin_id:
-                    supabase.table("admin_audit_logs").insert({
-                        "admin_user_id": admin_id,
-                        "target_user_id": user_id,
-                        "product": "internprep_ai",
-                        "action": "grant",
-                        "before_state": existing,
-                        "after_state": entitlement_record,
-                        "reason": f"Manual grant of {plan_key} for {duration_days} days"
-                    }).execute()
+                if admin_id and supabase:
+                    try:
+                        import uuid as _uuid
+                        valid_admin_id = admin_id if _uuid.UUID(str(admin_id)) else None
+                        valid_target_id = user_id if _uuid.UUID(str(user_id)) else None
+                        supabase.table("admin_audit_logs").insert({
+                            "admin_user_id": valid_admin_id,
+                            "target_user_id": valid_target_id,
+                            "product": "internprep_ai",
+                            "action": "grant",
+                            "before_state": existing,
+                            "after_state": entitlement_record,
+                            "reason": f"Manual grant of {plan_key} for {duration_days} days"
+                        }).execute()
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"Error granting entitlement to DB: {e}")
 
         return entitlement_record
 
     @staticmethod
-    def revoke_entitlement(user_id: str, admin_id: str, reason: str = "Admin revocation") -> bool:
+    def revoke_entitlement(user_id: str, admin_id: Optional[str] = None, reason: str = "Admin revocation") -> bool:
         """Revokes all active entitlements for a user."""
+        # Evict from in-memory cache
+        _IN_MEMORY_ENTITLEMENTS.pop(user_id, None)
         supabase = get_supabase()
         try:
-            supabase.table("entitlements").update({"status": "revoked"}).eq("user_id", user_id).eq("status", "active").execute()
-            supabase.table("admin_audit_logs").insert({
-                "admin_user_id": admin_id,
-                "target_user_id": user_id,
-                "product": "internprep_ai",
-                "action": "revoke",
-                "reason": reason
-            }).execute()
+            if supabase:
+                supabase.table("entitlements").update({"status": "revoked"}).eq("user_id", user_id).eq("status", "active").execute()
+                if admin_id:
+                    try:
+                        import uuid as _uuid
+                        valid_admin_id = admin_id if _uuid.UUID(str(admin_id)) else None
+                        valid_target_id = user_id if _uuid.UUID(str(user_id)) else None
+                        supabase.table("admin_audit_logs").insert({
+                            "admin_user_id": valid_admin_id,
+                            "target_user_id": valid_target_id,
+                            "product": "internprep_ai",
+                            "action": "revoke",
+                            "reason": reason
+                        }).execute()
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error revoking entitlement: {e}")

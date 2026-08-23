@@ -13,7 +13,7 @@ from dependencies import (
     limiter,
     get_supabase
 )
-from services.entitlement_service import EntitlementService, DEFAULT_PLANS
+from services.entitlement_service import EntitlementService, DEFAULT_PLANS, DEFAULT_FEATURE_LIMITS
 from services.usage_service import UsageService
 from services.payment_service import PaymentService
 from services.session_service import SessionService
@@ -145,13 +145,32 @@ async def get_admin_stats(admin: AuthUser = Depends(require_admin)):
             auth_users = auth_users_resp if isinstance(auth_users_resp, list) else getattr(auth_users_resp, 'users', [])
             total_users = len(auth_users)
 
+            # Batch query active entitlements
+            ent_map = {}
+            try:
+                ents_res = supabase.table("entitlements").select("user_id, plan_key, status, expires_at").in_("status", ["active", "scheduled"]).execute()
+                for e in (ents_res.data or []):
+                    ent_map[e.get("user_id")] = e
+            except Exception:
+                pass
+
+            now_utc = datetime.now(timezone.utc)
             for u in auth_users:
+                u_id = str(getattr(u, 'id', ''))
                 u_email = str(getattr(u, 'email', '') or '').lower().strip()
-                if u_email.endswith('@iitb.ac.in'):
+                if u_email.endswith('@iitb.ac.in') or u_email.endswith('.iitb.ac.in'):
                     iitb_users += 1
-                
-                ent = EntitlementService.get_active_entitlement(user_id=u.id, user_email=u_email)
-                pk = ent.get("plan_key", "free")
+
+                # Resolve tier from batch map
+                if u_email == "krishnagahlod@gmail.com" or u_email == "creator@internprep.ai":
+                    pk = "admin"
+                elif u_id in ent_map:
+                    pk = ent_map[u_id].get("plan_key", "free")
+                elif u_email.endswith('@iitb.ac.in') or u_email.endswith('.iitb.ac.in'):
+                    pk = "iitb_free"
+                else:
+                    pk = "free"
+
                 tier_distribution[pk] = tier_distribution.get(pk, 0) + 1
                 if pk.startswith("pro_") or pk == "lifetime" or pk == "pro":
                     active_subscriptions += 1
@@ -159,10 +178,14 @@ async def get_admin_stats(admin: AuthUser = Depends(require_admin)):
             print(f"Stats auth.users query notice: {e}")
 
         try:
-            # Payment transactions
-            tx_res = supabase.table("payment_transactions").select("amount_inr, status").eq("status", "captured").execute()
+            # Payment transactions - filter out simulated/sandbox records for real revenue
+            tx_res = supabase.table("payment_transactions").select("amount_inr, status, provider_payment_id, raw_payload").eq("status", "captured").execute()
             if tx_res.data:
-                total_revenue_inr = sum(r.get("amount_inr", 0) for r in tx_res.data)
+                for r in tx_res.data:
+                    raw = r.get("raw_payload") or {}
+                    pid = str(r.get("provider_payment_id") or "")
+                    if not raw.get("is_simulated") and not pid.startswith("pay_sandbox_"):
+                        total_revenue_inr += float(r.get("amount_inr", 0))
         except Exception:
             pass
 
@@ -204,13 +227,14 @@ async def get_admin_stats(admin: AuthUser = Depends(require_admin)):
 async def list_users(
     query: Optional[str] = None,
     plan: Optional[str] = None,
-    limit: int = Query(100, le=500),
+    limit: int = 100,
     offset: int = 0,
     admin: AuthUser = Depends(require_admin)
 ):
     """
     Lists users with their active plan, expiry, IITB status, usage metrics,
     and Placement Analysis access whitelist status directly from Supabase Auth & DB.
+    Optimized with batch pre-fetching for sub-second response times across all users.
     """
     from routers.placement_analysis import get_access_store, ADMIN_EMAILS
     access_store = get_access_store()
@@ -230,13 +254,52 @@ async def list_users(
             auth_users_resp = supabase.auth.admin.list_users()
             auth_users = auth_users_resp if isinstance(auth_users_resp, list) else getattr(auth_users_resp, 'users', [])
 
-            # 2. Pre-fetch counts for fast join
+            # 2. Batch pre-fetch supporting tables in single fast queries
             resumes_by_user = {}
             interviews_by_user = {}
             analyses_by_user = {}
             spent_by_user = {}
             profiles_by_user = {}
+            entitlements_by_user = {}
+            topups_by_user = {}
+            usage_counts_by_user = {}
 
+            # Active Entitlements
+            try:
+                e_data = supabase.table("entitlements").select("*").in_("status", ["active", "scheduled"]).execute().data or []
+                for e in e_data:
+                    uid = e.get("user_id")
+                    if uid:
+                        entitlements_by_user[uid] = e
+            except Exception:
+                pass
+
+            # Top-up Credits
+            try:
+                tp_data = supabase.table("user_topup_credits").select("*").execute().data or []
+                for tp in tp_data:
+                    uid = tp.get("user_id")
+                    feat = tp.get("feature_key")
+                    if uid not in topups_by_user:
+                        topups_by_user[uid] = {}
+                    topups_by_user[uid][feat] = int(tp.get("credits_remaining", 0))
+            except Exception:
+                pass
+
+            # Current Month Usage Events
+            now_month = datetime.now(timezone.utc).strftime("%Y-%m")
+            try:
+                u_data = supabase.table("usage_events").select("user_id, feature_key, count").eq("period_key", now_month).execute().data or []
+                for ev in u_data:
+                    uid = ev.get("user_id")
+                    feat = ev.get("feature_key")
+                    if uid not in usage_counts_by_user:
+                        usage_counts_by_user[uid] = {}
+                    usage_counts_by_user[uid][feat] = int(ev.get("count", 0))
+            except Exception:
+                pass
+
+            # Resumes
             try:
                 r_data = supabase.table("resumes").select("id, user_id").execute().data or []
                 for r in r_data:
@@ -245,6 +308,7 @@ async def list_users(
             except Exception:
                 pass
 
+            # Interview sessions
             try:
                 i_data = supabase.table("interview_sessions").select("id, user_id").execute().data or []
                 for i in i_data:
@@ -253,6 +317,7 @@ async def list_users(
             except Exception:
                 pass
 
+            # Resume Analyses
             try:
                 a_data = supabase.table("resume_analyses").select("id, user_id").execute().data or []
                 for a in a_data:
@@ -261,15 +326,20 @@ async def list_users(
             except Exception:
                 pass
 
+            # Payment Transactions (live spend)
             try:
-                tx_data = supabase.table("payment_transactions").select("user_id, amount_inr, status").execute().data or []
+                tx_data = supabase.table("payment_transactions").select("user_id, amount_inr, status, provider_payment_id, raw_payload").execute().data or []
                 for t in tx_data:
                     if t.get("status") == "captured":
-                        uid = t.get("user_id")
-                        spent_by_user[uid] = spent_by_user.get(uid, 0) + t.get("amount_inr", 0)
+                        raw = t.get("raw_payload") or {}
+                        pid = str(t.get("provider_payment_id") or "")
+                        if not raw.get("is_simulated") and not pid.startswith("pay_sandbox_"):
+                            uid = t.get("user_id")
+                            spent_by_user[uid] = spent_by_user.get(uid, 0) + float(t.get("amount_inr", 0))
             except Exception:
                 pass
 
+            # Profiles
             try:
                 prof_data = supabase.table("profiles").select("*").execute().data or []
                 for p in prof_data:
@@ -278,7 +348,10 @@ async def list_users(
             except Exception:
                 pass
 
-            # 3. Build comprehensive user records
+            # 3. Build comprehensive user records in-memory
+            now_dt = datetime.now(timezone.utc)
+            reset_at_str = UsageService.get_period_reset_at("month")
+
             for u in auth_users:
                 uid = str(getattr(u, "id", ""))
                 email = str(getattr(u, "email", "") or "").strip()
@@ -302,16 +375,77 @@ async def list_users(
                     if q_lower not in email.lower() and q_lower not in full_name.lower() and q_lower not in uid.lower():
                         continue
 
-                # Entitlements and Usage
-                ent = EntitlementService.get_active_entitlement(user_id=uid, user_email=email)
-                usage = UsageService.get_user_usage_summary(user_id=uid, plan_key=ent.get("plan_key", "free"))
-                topup_credits = {
-                    "resume_analysis": UsageService.get_topup_balance(user_id=uid, feature_key="resume_analysis"),
-                    "mock_interview": UsageService.get_topup_balance(user_id=uid, feature_key="mock_interview")
+                # Entitlement Resolution
+                is_iitb = email.lower().endswith("@iitb.ac.in") or email.lower().endswith(".iitb.ac.in")
+                is_admin_user = email.lower() == "krishnagahlod@gmail.com" or email.lower() == "creator@internprep.ai" or email.lower() in ADMIN_EMAILS
+                
+                db_ent = entitlements_by_user.get(uid)
+                if is_admin_user:
+                    plan_key = "admin"
+                    plan_name = "System Administrator"
+                    plan_status = "active"
+                    expires_at = None
+                elif db_ent:
+                    plan_key = db_ent.get("plan_key", "free")
+                    plan_info = DEFAULT_PLANS.get(plan_key, DEFAULT_PLANS["free"])
+                    plan_name = plan_info.get("display_name", "Pro")
+                    plan_status = db_ent.get("status", "active")
+                    expires_at = db_ent.get("expires_at")
+                elif is_iitb:
+                    plan_key = "iitb_free"
+                    plan_name = DEFAULT_PLANS["iitb_free"]["display_name"]
+                    plan_status = "active"
+                    expires_at = None
+                else:
+                    plan_key = "free"
+                    plan_name = DEFAULT_PLANS["free"]["display_name"]
+                    plan_status = "active"
+                    expires_at = None
+
+                limits = DEFAULT_FEATURE_LIMITS.get(plan_key, DEFAULT_FEATURE_LIMITS["free"])
+                ent = {
+                    "user_id": uid,
+                    "product": "internprep_ai",
+                    "plan_key": plan_key,
+                    "plan_name": plan_name,
+                    "status": plan_status,
+                    "is_iitb": is_iitb,
+                    "is_admin": is_admin_user,
+                    "expires_at": expires_at,
+                    "limits": limits,
+                    "feature_limits": limits
                 }
 
+                # Top-up Credits
+                u_topups = topups_by_user.get(uid, {})
+                topup_credits = {
+                    "resume_analysis": u_topups.get("resume_analysis", 0),
+                    "mock_interview": u_topups.get("mock_interview", 0)
+                }
+
+                # Usage Summary
+                u_usage = usage_counts_by_user.get(uid, {})
+                usage_summary = {}
+                for feat in ["resume_analysis", "mock_interview", "bullet_refine", "placement_intelligence"]:
+                    lim = limits.get(feat, 0)
+                    used = u_usage.get(feat, 0)
+                    tp_c = u_topups.get(feat, 0)
+                    base_rem = max(0, lim - used) if lim != -1 else 999999
+                    tot_rem = base_rem + tp_c if lim != -1 else 999999
+                    usage_summary[feat] = {
+                        "allowed": tot_rem > 0 if lim != -1 else True,
+                        "limit": lim,
+                        "used": used,
+                        "base_remaining": base_rem,
+                        "topup_credits": tp_c,
+                        "remaining": tot_rem,
+                        "period": "month",
+                        "reset_at": reset_at_str,
+                        "plan_key": plan_key,
+                        "feature_key": feat
+                    }
+
                 # Placement Whitelist Check
-                is_admin_user = ent.get("is_admin", False) or email.lower() in ADMIN_EMAILS
                 is_whitelisted = email.lower() in whitelisted_map or is_admin_user
                 placement_details = whitelisted_map.get(email.lower(), {
                     "role": "admin" if is_admin_user else "authorized_user",
@@ -323,19 +457,19 @@ async def list_users(
                 if plan:
                     if plan == "placement_whitelisted" and not is_whitelisted:
                         continue
-                    elif plan == "iitb_free" and not (ent.get("plan_key") == "iitb_free" or ent.get("is_iitb")):
+                    elif plan == "iitb_free" and not (plan_key == "iitb_free" or is_iitb):
                         continue
-                    elif plan == "pro" and not (ent.get("plan_key", "").startswith("pro") or ent.get("plan_key") == "pro"):
+                    elif plan == "pro" and not (plan_key.startswith("pro") or plan_key == "pro"):
                         continue
-                    elif plan == "lifetime" and ent.get("plan_key") != "lifetime":
+                    elif plan == "lifetime" and plan_key != "lifetime":
                         continue
-                    elif plan == "free" and (ent.get("plan_key") != "free" or ent.get("is_iitb")):
+                    elif plan == "free" and (plan_key != "free" or is_iitb):
                         continue
-                    elif plan == "admin" and not (ent.get("is_admin") or ent.get("plan_key") == "admin"):
+                    elif plan == "admin" and not (is_admin_user or plan_key == "admin"):
                         continue
 
                 # College Tag
-                college = "IIT Bombay" if email.lower().endswith("@iitb.ac.in") else "Candidate"
+                college = "IIT Bombay" if is_iitb else "Candidate"
 
                 user_record = {
                     "id": uid,
@@ -347,7 +481,7 @@ async def list_users(
                     "last_sign_in_at": last_sign_in_at,
                     "provider": provider,
                     "entitlement": ent,
-                    "usage": usage,
+                    "usage": usage_summary,
                     "topup_credits": topup_credits,
                     "activity": {
                         "resumes_count": resumes_by_user.get(uid, 0),
@@ -369,24 +503,52 @@ async def list_users(
         if w_email not in seen_emails:
             if query and query.lower() not in w_email.lower():
                 continue
-            is_admin_user = w_email.lower() in ADMIN_EMAILS or w_info.get("role") == "admin"
-            ent = EntitlementService.get_active_entitlement(user_id=w_email, user_email=w_email)
-            usage = UsageService.get_user_usage_summary(user_id=w_email, plan_key=ent.get("plan_key", "free"))
+            is_admin_user = w_email.lower() in ADMIN_EMAILS or w_info.get("role") == "admin" or w_email.lower() == "krishnagahlod@gmail.com"
+            is_iitb = w_email.endswith("@iitb.ac.in") or w_email.endswith(".iitb.ac.in")
+            plan_key = "admin" if is_admin_user else ("iitb_free" if is_iitb else "free")
+            limits = DEFAULT_FEATURE_LIMITS.get(plan_key, DEFAULT_FEATURE_LIMITS["free"])
 
             if plan and plan not in ["placement_whitelisted", "all"]:
                 continue
+
+            ent = {
+                "user_id": f"whitelisted_{w_email}",
+                "product": "internprep_ai",
+                "plan_key": plan_key,
+                "plan_name": DEFAULT_PLANS[plan_key]["display_name"],
+                "status": "active",
+                "is_iitb": is_iitb,
+                "is_admin": is_admin_user,
+                "expires_at": None,
+                "limits": limits,
+                "feature_limits": limits
+            }
 
             users_list.append({
                 "id": f"whitelisted_{w_email}",
                 "email": w_email,
                 "full_name": w_info.get("notes") or "Whitelisted Candidate",
                 "avatar_url": None,
-                "college": "IIT Bombay" if w_email.endswith("@iitb.ac.in") else "Authorized Candidate",
+                "college": "IIT Bombay" if is_iitb else "Authorized Candidate",
                 "created_at": w_info.get("granted_at"),
                 "last_sign_in_at": None,
                 "provider": "invitation",
                 "entitlement": ent,
-                "usage": usage,
+                "usage": {
+                    feat: {
+                        "allowed": True,
+                        "limit": limits.get(feat, 0),
+                        "used": 0,
+                        "base_remaining": limits.get(feat, 0) if limits.get(feat, 0) != -1 else 999999,
+                        "topup_credits": 0,
+                        "remaining": limits.get(feat, 0) if limits.get(feat, 0) != -1 else 999999,
+                        "period": "month",
+                        "reset_at": UsageService.get_period_reset_at("month"),
+                        "plan_key": plan_key,
+                        "feature_key": feat
+                    }
+                    for feat in ["resume_analysis", "mock_interview", "bullet_refine", "placement_intelligence"]
+                },
                 "topup_credits": {"resume_analysis": 0, "mock_interview": 0},
                 "activity": {
                     "resumes_count": 0,
@@ -409,13 +571,15 @@ async def list_users(
     )
 
     # Slice pagination
-    paginated_users = users_list[offset : offset + limit]
+    limit_int = int(limit) if isinstance(limit, (int, str)) and str(limit).isdigit() else 100
+    offset_int = int(offset) if isinstance(offset, (int, str)) and str(offset).isdigit() else 0
+    paginated_users = users_list[offset_int : offset_int + limit_int]
 
     return {
         "count": len(users_list),
         "total": len(users_list),
-        "limit": limit,
-        "offset": offset,
+        "limit": limit_int,
+        "offset": offset_int,
         "users": paginated_users
     }
 
@@ -540,10 +704,11 @@ async def grant_user_topup_credits(
         }
     )
 
-    new_balance = UsageService.get_topup_balance(user_id=target_user_id)
+    new_balance = UsageService.get_topup_balance(user_id=target_user_id, feature_key=body.feature_key)
     return {
         "status": "success",
         "message": f"Successfully added {body.credits} {body.feature_key} credits to user {target_email or target_user_id}",
+        "feature_key": body.feature_key,
         "topup_balance": new_balance
     }
 
@@ -697,7 +862,8 @@ async def grant_user_entitlement(
         plan_key=body.plan_key,
         duration_days=duration_days,
         source="admin_grant",
-        notes=f"{body.reason} (Granted by {admin.email})"
+        admin_id=admin.id,
+        metadata={"reason": body.reason, "granted_by": admin.email}
     )
 
     if not success:
@@ -781,7 +947,8 @@ async def extend_user_entitlement(
         plan_key=ent.get("plan_key", "pro_1m"),
         duration_days=int((new_expires_dt - datetime.now(timezone.utc)).total_seconds() // 86400),
         source="admin_extension",
-        notes=f"{body.reason} (+{body.additional_days}d by {admin.email})"
+        admin_id=admin.id,
+        metadata={"reason": body.reason, "extended_by": admin.email, "additional_days": body.additional_days}
     )
 
     _record_audit_log(
