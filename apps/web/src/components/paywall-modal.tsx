@@ -21,7 +21,7 @@ export function PaywallModal({
   isOpen,
   onClose,
   title = "Unlock Unlimited Interview Preparation",
-  description = "You've reached the free tier quota for this feature. Upgrade to InternPrep Pro for full placement dossiers, live case interviewer turns, and priority AI speeds.",
+  description = "You've reached the free tier quota for this feature. Upgrade to InternPrep Pro for full AI resume reviews, live case interviewer turns, and priority AI speeds.",
   featureKey,
   limit,
   used,
@@ -128,7 +128,7 @@ export function PaywallModal({
                   </li>
                   <li className="flex items-center gap-2 text-muted-foreground/60">
                     <XCircle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
-                    <span>Deep Placement Dossiers</span>
+                    <span>Live Voice Interview Engine</span>
                   </li>
                 </ul>
               </div>
@@ -157,7 +157,7 @@ export function PaywallModal({
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                    <span>Instant Company Placement Dossiers</span>
+                    <span>Priority Low-Latency AI Access</span>
                   </li>
                 </ul>
               </div>

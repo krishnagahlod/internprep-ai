@@ -191,12 +191,11 @@ async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
     whitelisted_set = {u.get("email", "").lower() for u in store.get("whitelisted_emails", [])}
     is_whitelisted = email_clean in whitelisted_set
     is_admin = is_admin_authorized(email_clean)
-    is_iitb = email_clean.endswith("@iitb.ac.in")
     
-    if not is_iitb and not is_admin and not is_whitelisted:
+    if not is_admin and not is_whitelisted:
         raise HTTPException(
-            status_code=400,
-            detail="Access restricted. Please use an official @iitb.ac.in email or ask an admin for access."
+            status_code=403,
+            detail="Placement Analysis is currently in private preview. Access is granted directly by the system administrator."
         )
         
     if body.action == "send_otp":
@@ -213,7 +212,6 @@ async def verify_iitb_email(request: Request, body: VerifyIITBEmailRequest):
             "message": f"Verification code sent to {email_clean}.",
             "email": email_clean,
             "email_sent": email_sent,
-            "demo_code": generated_otp,  # Returns code so user is never blocked if SMTP isn't set up yet
             "is_admin": is_admin
         }
         

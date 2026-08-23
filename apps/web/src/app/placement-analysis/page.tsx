@@ -439,19 +439,17 @@ export default function PlacementAnalysisPage() {
           setIsAdmin(true)
           return
         }
-        if (email.endsWith("@iitb.ac.in")) {
-          setIsIITBVerified(true)
-          return
-        }
       }
 
-      const savedVerification = localStorage.getItem("iitb_placement_verified")
       const savedAdmin = localStorage.getItem("iitb_placement_admin")
+      const savedVerification = localStorage.getItem("iitb_placement_verified")
+      if (savedAdmin === "true") {
+        setIsIITBVerified(true)
+        setIsAdmin(true)
+        return
+      }
       if (savedVerification === "true") {
         setIsIITBVerified(true)
-        if (savedAdmin === "true") {
-          setIsAdmin(true)
-        }
         return
       }
 
@@ -991,8 +989,8 @@ export default function PlacementAnalysisPage() {
               <ShieldCheck className="h-10 w-10 text-primary animate-pulse" />
             </div>
 
-            <Badge variant="outline" className="mb-3 px-3 py-1 bg-primary/10 text-primary border-primary/30 font-semibold text-xs uppercase tracking-wider">
-              IIT Bombay Institutional Portal
+            <Badge variant="outline" className="mb-3 px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold text-xs uppercase tracking-wider">
+              Private Preview • Invite Only
             </Badge>
 
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground mb-3 font-outfit">
@@ -1000,158 +998,50 @@ export default function PlacementAnalysisPage() {
             </h1>
 
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-              Historical campus recruitment data, verified JAF salary breakdowns, hiring tier slottings (C1 Dream / C2 / C3), and authentic senior selection questions across <strong className="text-foreground">627+ companies (2024–2026)</strong> are restricted to verified IIT Bombay students and authorized users.
+              This module is currently in private preview and hidden from general access. Early access is granted directly by the system administrator to authorized candidates.
             </p>
 
-            {!showInviteField ? (
-              !otpSent ? (
-                <div className="space-y-4 text-left">
-                  <div>
-                    <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                      IIT Bombay Student Email (LDAP) or Whitelisted Account
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="email"
-                        placeholder="rollnumber@iitb.ac.in"
-                        value={verificationEmail}
-                        onChange={(e) => setVerificationEmail(e.target.value)}
-                        className="pr-10 text-sm h-11 rounded-xl bg-background/80 border-input focus:border-primary"
-                      />
-                      <GraduationCap className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground mt-1 block">
-                      Must end with <code className="text-primary font-mono font-semibold">@iitb.ac.in</code> or be whitelisted by admin
-                    </span>
-                  </div>
-
-                  {verificationError && (
-                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
-                      {verificationError}
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleSendOTP}
-                    disabled={verifying || !verificationEmail}
-                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-sm"
-                  >
-                    {verifying ? "Verifying Domain..." : "Send Instant Access Code"}
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-
-                  <div className="pt-4 border-t border-border/40 flex justify-between items-center text-xs">
-                    <button
-                      onClick={() => setShowInviteField(true)}
-                      className="text-primary hover:underline font-medium flex items-center gap-1 cursor-pointer"
-                    >
-                      <Key className="h-3.5 w-3.5" /> Have an Invite Code or Admin Passcode?
-                    </button>
-                    <button
-                      onClick={() => {
-                        localStorage.setItem("iitb_placement_verified", "true")
-                        localStorage.setItem("iitb_verified_email", "student.verified@iitb.ac.in")
-                        setIsIITBVerified(true)
-                      }}
-                      className="text-muted-foreground hover:text-foreground underline"
-                    >
-                      Demo Unlock
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 text-left">
-                  <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-xs text-foreground mb-2">
-                    Verification code sent to <strong className="text-primary">{verificationEmail}</strong>.
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                      Enter 6-Digit Verification Code
-                    </label>
-                    <Input
-                      type="text"
-                      maxLength={6}
-                      placeholder="202626"
-                      value={verificationOtp}
-                      onChange={(e) => setVerificationOtp(e.target.value)}
-                      className="text-center font-mono text-lg tracking-widest h-12 rounded-xl bg-background/80 border-input focus:border-primary font-bold"
-                    />
-                  </div>
-
-                  {verificationError && (
-                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
-                      {verificationError}
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleVerifyOTP}
-                    disabled={verifying || !verificationOtp}
-                    className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
-                  >
-                    {verifying ? "Verifying..." : "Verify & Unlock Placement Analysis"}
-                    <CheckCircle2 className="h-4 w-4 ml-2" />
-                  </Button>
-
-                  <div className="flex justify-between items-center text-xs text-muted-foreground pt-2">
-                    <button onClick={() => setOtpSent(false)} className="hover:text-foreground underline">
-                      Change Email
-                    </button>
-                    <button onClick={() => setShowInviteField(true)} className="text-primary hover:underline font-medium">
-                      Use Invite / Admin Code
-                    </button>
-                  </div>
-                </div>
-              )
-            ) : (
-              <div className="space-y-4 text-left">
-                <div>
-                  <label className="text-xs font-semibold text-foreground mb-1.5 block">
-                    Invite Passcode or Admin Master Key
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      placeholder="e.g. IITB-VIP-2026 or Admin Key"
-                      value={invitePasscode}
-                      onChange={(e) => setInvitePasscode(e.target.value)}
-                      className="pr-10 text-sm font-mono tracking-wider h-11 rounded-xl bg-background/80 border-input focus:border-primary"
-                    />
-                    <Key className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-
-                {verificationError && (
-                  <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
-                    {verificationError}
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleRedeemInviteOrAdmin}
-                  disabled={verifying || !invitePasscode}
-                  className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
-                >
-                  {verifying ? "Redeeming Code..." : "Unlock with Passcode"}
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-
-                <div className="pt-2 text-center text-xs">
-                  <button
-                    onClick={() => setShowInviteField(false)}
-                    className="text-muted-foreground hover:text-foreground underline"
-                  >
-                    Back to IITB Email Verification
-                  </button>
+            <div className="space-y-4 text-left">
+              <div>
+                <label className="text-xs font-semibold text-foreground mb-1.5 block">
+                  Admin Master Key or Authorized Invite Passcode
+                </label>
+                <div className="relative">
+                  <Input
+                    type="password"
+                    placeholder="Enter admin key or invite passcode"
+                    value={invitePasscode}
+                    onChange={(e) => setInvitePasscode(e.target.value)}
+                    className="pr-10 text-sm font-mono tracking-wider h-11 rounded-xl bg-background/80 border-input focus:border-primary"
+                  />
+                  <Key className="absolute right-3.5 top-3 h-5 w-5 text-muted-foreground" />
                 </div>
               </div>
-            )}
+
+              {verificationError && (
+                <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-medium">
+                  {verificationError}
+                </div>
+              )}
+
+              <Button
+                onClick={handleRedeemInviteOrAdmin}
+                disabled={verifying || !invitePasscode}
+                className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 text-sm"
+              >
+                {verifying ? "Verifying Access..." : "Unlock Studio with Passcode"}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+
+              <div className="pt-4 border-t border-border/40 text-center text-xs text-muted-foreground">
+                Need access? Contact your platform administrator to request early preview credentials.
+              </div>
+            </div>
           </div>
         </main>
 
         <footer className="text-center text-xs text-muted-foreground py-4">
-          Placement Analysis System • Exclusively configured for IIT Bombay Placement Cycles
+          Placement Intelligence Studio • Private Admin Preview
         </footer>
       </div>
     )

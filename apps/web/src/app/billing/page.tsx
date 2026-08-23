@@ -437,7 +437,7 @@ export default function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Company Placement Intelligence Dossiers</span>
+                    <span>Full ATS Audit & Optimization Suite</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
@@ -507,7 +507,7 @@ export default function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary shrink-0" />
-                    <span>Full Company Intelligence Dossiers</span>
+                    <span>Full ATS & Dimensional Scorecard Suite</span>
                   </li>
                 </ul>
               </div>
