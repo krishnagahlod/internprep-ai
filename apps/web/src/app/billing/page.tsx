@@ -109,6 +109,15 @@ export default function BillingPage() {
               plan_key: planKey,
             });
 
+            if (verifyRes?.entitlement) {
+              setData((prev: any) => ({
+                ...(prev || {}),
+                entitlement: verifyRes.entitlement,
+                is_iitb: Boolean(verifyRes.entitlement.is_iitb),
+                is_admin: Boolean(verifyRes.entitlement.is_admin),
+              }));
+            }
+
             setActionMessage({
               type: "success",
               text: `🎉 Payment successful! Activated ${order.plan_title}.`,

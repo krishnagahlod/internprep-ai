@@ -122,6 +122,21 @@ class UsageService:
         }
 
     @classmethod
+    def get_user_usage_summary(cls, user_id: str, plan_key: str) -> Dict[str, Any]:
+        """
+        Returns quota consumption summary across all key platform capabilities:
+        - resume_analysis
+        - mock_interview
+        - bullet_refine
+        - placement_intelligence
+        """
+        features = ["resume_analysis", "mock_interview", "bullet_refine", "placement_intelligence"]
+        return {
+            feat: cls.check_quota(user_id=user_id, plan_key=plan_key, feature_key=feat)
+            for feat in features
+        }
+
+    @classmethod
     def consume_quota(
         cls,
         user_id: str,

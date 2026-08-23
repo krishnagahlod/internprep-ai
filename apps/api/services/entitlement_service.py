@@ -35,8 +35,18 @@ DEFAULT_PLANS = {
         "display_name": "Placement Season Pass",
         "description": "90 days of complete placement preparation"
     },
+    "pro_season": {
+        "slug": "pro_season",
+        "display_name": "Placement Season Pass",
+        "description": "90 days of complete placement preparation"
+    },
     "pro_1y": {
         "slug": "pro_1y",
+        "display_name": "Master Pass",
+        "description": "365 days of comprehensive preparation"
+    },
+    "pro_master": {
+        "slug": "pro_master",
         "display_name": "Master Pass",
         "description": "365 days of comprehensive preparation"
     },
@@ -89,7 +99,19 @@ DEFAULT_FEATURE_LIMITS = {
         "bullet_refine": 200,
         "placement_intelligence": -1
     },
+    "pro_season": {
+        "resume_analysis": 30,
+        "mock_interview": 15,
+        "bullet_refine": 200,
+        "placement_intelligence": -1
+    },
     "pro_1y": {
+        "resume_analysis": 30,
+        "mock_interview": 15,
+        "bullet_refine": 200,
+        "placement_intelligence": -1
+    },
+    "pro_master": {
         "resume_analysis": 30,
         "mock_interview": 15,
         "bullet_refine": 200,
@@ -363,58 +385,21 @@ class EntitlementService:
                     "external_reference": external_reference,
                     "metadata": metadata or {}
                 }).execute()
+                # Record admin audit log if applicable
+                if admin_id:
+                    supabase.table("admin_audit_logs").insert({
+                        "admin_user_id": admin_id,
+                        "target_user_id": user_id,
+                        "product": "internprep_ai",
+                        "action": "grant",
+                        "before_state": existing,
+                        "after_state": entitlement_record,
+                        "reason": f"Manual grant of {plan_key} for {duration_days} days"
+                    }).execute()
             except Exception as e:
                 print(f"Error granting entitlement to DB: {e}")
 
         return entitlement_record
-        
-        if duration_days is not None and duration_days > 0:
-            if existing and existing.get("expires_at"):
-                try:
-                    cur_exp = datetime.fromisoformat(existing["expires_at"].replace("Z", "+00:00"))
-                    if cur_exp > now:
-                        # Extend from existing expiration date
-                        expires_at = cur_exp + timedelta(days=duration_days)
-                    else:
-                        expires_at = now + timedelta(days=duration_days)
-                except Exception:
-                    expires_at = now + timedelta(days=duration_days)
-            else:
-                expires_at = now + timedelta(days=duration_days)
-
-        payload = {
-            "user_id": user_id,
-            "product": "internprep_ai",
-            "plan_key": plan_key,
-            "status": "active",
-            "source": source,
-            "starts_at": starts_at.isoformat(),
-            "expires_at": expires_at.isoformat() if expires_at else None,
-            "granted_by": admin_id,
-            "external_reference": external_reference,
-            "metadata": metadata or {}
-        }
-
-        try:
-            insert_res = supabase.table("entitlements").insert(payload).execute()
-            # Record admin audit log if applicable
-            if admin_id:
-                supabase.table("admin_audit_logs").insert({
-                    "admin_user_id": admin_id,
-                    "target_user_id": user_id,
-                    "product": "internprep_ai",
-                    "action": "grant",
-                    "before_state": existing,
-                    "after_state": payload,
-                    "reason": f"Manual grant of {plan_key} for {duration_days} days"
-                }).execute()
-            
-            if insert_res.data and len(insert_res.data) > 0:
-                return insert_res.data[0]
-        except Exception as e:
-            print(f"Error granting entitlement: {e}")
-
-        return payload
 
     @staticmethod
     def revoke_entitlement(user_id: str, admin_id: str, reason: str = "Admin revocation") -> bool:
