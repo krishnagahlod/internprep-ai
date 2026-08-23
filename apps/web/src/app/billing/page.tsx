@@ -81,27 +81,11 @@ export default function BillingPage() {
       // 1. Create payment order on server
       const order = await createPaymentOrder(planKey);
 
-      // 2. Check if sandbox simulation key or live Razorpay
-      const isSandboxSim = Boolean(order.is_simulated || !order.key_id || order.key_id.startsWith("rzp_test_internprep"));
-
-      if (isSandboxSim) {
-        // Instant Sandbox Activation
-        const verifyRes = await verifyPayment({
-          razorpay_order_id: order.order_id,
-          razorpay_payment_id: `pay_sandbox_${Date.now()}`,
-          razorpay_signature: "sandbox_valid_signature",
-          plan_key: planKey,
-        });
-
-        setActionMessage({
-          type: "success",
-          text: `🎉 Success! Activated ${order.plan_title} (${order.duration_days} days). Enjoy full Pro access!`,
-        });
-        await loadBillingData();
-        return;
+      if (!order || !order.order_id || !order.key_id) {
+        throw new Error("Failed to initialize payment gateway order.");
       }
 
-      // 3. Open live/test Razorpay modal
+      // 2. Open live/test Razorpay checkout modal
       await openRazorpayCheckout({
         key: order.key_id,
         amount: order.amount_paise,
@@ -117,6 +101,7 @@ export default function BillingPage() {
         },
         handler: async (response) => {
           try {
+            setCheckoutLoading(planKey);
             const verifyRes = await verifyPayment({
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
@@ -134,6 +119,8 @@ export default function BillingPage() {
               type: "error",
               text: vErr.message || "Payment verification failed. Please contact support.",
             });
+          } finally {
+            setCheckoutLoading(null);
           }
         },
         onDismiss: () => {

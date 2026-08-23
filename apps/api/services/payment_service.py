@@ -68,10 +68,9 @@ class PaymentService:
         amount_paise = plan["amount_paise"]
 
         order_id = f"order_{uuid.uuid4().hex[:14]}"
+        is_simulated = False
         
-        is_simulated = True
-        
-        # If live/test Razorpay SDK credentials exist, invoke Razorpay API
+        # Live/Test Razorpay API order creation
         if key_secret and not key_id.startswith("rzp_test_internprep"):
             try:
                 import razorpay
@@ -88,10 +87,16 @@ class PaymentService:
                     }
                 })
                 order_id = rzp_order["id"]
-                is_simulated = False
             except Exception as e:
-                print(f"Razorpay API call failed, falling back to simulator: {e}")
-                is_simulated = True
+                print(f"Razorpay API order creation failed: {e}")
+                raise HTTPException(status_code=502, detail=f"Razorpay gateway order creation failed: {str(e)}")
+        elif not key_secret and os.getenv("ALLOW_PAYMENT_SIMULATION", "false").lower() == "true":
+            is_simulated = True
+        elif not key_secret:
+            raise HTTPException(
+                status_code=500,
+                detail="RAZORPAY_KEY_SECRET is not configured on backend server. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your deployment environment variables."
+            )
 
         # Persist transaction in created state
         supabase = get_supabase()

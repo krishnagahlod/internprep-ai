@@ -1,7 +1,10 @@
 import os
 import unittest
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 from fastapi import HTTPException
+
+load_dotenv()
 
 from services.entitlement_service import EntitlementService, is_iitb_email, is_admin_email, DEFAULT_PLANS
 from services.usage_service import UsageService, _IN_MEMORY_USAGE_CACHE
@@ -79,13 +82,23 @@ class TestSaasEntitlementsAndMonetization(unittest.TestCase):
         self.assertEqual(order["amount"], 299)
         self.assertEqual(order["currency"], "INR")
 
+        # Compute HMAC signature for test
+        import hmac, hashlib
+        key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+        test_payment_id = "pay_simulated_test_123"
+        test_sig = hmac.new(
+            key_secret.encode("utf-8"),
+            f"{order['order_id']}|{test_payment_id}".encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
+
         # Verify payment
         verification = PaymentService.verify_payment(
             user_id="test_buyer_456",
             user_email="buyer@gmail.com",
             razorpay_order_id=order["order_id"],
-            razorpay_payment_id="pay_simulated_test_123",
-            razorpay_signature="simulated_signature",
+            razorpay_payment_id=test_payment_id,
+            razorpay_signature=test_sig,
             plan_key="pro_1m"
         )
         self.assertEqual(verification["status"], "success")
