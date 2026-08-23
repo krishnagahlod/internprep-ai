@@ -225,6 +225,7 @@ export function openRazorpayCheckout(
       razorpay_order_id: string;
       razorpay_signature: string;
     }) => void;
+    onPaymentFailed?: (error: any) => void;
     onDismiss?: () => void;
   }
 ): Promise<void> {
@@ -246,6 +247,9 @@ export function openRazorpayCheckout(
 
         rzp.on('payment.failed', function (response: any) {
           console.error('Razorpay payment failed:', response.error);
+          if (options.onPaymentFailed) {
+            options.onPaymentFailed(response.error);
+          }
         });
 
         rzp.open();

@@ -123,6 +123,13 @@ export default function BillingPage() {
             setCheckoutLoading(null);
           }
         },
+        onPaymentFailed: (error) => {
+          setCheckoutLoading(null);
+          setActionMessage({
+            type: "error",
+            text: error?.description || error?.reason || "Payment was cancelled or could not be completed.",
+          });
+        },
         onDismiss: () => {
           setCheckoutLoading(null);
         },

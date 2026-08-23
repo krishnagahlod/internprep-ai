@@ -97,6 +97,8 @@ async def create_razorpay_order(
             "status": "success",
             "order": order
         }
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

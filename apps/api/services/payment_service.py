@@ -88,14 +88,20 @@ class PaymentService:
                 })
                 order_id = rzp_order["id"]
             except Exception as e:
-                print(f"Razorpay API order creation failed: {e}")
-                raise HTTPException(status_code=502, detail=f"Razorpay gateway order creation failed: {str(e)}")
+                err_msg = str(e)
+                print(f"Razorpay API order creation failed: {err_msg}")
+                if "Authentication failed" in err_msg or "401" in err_msg:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Razorpay Authentication Failed: Your RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is invalid, expired, or was regenerated in Razorpay Dashboard. Please copy the latest Key ID and Secret from Razorpay Dashboard -> API Keys."
+                    )
+                raise HTTPException(status_code=502, detail=f"Razorpay gateway order creation failed: {err_msg}")
         elif not key_secret and os.getenv("ALLOW_PAYMENT_SIMULATION", "false").lower() == "true":
             is_simulated = True
         elif not key_secret:
             raise HTTPException(
                 status_code=500,
-                detail="RAZORPAY_KEY_SECRET is not configured on backend server. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your deployment environment variables."
+                detail="RAZORPAY_KEY_SECRET is not configured on backend server. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your environment variables."
             )
 
         # Persist transaction in created state
