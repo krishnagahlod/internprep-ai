@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2, CreditCard } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2, CreditCard, Crown } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { QuotaBadge } from "@/components/quota-badge"
 
 export default function DashboardPage() {
@@ -16,6 +17,11 @@ export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
+
+  const isAdmin =
+    user?.email?.toLowerCase() === "krishnagahlod@gmail.com" ||
+    user?.email?.toLowerCase() === "creator@internprep.ai" ||
+    user?.email?.toLowerCase().includes("admin")
 
   // Domain Interview Modal States
   const [showDomainModal, setShowDomainModal] = useState(false)
@@ -309,6 +315,37 @@ export default function DashboardPage() {
             Subscriptions & Quotas
           </Button>
 
+          {isAdmin && (
+            <div className="pt-2 space-y-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
+                <Crown className="h-3 w-3" /> Admin Studio
+              </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                onClick={() => router.push("/admin")}
+              >
+                <Crown className="mr-3 h-4 w-4 text-purple-500" />
+                Admin Console
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
+                onClick={() => {
+                  localStorage.setItem("iitb_placement_verified", "true")
+                  localStorage.setItem("iitb_placement_admin", "true")
+                  router.push("/placement-analysis")
+                }}
+              >
+                <Building2 className="mr-3 h-4 w-4 text-amber-500" />
+                Placement Intelligence
+                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
+                  VIP
+                </Badge>
+              </Button>
+            </div>
+          )}
+
           <div className="pt-4 pb-2">
             <div className="h-px bg-border/50 w-full" />
           </div>
@@ -383,6 +420,24 @@ export default function DashboardPage() {
             <Clock className="mr-3 h-4 w-4" />
             History
           </Button>
+
+          {isAdmin && (
+            <div className="pt-2 space-y-1 border-t border-border/50">
+              <Button variant="ghost" className="w-full justify-start text-purple-600 dark:text-purple-300 font-semibold" onClick={() => { router.push("/admin"); setIsMobileMenuOpen(false); }}>
+                <Crown className="mr-3 h-4 w-4 text-purple-500" />
+                Admin Console
+              </Button>
+              <Button variant="ghost" className="w-full justify-start text-amber-600 dark:text-amber-300 font-semibold" onClick={() => {
+                localStorage.setItem("iitb_placement_verified", "true")
+                localStorage.setItem("iitb_placement_admin", "true")
+                router.push("/placement-analysis");
+                setIsMobileMenuOpen(false);
+              }}>
+                <Building2 className="mr-3 h-4 w-4 text-amber-500" />
+                Placement Intelligence
+              </Button>
+            </div>
+          )}
         </nav>
       </aside>
 
