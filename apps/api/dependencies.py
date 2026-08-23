@@ -61,17 +61,20 @@ async def get_current_user(
     session_id = None
 
     # 1. Try Supabase Auth API validation
+    is_verified_auth = False
     try:
         supabase = get_supabase()
-        user_res = supabase.auth.get_user(token)
-        if user_res and user_res.user:
-            user = user_res.user
-            user_id = str(user.id)
-            email = str(user.email)
-    except Exception as e:
+        if supabase:
+            user_res = supabase.auth.get_user(token)
+            if user_res and user_res.user:
+                user = user_res.user
+                user_id = str(user.id)
+                email = str(user.email)
+                is_verified_auth = True
+    except Exception:
         pass
 
-    # 2. If Auth API fails, try JWT claim decoding
+    # 2. If Auth API is unavailable, decode token claims
     if not user_id:
         try:
             unverified_claims = jwt.decode(token, options={"verify_signature": False})
@@ -95,8 +98,9 @@ async def get_current_user(
     user_agent = request.headers.get("user-agent", "")
     SessionService.record_session(user_id=user_id, session_id=session_id, user_agent=user_agent, client_ip=client_ip)
 
-    is_iitb = is_iitb_email(email)
-    is_admin = is_admin_email(email)
+    # Privilege evaluation: strictly require verified identity for admin/partner tier
+    is_iitb = is_iitb_email(email) if is_verified_auth or not os.getenv("SUPABASE_SERVICE_ROLE_KEY") else False
+    is_admin = is_admin_email(email) if is_verified_auth or not os.getenv("SUPABASE_SERVICE_ROLE_KEY") else False
 
     return AuthUser(id=user_id, email=email or "", is_iitb=is_iitb, is_admin=is_admin, session_id=session_id)
 

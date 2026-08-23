@@ -127,15 +127,8 @@ def is_admin_email(email: Optional[str]) -> bool:
     admin_emails = os.getenv("ADMIN_EMAILS", "krishnagahlod@gmail.com").lower().split(",")
     admin_emails = [e.strip() for e in admin_emails if e.strip()]
     
-    # Primary admin accounts
-    if (
-        email_clean == "krishnagahlod@gmail.com"
-        or email_clean in admin_emails
-        or "krishnagahlod" in email_clean
-        or (email_clean.startswith("krishna") and "@" in email_clean)
-    ):
-        return True
-    return False
+    # Strictly check exact configured admin email list (no wildcards or substrings)
+    return email_clean == "krishnagahlod@gmail.com" or email_clean in admin_emails
 
 class EntitlementService:
     @staticmethod

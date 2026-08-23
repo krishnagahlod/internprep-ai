@@ -144,10 +144,15 @@ class PaymentService:
         effective_payment_id = razorpay_payment_id or payment_id or ""
         effective_signature = razorpay_signature or signature or ""
 
+        key_id = os.getenv("RAZORPAY_KEY_ID", "rzp_test_internprep")
         key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
+        is_live = bool(key_secret and not key_id.startswith("rzp_test_internprep"))
         
-        # Verify cryptographic signature if secret is configured and not sandbox signature
-        if key_secret and effective_signature and effective_signature != "sandbox_valid_signature":
+        # In production/live mode, require strict HMAC-SHA256 signature verification
+        if is_live:
+            if not effective_signature or effective_signature == "sandbox_valid_signature" or not effective_order_id or not effective_payment_id:
+                raise HTTPException(status_code=400, detail="Invalid payment verification request. Cryptographic signature required.")
+            
             generated_signature = hmac.new(
                 key_secret.encode("utf-8"),
                 f"{effective_order_id}|{effective_payment_id}".encode("utf-8"),
@@ -155,6 +160,16 @@ class PaymentService:
             ).hexdigest()
             if not hmac.compare_digest(generated_signature, effective_signature):
                 raise HTTPException(status_code=400, detail="Invalid Razorpay signature verification failed.")
+        else:
+            # Sandbox / local simulation mode
+            if key_secret and effective_signature and effective_signature != "sandbox_valid_signature":
+                generated_signature = hmac.new(
+                    key_secret.encode("utf-8"),
+                    f"{effective_order_id}|{effective_payment_id}".encode("utf-8"),
+                    hashlib.sha256
+                ).hexdigest()
+                if not hmac.compare_digest(generated_signature, effective_signature):
+                    raise HTTPException(status_code=400, detail="Invalid Razorpay signature verification failed.")
 
         # Idempotency check: verify if payment was already captured
         supabase = get_supabase()
