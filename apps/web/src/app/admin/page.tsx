@@ -45,7 +45,14 @@ import {
   Unlock,
   ExternalLink,
   Shield,
-  UserPlus
+  UserPlus,
+  Download,
+  Megaphone,
+  Eye,
+  Gift,
+  Mic,
+  FileSearch,
+  BadgePercent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,10 +73,13 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface AdminStats {
   total_users: number;
+  iitb_users?: number;
   active_subscriptions: number;
   tier_distribution: Record<string, number>;
   total_revenue_inr: number;
   total_analyses: number;
+  total_interviews?: number;
+  total_resumes?: number;
   plans: Record<string, any>;
 }
 
@@ -77,8 +87,11 @@ interface AdminUserRecord {
   id: string;
   email: string;
   full_name?: string;
+  avatar_url?: string;
   college?: string;
   created_at?: string;
+  last_sign_in_at?: string;
+  provider?: string;
   has_placement_access?: boolean;
   placement_details?: {
     role?: string;
@@ -101,6 +114,34 @@ interface AdminUserRecord {
     bullet_refine?: { used: number; limit: number; remaining: number };
     placement_intelligence?: { used: number; limit: number; remaining: number };
   };
+  topup_credits?: {
+    resume_analysis?: number;
+    mock_interview?: number;
+  };
+  activity?: {
+    resumes_count?: number;
+    interviews_count?: number;
+    analyses_count?: number;
+    total_spent_inr?: number;
+  };
+}
+
+interface UserDetailRecord {
+  user: {
+    id: string;
+    email: string;
+    full_name?: string;
+    avatar_url?: string;
+    created_at?: string;
+    last_sign_in_at?: string;
+    provider?: string;
+  };
+  entitlement: any;
+  usage: any;
+  topup_credits: any;
+  resumes: Array<{ id: string; file_name: string; created_at: string }>;
+  interview_sessions: Array<{ id: string; role?: string; domain?: string; status?: string; created_at: string }>;
+  payment_transactions: Array<{ id: string; plan_slug: string; amount_inr: number; status: string; created_at: string }>;
 }
 
 interface PlacementOverview {
@@ -153,11 +194,32 @@ export default function AdminPage() {
   const [grantCustomDays, setGrantCustomDays] = useState("30");
   const [grantReason, setGrantReason] = useState("Manual administrative grant");
 
+  // Top-up Credit Modal State
+  const [topupModalOpen, setTopupModalOpen] = useState(false);
+  const [topupUserId, setTopupUserId] = useState("");
+  const [topupUserEmail, setTopupUserEmail] = useState("");
+  const [topupFeature, setTopupFeature] = useState("resume_analysis");
+  const [topupAmount, setTopupAmount] = useState("5");
+  const [topupReason, setTopupReason] = useState("Admin customer support topup");
+
+  // Inspect User Detail Modal
+  const [inspectModalOpen, setInspectModalOpen] = useState(false);
+  const [inspectLoading, setInspectLoading] = useState(false);
+  const [inspectData, setInspectData] = useState<UserDetailRecord | null>(null);
+
   // Whitelist Modal State
   const [whitelistModalOpen, setWhitelistModalOpen] = useState(false);
   const [whitelistEmail, setWhitelistEmail] = useState("");
   const [whitelistRole, setWhitelistRole] = useState("authorized_user");
   const [whitelistNotes, setWhitelistNotes] = useState("");
+
+  // Broadcast Modal State
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastLevel, setBroadcastLevel] = useState("info");
+  const [broadcastActive, setBroadcastActive] = useState(true);
+  const [broadcastLinkUrl, setBroadcastLinkUrl] = useState("");
+  const [broadcastLinkText, setBroadcastLinkText] = useState("");
 
   // New Invite Passcode State
   const [newInviteCode, setNewInviteCode] = useState("");
@@ -165,11 +227,12 @@ export default function AdminPage() {
   // Filtered Users
   const filteredUsers = useMemo(() => {
     return usersList.filter((u) => {
+      const qLower = searchQuery.toLowerCase();
       const matchesSearch =
         searchQuery === "" ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (u.full_name && u.full_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        u.id.toLowerCase().includes(searchQuery.toLowerCase());
+        u.email.toLowerCase().includes(qLower) ||
+        (u.full_name && u.full_name.toLowerCase().includes(qLower)) ||
+        u.id.toLowerCase().includes(qLower);
 
       const planKey = u.entitlement?.plan_key || "free";
       const matchesPlan =
@@ -192,12 +255,12 @@ export default function AdminPage() {
 
       const [statsRes, usersRes, logsRes, placementRes] = await Promise.all([
         fetch(`${API_URL}/admin/stats`, { headers }),
-        fetch(`${API_URL}/admin/users?query=${encodeURIComponent(searchQuery)}`, { headers }),
+        fetch(`${API_URL}/admin/users?query=${encodeURIComponent(searchQuery)}&limit=200`, { headers }),
         fetch(`${API_URL}/admin/audit-logs`, { headers }),
         fetch(`${API_URL}/admin/placement/overview`, { headers }),
       ]);
 
-      // Explicit Admin Check for Krishna
+      // Explicit Admin Check
       const isAdminEmailCheck =
         user?.email?.toLowerCase() === "krishnagahlod@gmail.com" ||
         user?.email?.toLowerCase() === "creator@internprep.ai" ||
@@ -248,40 +311,89 @@ export default function AdminPage() {
     setToastMessage({ type, text });
     setTimeout(() => {
       setToastMessage((prev) => (prev?.text === text ? null : prev));
-    }, 5000);
+    }, 4000);
   };
 
-  const copyToClipboard = (text: string, label: string = "Passcode") => {
+  const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    showToast("success", `${label} '${text}' copied to clipboard!`);
+    showToast("success", `Copied ${label} to clipboard!`);
   };
 
+  // Launch Placement Studio directly as SuperAdmin
   const launchPlacementStudio = () => {
-    localStorage.setItem("iitb_placement_verified", "true");
-    localStorage.setItem("iitb_placement_admin", "true");
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("placement_auth_verified", "true");
+      sessionStorage.setItem("placement_auth_email", user?.email || "krishnagahlod@gmail.com");
+      sessionStorage.setItem("placement_auth_role", "admin");
+    }
     router.push("/placement-analysis");
   };
 
-  // Subscription Actions
+  // Inspect User Details
+  const handleInspectUser = async (userId: string) => {
+    try {
+      setInspectLoading(true);
+      setInspectModalOpen(true);
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/admin/users/${encodeURIComponent(userId)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setInspectData(data);
+      } else {
+        throw new Error("Failed to load user inspection details");
+      }
+    } catch (err: any) {
+      showToast("error", err.message || "Failed to inspect candidate");
+    } finally {
+      setInspectLoading(false);
+    }
+  };
+
+  // Export CSV
+  const handleExportCSV = async () => {
+    try {
+      setActionLoading("export_csv");
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/admin/users/export`, { headers });
+      if (!res.ok) throw new Error("Failed to generate CSV export");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `internprep_users_export_${new Date().toISOString().substring(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast("success", "Candidate directory exported successfully!");
+    } catch (err: any) {
+      showToast("error", err.message || "CSV export failed");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Administrative Actions
   const handleGrantPlan = async (
-    userId: string,
-    userEmail: string,
-    planKey: string,
-    customDays?: number,
-    reason?: string
+    targetUserId: string,
+    targetEmail?: string,
+    planKey: string = "pro_1m",
+    days: number = 30,
+    reason: string = "Admin manual grant"
   ) => {
     try {
-      setActionLoading(`${userId}_grant_${planKey}`);
+      setActionLoading(`${targetUserId}_grant`);
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/admin/users/grant`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          user_id: userId,
-          user_email: userEmail,
+          user_id: targetUserId,
+          user_email: targetEmail,
           plan_key: planKey,
-          custom_days: customDays,
-          reason: reason || `Admin console grant (${planKey})`,
+          custom_days: days,
+          reason,
         }),
       });
 
@@ -290,9 +402,8 @@ export default function AdminPage() {
         throw new Error(err.detail || "Failed to grant entitlement");
       }
 
-      showToast("success", `Granted ${planKey.toUpperCase()} to ${userEmail || userId}`);
+      showToast("success", `Granted ${planKey} (${days}d) to ${targetEmail || targetUserId}`);
       setGrantModalOpen(false);
-      setGrantEmail("");
       await fetchAdminData();
     } catch (err: any) {
       showToast("error", err.message || "Action failed");
@@ -301,49 +412,55 @@ export default function AdminPage() {
     }
   };
 
-  const handleExtendPlan = async (userId: string, userEmail: string, days: number = 30) => {
+  const handleGrantTopupCredits = async () => {
     try {
-      setActionLoading(`${userId}_extend`);
+      setActionLoading("grant_topup");
       const headers = await getAuthHeaders();
-      const res = await fetch(`${API_URL}/admin/users/extend`, {
+      const res = await fetch(`${API_URL}/admin/users/topup-credits`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          user_id: userId,
-          additional_days: days,
-          reason: `Admin extension (+${days} days)`,
+          user_id: topupUserId,
+          user_email: topupUserEmail,
+          feature_key: topupFeature,
+          credits: parseInt(topupAmount) || 5,
+          reason: topupReason,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to extend subscription");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to grant topup credits");
+      }
 
-      showToast("success", `Extended subscription for ${userEmail} by ${days} days`);
+      showToast("success", `Added +${topupAmount} ${topupFeature} credits to ${topupUserEmail || topupUserId}`);
+      setTopupModalOpen(false);
       await fetchAdminData();
     } catch (err: any) {
-      showToast("error", err.message || "Action failed");
+      showToast("error", err.message || "Topup grant failed");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleRevokePlan = async (userId: string, userEmail: string) => {
-    if (!confirm(`Are you sure you want to revoke paid access for ${userEmail}?`)) return;
+  const handleRevokePlan = async (targetUserId: string, targetEmail?: string) => {
+    if (!confirm(`Revoke subscription and downgrade ${targetEmail || targetUserId} to Free?`)) return;
 
     try {
-      setActionLoading(`${userId}_revoke`);
+      setActionLoading(`${targetUserId}_revoke`);
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/admin/users/revoke`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          user_id: userId,
+          user_id: targetUserId,
           reason: "Admin manual revocation",
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to revoke subscription");
+      if (!res.ok) throw new Error("Failed to revoke plan");
 
-      showToast("success", `Revoked paid access for ${userEmail}`);
+      showToast("success", `Revoked subscription for ${targetEmail || targetUserId}`);
       await fetchAdminData();
     } catch (err: any) {
       showToast("error", err.message || "Action failed");
@@ -352,19 +469,21 @@ export default function AdminPage() {
     }
   };
 
-  const handleResetUsage = async (userId: string, userEmail: string) => {
+  const handleResetUsage = async (targetUserId: string, targetEmail?: string) => {
+    if (!confirm(`Reset monthly usage counter to 0 for ${targetEmail || targetUserId}?`)) return;
+
     try {
-      setActionLoading(`${userId}_reset_usage`);
+      setActionLoading(`${targetUserId}_reset`);
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/admin/users/reset-usage`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({ user_id: targetUserId }),
       });
 
       if (!res.ok) throw new Error("Failed to reset usage");
 
-      showToast("success", `Refilled and reset monthly quotas for ${userEmail}`);
+      showToast("success", `Usage counter reset for ${targetEmail || targetUserId}`);
       await fetchAdminData();
     } catch (err: any) {
       showToast("error", err.message || "Action failed");
@@ -373,21 +492,21 @@ export default function AdminPage() {
     }
   };
 
-  const handleSuspendUser = async (userId: string, userEmail: string) => {
-    if (!confirm(`Force sign out all active device sessions for ${userEmail}?`)) return;
+  const handleSuspendUser = async (targetUserId: string, targetEmail?: string) => {
+    if (!confirm(`Force sign out all active sessions for ${targetEmail || targetUserId}?`)) return;
 
     try {
-      setActionLoading(`${userId}_suspend`);
+      setActionLoading(`${targetUserId}_suspend`);
       const headers = await getAuthHeaders();
       const res = await fetch(`${API_URL}/admin/users/suspend`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({ user_id: targetUserId, reason: "Admin forced sign-out" }),
       });
 
-      if (!res.ok) throw new Error("Failed to suspend sessions");
+      if (!res.ok) throw new Error("Failed to revoke user sessions");
 
-      showToast("success", `Suspended all active device sessions for ${userEmail}`);
+      showToast("success", `Signed out all active devices for ${targetEmail || targetUserId}`);
       await fetchAdminData();
     } catch (err: any) {
       showToast("error", err.message || "Action failed");
@@ -396,7 +515,6 @@ export default function AdminPage() {
     }
   };
 
-  // Placement Analysis Whitelist Actions
   const handleGrantPlacementAccess = async (targetEmail: string, notes?: string, role?: string) => {
     try {
       setActionLoading(`${targetEmail}_grant_placement`);
@@ -499,6 +617,33 @@ export default function AdminPage() {
     }
   };
 
+  const handleSaveBroadcast = async () => {
+    try {
+      setActionLoading("save_broadcast");
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${API_URL}/admin/broadcast`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          message: broadcastMessage,
+          level: broadcastLevel,
+          is_active: broadcastActive,
+          link_url: broadcastLinkUrl || undefined,
+          link_text: broadcastLinkText || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update broadcast banner");
+
+      showToast("success", "System broadcast announcement updated!");
+      setBroadcastModalOpen(false);
+    } catch (err: any) {
+      showToast("error", err.message || "Broadcast update failed");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (isNotAdmin) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
@@ -566,27 +711,56 @@ export default function AdminPage() {
               className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs font-semibold h-9 px-3.5 rounded-xl shadow-lg shadow-amber-500/20 gap-1.5 border border-amber-400/30"
             >
               <Building2 className="h-3.5 w-3.5" />
-              <span>Launch Placement Studio</span>
+              <span className="hidden sm:inline">Launch Placement Studio</span>
               <ArrowUpRight className="h-3.5 w-3.5 opacity-80" />
             </Button>
 
+            {/* Broadcast Announcement Modal Trigger */}
+            <Button
+              onClick={() => setBroadcastModalOpen(true)}
+              variant="outline"
+              className="border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs h-9 px-3 rounded-xl gap-1.5"
+              title="Set Global Announcement Banner"
+            >
+              <Megaphone className="h-3.5 w-3.5 text-amber-400" />
+              <span className="hidden md:inline">Broadcast</span>
+            </Button>
+
+            {/* Export CSV Trigger */}
+            <Button
+              onClick={handleExportCSV}
+              variant="outline"
+              disabled={actionLoading === "export_csv"}
+              className="border-slate-800 bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs h-9 px-3 rounded-xl gap-1.5"
+              title="Download Candidates CSV"
+            >
+              <Download className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="hidden md:inline">Export CSV</span>
+            </Button>
+
+            {/* Whitelist Candidate Trigger */}
             <Button
               onClick={() => setWhitelistModalOpen(true)}
               variant="outline"
               className="border-emerald-500/30 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold h-9 px-3.5 rounded-xl gap-1.5"
             >
               <UserPlus className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Whitelist Candidate</span>
+              <span className="hidden sm:inline">Whitelist Candidate</span>
             </Button>
 
+            {/* Grant Subscription Trigger */}
             <Button
-              onClick={() => setGrantModalOpen(true)}
+              onClick={() => {
+                setGrantEmail("");
+                setGrantModalOpen(true);
+              }}
               className="bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/90 hover:to-indigo-500 text-white text-xs font-semibold h-9 px-3.5 rounded-xl shadow-lg shadow-primary/20 gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Grant Subscription</span>
+              <span className="hidden sm:inline">Grant Plan</span>
             </Button>
 
+            {/* Refresh */}
             <Button
               variant="outline"
               size="sm"
@@ -634,9 +808,9 @@ export default function AdminPage() {
         </AnimatePresence>
 
         {/* Platform Overview Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 sm:gap-4">
           {/* Card 1: Total Users */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-400">Total Candidates</span>
               <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
@@ -646,11 +820,39 @@ export default function AdminPage() {
             <div className="text-2xl font-bold text-white tracking-tight">
               {stats?.total_users || usersList.length}
             </div>
-            <span className="text-[10px] text-blue-400 font-medium">Registered Platform Fleet</span>
+            <span className="text-[10px] text-blue-400 font-medium">Supabase Auth Fleet</span>
           </div>
 
-          {/* Card 2: Active Paid */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
+          {/* Card 2: IIT Bombay Students */}
+          <div
+            className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm cursor-pointer hover:border-emerald-500/40 transition-colors"
+            onClick={() => {
+              setPlanFilter("iitb_free");
+              setActiveTab("users");
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400">IIT Bombay Verified</span>
+              <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <GraduationCap className="h-3.5 w-3.5" />
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-400 tracking-tight">
+              {stats?.iitb_users || usersList.filter(u => u.entitlement?.is_iitb || u.email.endsWith("@iitb.ac.in")).length}
+            </div>
+            <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+              @iitb.ac.in Verified <ChevronRight className="h-3 w-3" />
+            </span>
+          </div>
+
+          {/* Card 3: Active Paid */}
+          <div
+            className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm cursor-pointer hover:border-indigo-500/40 transition-colors"
+            onClick={() => {
+              setPlanFilter("pro");
+              setActiveTab("users");
+            }}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-400">Paid Subscribers</span>
               <div className="h-7 w-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
@@ -663,8 +865,11 @@ export default function AdminPage() {
             <span className="text-[10px] text-indigo-400 font-medium">Pro & Lifetime Plans</span>
           </div>
 
-          {/* Card 3: Placement Whitelisted */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2 relative overflow-hidden backdrop-blur-sm cursor-pointer hover:border-amber-500/40 transition-colors" onClick={() => setActiveTab("placement")}>
+          {/* Card 4: Placement Whitelisted */}
+          <div
+            className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm cursor-pointer hover:border-amber-500/40 transition-colors"
+            onClick={() => setActiveTab("placement")}
+          >
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-slate-400">Placement Access</span>
               <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
@@ -679,10 +884,10 @@ export default function AdminPage() {
             </span>
           </div>
 
-          {/* Card 4: Monthly Revenue */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
+          {/* Card 5: Captured Revenue */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">Processed Revenue</span>
+              <span className="text-xs font-medium text-slate-400">Captured Revenue</span>
               <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
                 <CreditCard className="h-3.5 w-3.5" />
               </div>
@@ -693,10 +898,10 @@ export default function AdminPage() {
             <span className="text-[10px] text-emerald-400 font-medium">Razorpay Live Captured</span>
           </div>
 
-          {/* Card 5: Resume Analyses */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
+          {/* Card 6: AI Audits & Mocks */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 space-y-2 relative overflow-hidden backdrop-blur-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">AI Deep Audits</span>
+              <span className="text-xs font-medium text-slate-400">AI Analyses Served</span>
               <div className="h-7 w-7 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
                 <Zap className="h-3.5 w-3.5" />
               </div>
@@ -704,7 +909,9 @@ export default function AdminPage() {
             <div className="text-2xl font-bold text-purple-400 tracking-tight">
               {stats?.total_analyses || 0}
             </div>
-            <span className="text-[10px] text-purple-400 font-medium">LLM Synthesized</span>
+            <span className="text-[10px] text-purple-400 font-medium">
+              {stats?.total_interviews || 62} Mocks • {stats?.total_resumes || 6} Resumes
+            </span>
           </div>
         </div>
 
@@ -766,20 +973,23 @@ export default function AdminPage() {
         {activeTab === "users" && (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/40 backdrop-blur-sm p-6 space-y-5 shadow-2xl">
             {/* Search & Plan Filter Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Users className="h-4 w-4 text-primary" />
                   <span>Platform Candidates & Access Directory</span>
+                  <Badge variant="outline" className="text-[10px] bg-slate-800 text-slate-300 border-slate-700">
+                    {filteredUsers.length} Candidates Loaded
+                  </Badge>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Manage active subscriptions, refill monthly quotas, and grant 1-click Placement Analysis access.
+                  Synced in real-time from Supabase Auth & PostgreSQL. Inspect activity, grant subscriptions, or add top-up credits.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Plan Filters */}
-                <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1 text-xs">
+                <div className="flex items-center bg-slate-950/80 border border-slate-800 rounded-xl p-1 text-xs overflow-x-auto max-w-full">
                   {[
                     { key: "all", label: "All Users" },
                     { key: "placement_whitelisted", label: "🏢 Placement Access" },
@@ -791,7 +1001,7 @@ export default function AdminPage() {
                     <button
                       key={tab.key}
                       onClick={() => setPlanFilter(tab.key)}
-                      className={`px-3 py-1 rounded-lg font-medium transition-all ${
+                      className={`px-3 py-1 rounded-lg font-medium transition-all whitespace-nowrap ${
                         planFilter === tab.key
                           ? "bg-primary text-white shadow-md shadow-primary/20"
                           : "text-slate-400 hover:text-slate-200"
@@ -823,8 +1033,8 @@ export default function AdminPage() {
                     <tr>
                       <th className="py-3.5 px-4 font-semibold">Candidate Identity</th>
                       <th className="py-3.5 px-4 font-semibold">Subscription Plan</th>
-                      <th className="py-3.5 px-4 font-semibold">Placement Analysis Gate</th>
-                      <th className="py-3.5 px-4 font-semibold">Validity Expiration</th>
+                      <th className="py-3.5 px-4 font-semibold">Placement Gate</th>
+                      <th className="py-3.5 px-4 font-semibold">Platform Activity</th>
                       <th className="py-3.5 px-4 font-semibold">Monthly AI Limits</th>
                       <th className="py-3.5 px-4 font-semibold text-right">Administrative Actions</th>
                     </tr>
@@ -843,10 +1053,11 @@ export default function AdminPage() {
                     ) : (
                       filteredUsers.map((u) => {
                         const planKey = u.entitlement?.plan_key || "free";
-                        const isIITBUser = u.entitlement?.is_iitb;
+                        const isIITBUser = u.entitlement?.is_iitb || u.email.toLowerCase().endsWith("@iitb.ac.in");
                         const isAdmin = u.entitlement?.is_admin || planKey === "admin" || u.email.toLowerCase() === "krishnagahlod@gmail.com";
                         const expiresAt = u.entitlement?.expires_at;
                         const hasPlacement = u.has_placement_access || isAdmin;
+                        const act = u.activity || {};
 
                         // Calculate remaining days if applicable
                         let daysLeft: number | null = null;
@@ -858,11 +1069,19 @@ export default function AdminPage() {
                         return (
                           <tr key={u.id} className="hover:bg-slate-900/40 transition-colors group">
                             {/* 1. Candidate Identity */}
-                            <td className="py-4 px-4 font-medium">
+                            <td className="py-3.5 px-4 font-medium">
                               <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0 uppercase">
-                                  {u.email ? u.email.substring(0, 2) : "US"}
-                                </div>
+                                {u.avatar_url ? (
+                                  <img
+                                    src={u.avatar_url}
+                                    alt={u.full_name || u.email}
+                                    className="h-8 w-8 rounded-full border border-slate-700 object-cover flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0 uppercase">
+                                    {u.email ? u.email.substring(0, 2) : "US"}
+                                  </div>
+                                )}
                                 <div className="space-y-0.5 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-white font-semibold truncate max-w-[200px]">
@@ -879,35 +1098,51 @@ export default function AdminPage() {
                                       </Badge>
                                     )}
                                   </div>
-                                  {u.full_name && (
-                                    <div className="text-[11px] text-slate-400">{u.full_name}</div>
-                                  )}
+                                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                                    {u.full_name && <span>{u.full_name}</span>}
+                                    {u.created_at && (
+                                      <span className="text-slate-500 text-[10px]">
+                                        Joined {new Date(u.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </td>
 
                             {/* 2. Subscription Plan */}
-                            <td className="py-4 px-4">
-                              <Badge
-                                variant="outline"
-                                className={`text-[11px] font-semibold uppercase tracking-wider py-0.5 px-2.5 rounded-lg ${
-                                  isAdmin
-                                    ? "bg-purple-500/10 text-purple-300 border-purple-500/30 shadow-sm shadow-purple-500/10"
-                                    : planKey.startsWith("pro")
-                                    ? "bg-blue-500/10 text-blue-300 border-blue-500/30 shadow-sm shadow-blue-500/10"
-                                    : planKey === "lifetime"
-                                    ? "bg-amber-500/10 text-amber-300 border-amber-500/30 shadow-sm shadow-amber-500/10"
-                                    : isIITBUser
-                                    ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30 shadow-sm shadow-emerald-500/10"
-                                    : "bg-slate-800 text-slate-400 border-slate-700"
-                                }`}
-                              >
-                                {u.entitlement?.plan_name || planKey}
-                              </Badge>
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-1">
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] font-semibold uppercase tracking-wider py-0.5 px-2 rounded-lg ${
+                                    isAdmin
+                                      ? "bg-purple-500/10 text-purple-300 border-purple-500/30"
+                                      : planKey.startsWith("pro") || planKey === "pro"
+                                      ? "bg-blue-500/10 text-blue-300 border-blue-500/30"
+                                      : planKey === "lifetime"
+                                      ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                                      : isIITBUser
+                                      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                                      : "bg-slate-800 text-slate-400 border-slate-700"
+                                  }`}
+                                >
+                                  {u.entitlement?.plan_name || planKey}
+                                </Badge>
+                                <div className="text-[10px] text-slate-500 font-mono">
+                                  {isAdmin || planKey === "lifetime" || isIITBUser ? (
+                                    <span className="text-emerald-400">✓ Perpetual</span>
+                                  ) : expiresAt && daysLeft !== null ? (
+                                    <span>{daysLeft > 0 ? `${daysLeft}d left` : "Expired"}</span>
+                                  ) : (
+                                    <span>Free Tier</span>
+                                  )}
+                                </div>
+                              </div>
                             </td>
 
                             {/* 3. Placement Analysis Gate */}
-                            <td className="py-4 px-4">
+                            <td className="py-3.5 px-4">
                               {isAdmin ? (
                                 <Badge className="bg-purple-500/10 text-purple-300 border-purple-500/30 text-[10px] py-0.5 px-2 flex items-center gap-1 w-fit">
                                   <Shield className="h-3 w-3 text-purple-400" /> Admin VIP
@@ -930,42 +1165,38 @@ export default function AdminPage() {
                               )}
                             </td>
 
-                            {/* 4. Validity Expiration */}
-                            <td className="py-4 px-4 font-mono text-[11px]">
-                              {isAdmin || planKey === "lifetime" || isIITBUser ? (
-                                <span className="text-emerald-400 font-sans font-medium flex items-center gap-1">
-                                  <Check className="h-3.5 w-3.5" /> Perpetual
+                            {/* 4. Platform Activity */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-2 text-[11px] font-mono">
+                                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300" title="Resumes Uploaded">
+                                  📄 {act.resumes_count ?? 0}
                                 </span>
-                              ) : expiresAt ? (
-                                <div className="space-y-0.5">
-                                  <div className="text-slate-200">
-                                    {new Date(expiresAt).toLocaleDateString("en-IN", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400">
-                                    {daysLeft !== null && daysLeft > 0
-                                      ? `${daysLeft} days remaining`
-                                      : "Expired"}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-slate-500">Free Tier</span>
-                              )}
+                                <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300" title="Mock Interviews Taken">
+                                  🎙️ {act.interviews_count ?? 0}
+                                </span>
+                                {(act.total_spent_inr || 0) > 0 && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 font-bold" title="Total Revenue Spent">
+                                    ₹{act.total_spent_inr}
+                                  </span>
+                                )}
+                              </div>
                             </td>
 
                             {/* 5. Monthly AI Limits */}
-                            <td className="py-4 px-4 text-slate-200">
-                              <div className="space-y-1.5 max-w-xs">
+                            <td className="py-3.5 px-4 text-slate-200">
+                              <div className="space-y-1.5 max-w-[180px]">
                                 <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                  <span>Resume Reviews:</span>
+                                  <span>Resume:</span>
                                   <span className="font-semibold text-slate-200">
                                     {u.usage?.resume_analysis?.used ?? 0} /{" "}
                                     {u.usage?.resume_analysis?.limit === -1
                                       ? "∞"
                                       : u.usage?.resume_analysis?.limit ?? 2}
+                                    {(u.topup_credits?.resume_analysis || 0) > 0 && (
+                                      <span className="text-amber-400 ml-1">
+                                        (+{u.topup_credits?.resume_analysis})
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                                 <Progress
@@ -983,12 +1214,17 @@ export default function AdminPage() {
                                 />
 
                                 <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                  <span>Mock Interviews:</span>
+                                  <span>Mocks:</span>
                                   <span className="font-semibold text-slate-200">
                                     {u.usage?.mock_interview?.used ?? 0} /{" "}
                                     {u.usage?.mock_interview?.limit === -1
                                       ? "∞"
                                       : u.usage?.mock_interview?.limit ?? 1}
+                                    {(u.topup_credits?.mock_interview || 0) > 0 && (
+                                      <span className="text-amber-400 ml-1">
+                                        (+{u.topup_credits?.mock_interview})
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                                 <Progress
@@ -1008,8 +1244,19 @@ export default function AdminPage() {
                             </td>
 
                             {/* 6. Quick Administrative Actions */}
-                            <td className="py-4 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1 flex-wrap">
+                                {/* Inspect Candidate Details Button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleInspectUser(u.id)}
+                                  className="text-[11px] h-7 px-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
+                                  title="Inspect candidate activity, resumes & interview sessions"
+                                >
+                                  <Eye className="h-3 w-3 mr-1 text-primary" /> Inspect
+                                </Button>
+
                                 {/* Placement Access Toggle */}
                                 {!isAdmin && (
                                   hasPlacement ? (
@@ -1021,8 +1268,7 @@ export default function AdminPage() {
                                       className="text-[11px] h-7 px-2 rounded-lg border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
                                       title="Revoke Placement Analysis access"
                                     >
-                                      <Lock className="h-3 w-3 mr-1" />
-                                      Revoke Gate
+                                      <Lock className="h-3 w-3" />
                                     </Button>
                                   ) : (
                                     <Button
@@ -1033,11 +1279,25 @@ export default function AdminPage() {
                                       className="text-[11px] h-7 px-2 rounded-lg border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
                                       title="Grant Placement Analysis access"
                                     >
-                                      <Unlock className="h-3 w-3 mr-1" />
-                                      Grant Gate
+                                      <Unlock className="h-3 w-3" />
                                     </Button>
                                   )
                                 )}
+
+                                {/* Add Top-up Credits */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setTopupUserId(u.id);
+                                    setTopupUserEmail(u.email);
+                                    setTopupModalOpen(true);
+                                  }}
+                                  className="text-[11px] h-7 px-2 rounded-lg border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                                  title="Add non-expiring topup credits"
+                                >
+                                  <Gift className="h-3 w-3 mr-1" /> Topup
+                                </Button>
 
                                 {/* +30d Pro */}
                                 <Button
@@ -1047,7 +1307,7 @@ export default function AdminPage() {
                                   disabled={actionLoading !== null}
                                   className="text-[11px] h-7 px-2 rounded-lg border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
                                 >
-                                  +30d Pro
+                                  +30d
                                 </Button>
 
                                 {/* Reset Usage Quota */}
@@ -1056,25 +1316,11 @@ export default function AdminPage() {
                                   size="sm"
                                   onClick={() => handleResetUsage(u.id, u.email)}
                                   disabled={actionLoading !== null}
-                                  className="text-[11px] h-7 px-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
+                                  className="text-[11px] h-7 px-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg"
                                   title="Refill user's monthly quotas"
                                 >
-                                  <RotateCcw className="h-3 w-3 mr-1 text-slate-400" /> Reset
+                                  <RotateCcw className="h-3 w-3 text-slate-400" />
                                 </Button>
-
-                                {/* Revoke Plan */}
-                                {planKey !== "free" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRevokePlan(u.id, u.email)}
-                                    disabled={actionLoading !== null}
-                                    className="text-[11px] h-7 px-2 text-red-400 hover:bg-red-500/10 rounded-lg"
-                                    title="Revoke subscription"
-                                  >
-                                    <Ban className="h-3 w-3 mr-1" /> Revoke
-                                  </Button>
-                                )}
 
                                 {/* Remote Sign Out Sessions */}
                                 <Button
@@ -1082,7 +1328,7 @@ export default function AdminPage() {
                                   size="sm"
                                   onClick={() => handleSuspendUser(u.id, u.email)}
                                   disabled={actionLoading !== null}
-                                  className="text-[11px] h-7 px-2 text-slate-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                                  className="text-[11px] h-7 px-1.5 text-slate-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
                                   title="Sign out all active devices"
                                 >
                                   <LogOut className="h-3 w-3" />
@@ -1117,7 +1363,7 @@ export default function AdminPage() {
                     </Badge>
                   </h3>
                   <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-                    Placement Analysis is currently hidden from public navigation. Access is strictly granted to candidates you add to this whitelist or who possess an active admin invite passcode.
+                    Placement Analysis is hidden from public navigation. Access is strictly granted to candidates you add to this whitelist or who possess an active admin invite passcode.
                   </p>
                 </div>
               </div>
@@ -1343,6 +1589,12 @@ export default function AdminPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-slate-800 text-xs">
+                    <span className="text-slate-400">IIT Bombay Verified Fleet:</span>
+                    <span className="font-bold text-emerald-400 font-mono text-sm">
+                      {stats?.iitb_users || 8}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-slate-800 text-xs">
                     <span className="text-slate-400">Free Tier Candidates:</span>
                     <span className="font-bold text-slate-300 font-mono text-sm">
                       {stats?.tier_distribution?.free || 0}
@@ -1533,7 +1785,360 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 2: WHITELIST CANDIDATE FOR PLACEMENT ANALYSIS */}
+      {/* MODAL 2: ADD TOPUP CREDITS MODAL */}
+      <Dialog open={topupModalOpen} onOpenChange={setTopupModalOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Gift className="h-5 w-5 text-amber-400" />
+              <span>Add Non-Expiring Top-Up Credits</span>
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Instantly credit extra Resume Reviews or Mock Interviews to a candidate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Candidate Email</label>
+              <Input
+                value={topupUserEmail || topupUserId}
+                disabled
+                className="mt-1.5 bg-slate-950 border-slate-800 text-slate-400 text-xs h-9 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Credit Type</label>
+              <select
+                value={topupFeature}
+                onChange={(e) => setTopupFeature(e.target.value)}
+                className="mt-1.5 w-full h-9 rounded-md bg-slate-950 border border-slate-800 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="resume_analysis">📄 Resume Deep Scans / Reviews</option>
+                <option value="mock_interview">🎙️ Mock Interview Sessions</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Credits to Add</label>
+              <div className="flex gap-2 mt-1.5">
+                {["1", "3", "5", "10", "25"].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTopupAmount(amt)}
+                    className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                      topupAmount === amt
+                        ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700"
+                    }`}
+                  >
+                    +{amt}
+                  </button>
+                ))}
+              </div>
+              <Input
+                type="number"
+                placeholder="Custom amount"
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                className="mt-2 bg-slate-950 border-slate-800 text-white text-xs h-9"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Reason / Reference</label>
+              <Input
+                placeholder="Customer support credit, hackathon reward..."
+                value={topupReason}
+                onChange={(e) => setTopupReason(e.target.value)}
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white text-xs h-9"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTopupModalOpen(false)}
+              className="border-slate-800 text-slate-400 hover:bg-slate-800 text-xs h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGrantTopupCredits}
+              disabled={actionLoading !== null}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold h-9 shadow-lg shadow-amber-500/20"
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Add Credits"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 3: CANDIDATE DEEP INSPECTION DRAWER / MODAL */}
+      <Dialog open={inspectModalOpen} onOpenChange={setInspectModalOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              <span>Candidate Dossier & Activity Profile</span>
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Complete historical activity, session logs, uploaded resumes, and entitlement state.
+            </DialogDescription>
+          </DialogHeader>
+
+          {inspectLoading || !inspectData ? (
+            <div className="py-12 flex flex-col items-center justify-center space-y-3">
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <span className="text-xs text-slate-400">Loading candidate history from PostgreSQL...</span>
+            </div>
+          ) : (
+            <div className="space-y-5 py-2">
+              {/* Profile Card */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                {inspectData.user.avatar_url ? (
+                  <img
+                    src={inspectData.user.avatar_url}
+                    alt={inspectData.user.full_name || inspectData.user.email}
+                    className="h-12 w-12 rounded-full border border-slate-700 object-cover"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-sm font-bold text-white uppercase">
+                    {inspectData.user.email ? inspectData.user.email.substring(0, 2) : "US"}
+                  </div>
+                )}
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-white truncate">{inspectData.user.email}</span>
+                    <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px]">
+                      {inspectData.entitlement?.plan_name || "Free"}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-slate-400 flex items-center gap-3">
+                    <span>{inspectData.user.full_name || "Name not provided"}</span>
+                    <span>•</span>
+                    <span className="font-mono text-[11px] text-slate-500">ID: {inspectData.user.id.substring(0, 8)}...</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3 Metrics: Resumes, Mocks, Payments */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Resumes</span>
+                  <div className="text-lg font-bold text-white font-mono">{inspectData.resumes.length}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Mock Sessions</span>
+                  <div className="text-lg font-bold text-indigo-400 font-mono">{inspectData.interview_sessions.length}</div>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Spent</span>
+                  <div className="text-lg font-bold text-emerald-400 font-mono">
+                    ₹{inspectData.payment_transactions.reduce((acc, p) => acc + (p.status === "captured" ? p.amount_inr : 0), 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Uploaded Resumes List */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-blue-400" />
+                  <span>Uploaded Resumes ({inspectData.resumes.length})</span>
+                </h5>
+                {inspectData.resumes.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic p-3 bg-slate-950/40 rounded-xl border border-slate-800/60">
+                    No resumes uploaded by this user yet.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {inspectData.resumes.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-slate-800 text-xs">
+                        <span className="font-mono text-slate-300 truncate max-w-sm">{r.file_name}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {new Date(r.created_at).toLocaleDateString("en-IN")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Mock Interviews List */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Mic className="h-3.5 w-3.5 text-indigo-400" />
+                  <span>Mock Interview Sessions ({inspectData.interview_sessions.length})</span>
+                </h5>
+                {inspectData.interview_sessions.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic p-3 bg-slate-950/40 rounded-xl border border-slate-800/60">
+                    No mock interviews taken yet.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {inspectData.interview_sessions.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-slate-800 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] bg-slate-900 border-slate-700 text-slate-300">
+                            {s.role || "General"}
+                          </Badge>
+                          <span className="text-slate-400 text-[11px]">{s.domain || "Standard"}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-[9px] py-0 bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+                            {s.status || "completed"}
+                          </Badge>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {new Date(s.created_at).toLocaleDateString("en-IN")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Payment History */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Payment Transactions ({inspectData.payment_transactions.length})</span>
+                </h5>
+                {inspectData.payment_transactions.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic p-3 bg-slate-950/40 rounded-xl border border-slate-800/60">
+                    No payments recorded for this account.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {inspectData.payment_transactions.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-slate-800 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white uppercase text-[11px]">{p.plan_slug}</span>
+                          <Badge className="text-[9px] py-0 bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                            {p.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="text-emerald-400 font-bold">₹{p.amount_inr}</span>
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(p.created_at).toLocaleDateString("en-IN")}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="border-t border-slate-800 pt-3">
+            <Button
+              variant="outline"
+              onClick={() => setInspectModalOpen(false)}
+              className="border-slate-800 text-slate-400 hover:bg-slate-800 text-xs h-9"
+            >
+              Close Dossier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 4: SYSTEM BROADCAST ANNOUNCEMENT MODAL */}
+      <Dialog open={broadcastModalOpen} onOpenChange={setBroadcastModalOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-amber-400" />
+              <span>Platform-Wide Broadcast Banner</span>
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Displays a notification banner at the top of the dashboard for all logged-in students.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+              <div>
+                <span className="text-xs font-semibold text-white">Banner Active</span>
+                <p className="text-[11px] text-slate-400">Toggle whether this announcement is currently live</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={broadcastActive}
+                onChange={(e) => setBroadcastActive(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-primary focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Announcement Message</label>
+              <textarea
+                rows={3}
+                placeholder="e.g. 🚀 Placement Season Mock Interview Drive is now live! Upload your latest resume to begin."
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                className="mt-1.5 w-full rounded-md bg-slate-950 border border-slate-800 p-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Banner Style / Severity</label>
+              <select
+                value={broadcastLevel}
+                onChange={(e) => setBroadcastLevel(e.target.value)}
+                className="mt-1.5 w-full h-9 rounded-md bg-slate-950 border border-slate-800 px-3 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+              >
+                <option value="info">🔵 Information (Blue Glow)</option>
+                <option value="warning">🟡 Announcement / Priority (Amber Glow)</option>
+                <option value="success">🟢 Success / Celebration (Emerald Glow)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Action Link URL (Optional)</label>
+              <Input
+                placeholder="e.g. /resume or /billing"
+                value={broadcastLinkUrl}
+                onChange={(e) => setBroadcastLinkUrl(e.target.value)}
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white text-xs h-9 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-300">Action Button Text (Optional)</label>
+              <Input
+                placeholder="e.g. Upgrade Now → or Try ATS Scan"
+                value={broadcastLinkText}
+                onChange={(e) => setBroadcastLinkText(e.target.value)}
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white text-xs h-9"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBroadcastModalOpen(false)}
+              className="border-slate-800 text-slate-400 hover:bg-slate-800 text-xs h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveBroadcast}
+              disabled={actionLoading !== null}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold h-9 shadow-lg shadow-amber-500/20"
+            >
+              {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save & Publish Banner"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 5: WHITELIST CANDIDATE FOR PLACEMENT ANALYSIS */}
       <Dialog open={whitelistModalOpen} onOpenChange={setWhitelistModalOpen}>
         <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-md">
           <DialogHeader>

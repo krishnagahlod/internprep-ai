@@ -1,7 +1,10 @@
 import os
+import csv
+import io
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from dependencies import (
@@ -43,6 +46,14 @@ class ResetUsageRequest(BaseModel):
     feature_key: Optional[str] = None  # None resets all features for current month
 
 
+class GrantTopupCreditsRequest(BaseModel):
+    user_id: str
+    user_email: Optional[str] = None
+    feature_key: str  # 'resume_analysis' or 'mock_interview'
+    credits: int
+    reason: Optional[str] = "Admin topup grant"
+
+
 class SuspendUserRequest(BaseModel):
     user_id: str
     reason: Optional[str] = "Administrative suspension"
@@ -64,12 +75,25 @@ class CreatePlacementInviteRequest(BaseModel):
     code_name: Optional[str] = None
 
 
-class DeletePlacementInviteRequest(BaseModel):
-    code_name: str
+class BroadcastAnnouncementRequest(BaseModel):
+    message: str
+    level: Optional[str] = "info"  # "info", "warning", "success"
+    is_active: bool = True
+    link_url: Optional[str] = None
+    link_text: Optional[str] = None
 
 
-# --- In-Memory Audit Log Fallback ---
+# --- In-Memory State & Audit Log Fallback ---
 _ADMIN_AUDIT_LOGS: List[Dict[str, Any]] = []
+_SYSTEM_BROADCAST: Dict[str, Any] = {
+    "is_active": False,
+    "message": "",
+    "level": "info",
+    "link_url": None,
+    "link_text": None,
+    "updated_at": None,
+    "updated_by": None
+}
 
 
 def _record_audit_log(admin_email: str, action: str, target_user_id: str, details: Dict[str, Any]):
@@ -106,30 +130,33 @@ async def get_admin_stats(admin: AuthUser = Depends(require_admin)):
     """
     supabase = get_supabase()
     total_users = 0
+    iitb_users = 0
     active_subscriptions = 0
     tier_distribution = {"free": 0, "iitb_free": 0, "pro_1m": 0, "pro_3m": 0, "pro_1y": 0, "lifetime": 0, "admin": 0}
     total_revenue_inr = 0
     total_analyses = 0
+    total_interviews = 0
+    total_resumes = 0
 
     if supabase:
         try:
-            # Users count
-            users_res = supabase.table("profiles").select("id", count="exact").execute()
-            total_users = users_res.count or len(users_res.data or [])
-        except Exception:
-            pass
+            # Query auth.users directly with service role
+            auth_users_resp = supabase.auth.admin.list_users()
+            auth_users = auth_users_resp if isinstance(auth_users_resp, list) else getattr(auth_users_resp, 'users', [])
+            total_users = len(auth_users)
 
-        try:
-            # Entitlements
-            ent_res = supabase.table("entitlements").select("plan_key, status, expires_at").execute()
-            if ent_res.data:
-                for row in ent_res.data:
-                    pk = row.get("plan_key", "free")
-                    tier_distribution[pk] = tier_distribution.get(pk, 0) + 1
-                    if pk.startswith("pro_") or pk == "lifetime":
-                        active_subscriptions += 1
-        except Exception:
-            pass
+            for u in auth_users:
+                u_email = str(getattr(u, 'email', '') or '').lower().strip()
+                if u_email.endswith('@iitb.ac.in'):
+                    iitb_users += 1
+                
+                ent = EntitlementService.get_active_entitlement(user_id=u.id, user_email=u_email)
+                pk = ent.get("plan_key", "free")
+                tier_distribution[pk] = tier_distribution.get(pk, 0) + 1
+                if pk.startswith("pro_") or pk == "lifetime" or pk == "pro":
+                    active_subscriptions += 1
+        except Exception as e:
+            print(f"Stats auth.users query notice: {e}")
 
         try:
             # Payment transactions
@@ -146,12 +173,29 @@ async def get_admin_stats(admin: AuthUser = Depends(require_admin)):
         except Exception:
             pass
 
+        try:
+            # Interview sessions count
+            int_count = supabase.table("interview_sessions").select("id", count="exact").execute()
+            total_interviews = int_count.count or len(int_count.data or [])
+        except Exception:
+            pass
+
+        try:
+            # Resumes count
+            resumes_res = supabase.table("resumes").select("id", count="exact").execute()
+            total_resumes = resumes_res.count or len(resumes_res.data or [])
+        except Exception:
+            pass
+
     return {
         "total_users": max(total_users, 1),
+        "iitb_users": iitb_users,
         "active_subscriptions": active_subscriptions,
         "tier_distribution": tier_distribution,
         "total_revenue_inr": total_revenue_inr,
         "total_analyses": total_analyses,
+        "total_interviews": total_interviews,
+        "total_resumes": total_resumes,
         "plans": DEFAULT_PLANS
     }
 
@@ -166,7 +210,7 @@ async def list_users(
 ):
     """
     Lists users with their active plan, expiry, IITB status, usage metrics,
-    and Placement Analysis access whitelist status.
+    and Placement Analysis access whitelist status directly from Supabase Auth & DB.
     """
     from routers.placement_analysis import get_access_store, ADMIN_EMAILS
     access_store = get_access_store()
@@ -182,53 +226,145 @@ async def list_users(
 
     if supabase:
         try:
-            # Query profiles table
-            req = supabase.table("profiles").select("id, email, full_name, college, created_at")
-            if query:
-                req = req.ilike("email", f"%{query}%")
-            
-            res = req.limit(limit).offset(offset).execute()
-            profiles = res.data or []
+            # 1. Fetch all users from Supabase Auth (Service Role)
+            auth_users_resp = supabase.auth.admin.list_users()
+            auth_users = auth_users_resp if isinstance(auth_users_resp, list) else getattr(auth_users_resp, 'users', [])
 
-            for prof in profiles:
-                uid = str(prof.get("id"))
-                email = str(prof.get("email") or "").strip()
-                if email:
-                    seen_emails.add(email.lower())
+            # 2. Pre-fetch counts for fast join
+            resumes_by_user = {}
+            interviews_by_user = {}
+            analyses_by_user = {}
+            spent_by_user = {}
+            profiles_by_user = {}
+
+            try:
+                r_data = supabase.table("resumes").select("id, user_id").execute().data or []
+                for r in r_data:
+                    uid = r.get("user_id")
+                    resumes_by_user[uid] = resumes_by_user.get(uid, 0) + 1
+            except Exception:
+                pass
+
+            try:
+                i_data = supabase.table("interview_sessions").select("id, user_id").execute().data or []
+                for i in i_data:
+                    uid = i.get("user_id")
+                    interviews_by_user[uid] = interviews_by_user.get(uid, 0) + 1
+            except Exception:
+                pass
+
+            try:
+                a_data = supabase.table("resume_analyses").select("id, user_id").execute().data or []
+                for a in a_data:
+                    uid = a.get("user_id")
+                    analyses_by_user[uid] = analyses_by_user.get(uid, 0) + 1
+            except Exception:
+                pass
+
+            try:
+                tx_data = supabase.table("payment_transactions").select("user_id, amount_inr, status").execute().data or []
+                for t in tx_data:
+                    if t.get("status") == "captured":
+                        uid = t.get("user_id")
+                        spent_by_user[uid] = spent_by_user.get(uid, 0) + t.get("amount_inr", 0)
+            except Exception:
+                pass
+
+            try:
+                prof_data = supabase.table("profiles").select("*").execute().data or []
+                for p in prof_data:
+                    uid = p.get("id")
+                    profiles_by_user[uid] = p
+            except Exception:
+                pass
+
+            # 3. Build comprehensive user records
+            for u in auth_users:
+                uid = str(getattr(u, "id", ""))
+                email = str(getattr(u, "email", "") or "").strip()
+                if not email:
+                    continue
+
+                seen_emails.add(email.lower())
+
+                # Metadata extraction
+                meta = getattr(u, "user_metadata", {}) or {}
+                app_meta = getattr(u, "app_metadata", {}) or {}
+                full_name = meta.get("full_name") or meta.get("name") or meta.get("given_name") or ""
+                avatar_url = meta.get("avatar_url") or meta.get("picture") or None
+                created_at = str(getattr(u, "created_at", "") or "")
+                last_sign_in_at = str(getattr(u, "last_sign_in_at", "") or "")
+                provider = app_meta.get("provider") or meta.get("iss") or "email"
+
+                # Filter by search query
+                if query:
+                    q_lower = query.lower()
+                    if q_lower not in email.lower() and q_lower not in full_name.lower() and q_lower not in uid.lower():
+                        continue
+
+                # Entitlements and Usage
                 ent = EntitlementService.get_active_entitlement(user_id=uid, user_email=email)
                 usage = UsageService.get_user_usage_summary(user_id=uid, plan_key=ent.get("plan_key", "free"))
-                
-                # Check placement analysis access
+                topup_credits = {
+                    "resume_analysis": UsageService.get_topup_balance(user_id=uid, feature_key="resume_analysis"),
+                    "mock_interview": UsageService.get_topup_balance(user_id=uid, feature_key="mock_interview")
+                }
+
+                # Placement Whitelist Check
                 is_admin_user = ent.get("is_admin", False) or email.lower() in ADMIN_EMAILS
                 is_whitelisted = email.lower() in whitelisted_map or is_admin_user
                 placement_details = whitelisted_map.get(email.lower(), {
                     "role": "admin" if is_admin_user else "authorized_user",
-                    "notes": "System Administrator" if is_admin_user else None,
-                    "granted_at": prof.get("created_at")
+                    "notes": "System SuperAdmin" if is_admin_user else None,
+                    "granted_at": created_at
                 } if is_admin_user else None)
 
-                # Filter by plan if requested
+                # Filter by Plan Tab
                 if plan:
                     if plan == "placement_whitelisted" and not is_whitelisted:
                         continue
-                    elif plan != "placement_whitelisted" and plan != "all" and ent.get("plan_key") != plan:
+                    elif plan == "iitb_free" and not (ent.get("plan_key") == "iitb_free" or ent.get("is_iitb")):
+                        continue
+                    elif plan == "pro" and not (ent.get("plan_key", "").startswith("pro") or ent.get("plan_key") == "pro"):
+                        continue
+                    elif plan == "lifetime" and ent.get("plan_key") != "lifetime":
+                        continue
+                    elif plan == "free" and (ent.get("plan_key") != "free" or ent.get("is_iitb")):
+                        continue
+                    elif plan == "admin" and not (ent.get("is_admin") or ent.get("plan_key") == "admin"):
                         continue
 
-                users_list.append({
+                # College Tag
+                college = "IIT Bombay" if email.lower().endswith("@iitb.ac.in") else "Candidate"
+
+                user_record = {
                     "id": uid,
                     "email": email,
-                    "full_name": prof.get("full_name"),
-                    "college": prof.get("college"),
-                    "created_at": prof.get("created_at"),
+                    "full_name": full_name,
+                    "avatar_url": avatar_url,
+                    "college": college,
+                    "created_at": created_at,
+                    "last_sign_in_at": last_sign_in_at,
+                    "provider": provider,
                     "entitlement": ent,
                     "usage": usage,
+                    "topup_credits": topup_credits,
+                    "activity": {
+                        "resumes_count": resumes_by_user.get(uid, 0),
+                        "interviews_count": interviews_by_user.get(uid, 0),
+                        "analyses_count": analyses_by_user.get(uid, 0),
+                        "total_spent_inr": spent_by_user.get(uid, 0)
+                    },
+                    "profile_details": profiles_by_user.get(uid, {}),
                     "has_placement_access": is_whitelisted,
                     "placement_details": placement_details
-                })
-        except Exception as e:
-            print(f"Error listing users: {e}")
+                }
+                users_list.append(user_record)
 
-    # Also include any whitelisted emails that may not be in profiles table yet
+        except Exception as e:
+            print(f"Error compiling auth users list: {e}")
+
+    # Also include any whitelisted emails that may not have registered on Supabase yet
     for w_email, w_info in whitelisted_map.items():
         if w_email not in seen_emails:
             if query and query.lower() not in w_email.lower():
@@ -236,43 +372,296 @@ async def list_users(
             is_admin_user = w_email.lower() in ADMIN_EMAILS or w_info.get("role") == "admin"
             ent = EntitlementService.get_active_entitlement(user_id=w_email, user_email=w_email)
             usage = UsageService.get_user_usage_summary(user_id=w_email, plan_key=ent.get("plan_key", "free"))
-            
+
             if plan and plan not in ["placement_whitelisted", "all"]:
                 continue
 
             users_list.append({
                 "id": f"whitelisted_{w_email}",
                 "email": w_email,
-                "full_name": w_info.get("notes") or "Whitelisted User",
+                "full_name": w_info.get("notes") or "Whitelisted Candidate",
+                "avatar_url": None,
                 "college": "IIT Bombay" if w_email.endswith("@iitb.ac.in") else "Authorized Candidate",
                 "created_at": w_info.get("granted_at"),
+                "last_sign_in_at": None,
+                "provider": "invitation",
                 "entitlement": ent,
                 "usage": usage,
+                "topup_credits": {"resume_analysis": 0, "mock_interview": 0},
+                "activity": {
+                    "resumes_count": 0,
+                    "interviews_count": 0,
+                    "analyses_count": 0,
+                    "total_spent_inr": 0
+                },
+                "profile_details": {},
                 "has_placement_access": True,
                 "placement_details": w_info
             })
 
-    # If no users found, return admin
-    if not users_list:
-        ent = EntitlementService.get_active_entitlement(user_id=admin.id, user_email=admin.email)
-        usage = UsageService.get_user_usage_summary(user_id=admin.id, plan_key="admin")
-        users_list.append({
-            "id": admin.id,
-            "email": admin.email,
-            "full_name": "Admin User",
-            "college": "IIT Bombay",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "entitlement": ent,
-            "usage": usage,
-            "has_placement_access": True,
-            "placement_details": {"role": "admin", "notes": "Platform Owner"}
-        })
+    # Sort users: Admins first, then by created_at descending
+    users_list.sort(
+        key=lambda x: (
+            1 if x.get("entitlement", {}).get("is_admin") else 0,
+            x.get("created_at") or ""
+        ),
+        reverse=True
+    )
+
+    # Slice pagination
+    paginated_users = users_list[offset : offset + limit]
 
     return {
         "count": len(users_list),
-        "users": users_list
+        "total": len(users_list),
+        "limit": limit,
+        "offset": offset,
+        "users": paginated_users
     }
 
+
+@router.get("/users/{user_id}")
+async def get_user_details(
+    user_id: str,
+    admin: AuthUser = Depends(require_admin)
+):
+    """
+    Returns deep detailed inspection data for a specific user:
+    their profile, full entitlement, uploaded resumes, past interviews, payments, and audit logs.
+    """
+    supabase = get_supabase()
+    user_info = None
+
+    if supabase:
+        try:
+            # Look up auth user
+            auth_user = supabase.auth.admin.get_user_by_id(user_id)
+            if auth_user and getattr(auth_user, "user", None):
+                u = auth_user.user
+                email = getattr(u, "email", "")
+                meta = getattr(u, "user_metadata", {}) or {}
+                user_info = {
+                    "id": u.id,
+                    "email": email,
+                    "full_name": meta.get("full_name") or meta.get("name") or "",
+                    "avatar_url": meta.get("avatar_url") or meta.get("picture"),
+                    "created_at": getattr(u, "created_at", None),
+                    "last_sign_in_at": getattr(u, "last_sign_in_at", None),
+                    "provider": getattr(u, "app_metadata", {}).get("provider", "email")
+                }
+        except Exception:
+            pass
+
+    if not user_info:
+        user_info = {"id": user_id, "email": user_id}
+
+    topup = {
+        "resume_analysis": UsageService.get_topup_balance(user_id=user_id, feature_key="resume_analysis"),
+        "mock_interview": UsageService.get_topup_balance(user_id=user_id, feature_key="mock_interview")
+    }
+
+    # Fetch user resumes, interview sessions, and transactions
+    resumes = []
+    interview_sessions = []
+    payments = []
+
+    if supabase:
+        try:
+            res_res = supabase.table("resumes").select("id, file_name, created_at").eq("user_id", user_id).order("created_at", desc=True).execute()
+            resumes = res_res.data or []
+        except Exception:
+            pass
+
+        try:
+            int_res = supabase.table("interview_sessions").select("id, role, domain, status, created_at").eq("user_id", user_id).order("created_at", desc=True).execute()
+            interview_sessions = int_res.data or []
+        except Exception:
+            pass
+
+        try:
+            pay_res = supabase.table("payment_transactions").select("id, plan_slug, amount_inr, status, created_at").eq("user_id", user_id).order("created_at", desc=True).execute()
+            payments = pay_res.data or []
+        except Exception:
+            pass
+
+    return {
+        "user": user_info,
+        "entitlement": ent,
+        "usage": usage,
+        "topup_credits": topup,
+        "resumes": resumes,
+        "interview_sessions": interview_sessions,
+        "payment_transactions": payments
+    }
+
+
+@router.post("/users/topup-credits")
+async def grant_user_topup_credits(
+    body: GrantTopupCreditsRequest,
+    admin: AuthUser = Depends(require_admin)
+):
+    """
+    Admin manually adds top-up credits (e.g. +5 Resume Scans or +3 Mock Interviews) to a user.
+    """
+    supabase = get_supabase()
+    target_user_id = body.user_id
+    target_email = body.user_email or ""
+
+    if "@" in body.user_id and supabase:
+        try:
+            auth_resp = supabase.auth.admin.list_users()
+            users = auth_resp if isinstance(auth_resp, list) else getattr(auth_resp, 'users', [])
+            for u in users:
+                if getattr(u, 'email', '').lower() == body.user_id.lower().strip():
+                    target_user_id = u.id
+                    target_email = u.email
+                    break
+        except Exception:
+            pass
+
+    success = UsageService.add_topup_credits(
+        user_id=target_user_id,
+        feature_key=body.feature_key,
+        credits=body.credits
+    )
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to grant topup credits")
+
+    _record_audit_log(
+        admin_email=admin.email,
+        action="GRANT_TOPUP_CREDITS",
+        target_user_id=target_user_id,
+        details={
+            "feature_key": body.feature_key,
+            "credits": body.credits,
+            "reason": body.reason,
+            "target_email": target_email
+        }
+    )
+
+    new_balance = UsageService.get_topup_balance(user_id=target_user_id)
+    return {
+        "status": "success",
+        "message": f"Successfully added {body.credits} {body.feature_key} credits to user {target_email or target_user_id}",
+        "topup_balance": new_balance
+    }
+
+
+@router.get("/users/export")
+async def export_users_csv(admin: AuthUser = Depends(require_admin)):
+    """
+    Generates and downloads a complete CSV of all candidates, entitlements, usage, and placement whitelist.
+    """
+    users_data = await list_users(limit=500, admin=admin)
+    users = users_data.get("users", [])
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header Row
+    writer.writerow([
+        "User ID",
+        "Email",
+        "Full Name",
+        "College / Institution",
+        "Active Plan",
+        "Plan Status",
+        "Expires At",
+        "Is IITB Verified",
+        "Placement Analysis Whitelisted",
+        "Placement Role / Notes",
+        "Resumes Uploaded",
+        "Mock Interviews Taken",
+        "Total Revenue Spent (INR)",
+        "Resume Quota Used",
+        "Resume Quota Limit",
+        "Mock Quota Used",
+        "Mock Quota Limit",
+        "Signup Date",
+        "Last Sign-In Date"
+    ])
+
+    for u in users:
+        ent = u.get("entitlement", {})
+        usage = u.get("usage", {})
+        act = u.get("activity", {})
+        p_details = u.get("placement_details") or {}
+
+        writer.writerow([
+            u.get("id"),
+            u.get("email"),
+            u.get("full_name"),
+            u.get("college"),
+            ent.get("plan_key"),
+            ent.get("status"),
+            ent.get("expires_at") or "Perpetual / Free",
+            "Yes" if ent.get("is_iitb") else "No",
+            "Yes" if u.get("has_placement_access") else "No",
+            p_details.get("notes") or p_details.get("role") or "",
+            act.get("resumes_count", 0),
+            act.get("interviews_count", 0),
+            act.get("total_spent_inr", 0),
+            usage.get("resume_analysis", {}).get("used", 0),
+            usage.get("resume_analysis", {}).get("limit", 0),
+            usage.get("mock_interview", {}).get("used", 0),
+            usage.get("mock_interview", {}).get("limit", 0),
+            u.get("created_at") or "",
+            u.get("last_sign_in_at") or ""
+        ])
+
+    output.seek(0)
+    filename = f"internprep_users_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# --- Platform Broadcast Banner ---
+
+@router.get("/broadcast")
+async def get_system_broadcast():
+    """
+    Returns the active system-wide broadcast announcement banner.
+    """
+    return _SYSTEM_BROADCAST
+
+
+@router.post("/broadcast")
+async def set_system_broadcast(
+    body: BroadcastAnnouncementRequest,
+    admin: AuthUser = Depends(require_admin)
+):
+    """
+    Admin sets or clears the platform-wide broadcast announcement banner.
+    """
+    global _SYSTEM_BROADCAST
+    _SYSTEM_BROADCAST = {
+        "is_active": body.is_active,
+        "message": body.message,
+        "level": body.level or "info",
+        "link_url": body.link_url,
+        "link_text": body.link_text,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": admin.email
+    }
+
+    _record_audit_log(
+        admin_email=admin.email,
+        action="UPDATE_BROADCAST",
+        target_user_id="ALL",
+        details=_SYSTEM_BROADCAST
+    )
+
+    return {
+        "status": "success",
+        "broadcast": _SYSTEM_BROADCAST
+    }
+
+
+# --- Subscription Overrides ---
 
 @router.post("/users/grant")
 async def grant_user_entitlement(
@@ -287,13 +676,16 @@ async def grant_user_entitlement(
     target_user_id = body.user_id
     target_email = body.user_email or (body.user_id if "@" in body.user_id else "")
 
-    # If user passed email as user_id, resolve UUID from profiles
+    # If user passed email as user_id, resolve UUID from Supabase Auth
     if "@" in body.user_id and supabase:
         try:
-            p_res = supabase.table("profiles").select("id, email").eq("email", body.user_id.lower().strip()).limit(1).execute()
-            if p_res.data and len(p_res.data) > 0:
-                target_user_id = p_res.data[0]["id"]
-                target_email = p_res.data[0]["email"]
+            auth_resp = supabase.auth.admin.list_users()
+            users = auth_resp if isinstance(auth_resp, list) else getattr(auth_resp, 'users', [])
+            for u in users:
+                if getattr(u, 'email', '').lower() == body.user_id.lower().strip():
+                    target_user_id = u.id
+                    target_email = u.email
+                    break
         except Exception:
             pass
 
@@ -451,78 +843,49 @@ async def reset_user_usage(
 
 
 @router.post("/users/suspend")
-async def suspend_user(
+async def suspend_user_sessions(
     body: SuspendUserRequest,
     admin: AuthUser = Depends(require_admin)
 ):
     """
-    Admin signs out and revokes all active device sessions for a user.
+    Admin revokes all active device sessions for a user, forcing immediate logout.
     """
-    revoked = SessionService.revoke_all_other_sessions(user_id=body.user_id, current_session_id="none")
-    
+    SessionService.revoke_all_user_sessions(user_id=body.user_id)
+
     _record_audit_log(
         admin_email=admin.email,
-        action="SUSPEND_USER_SESSIONS",
+        action="SUSPEND_SESSIONS",
         target_user_id=body.user_id,
-        details={"reason": body.reason, "revoked_sessions": revoked}
+        details={"reason": body.reason}
     )
 
     return {
         "status": "success",
-        "message": f"Suspended and revoked {revoked} active session(s) for user {body.user_id}"
+        "message": f"All active sessions revoked for user {body.user_id}"
     }
 
 
-@router.get("/audit-logs")
-async def get_audit_logs(
-    limit: int = 50,
-    admin: AuthUser = Depends(require_admin)
-):
-    """
-    Returns recent administrative audit logs and transactions.
-    """
-    supabase = get_supabase()
-    db_logs = []
-
-    if supabase:
-        try:
-            res = supabase.table("admin_audit_logs").select("*").order("created_at", desc=True).limit(limit).execute()
-            if res.data:
-                db_logs = res.data
-        except Exception:
-            pass
-
-    combined_logs = db_logs if db_logs else _ADMIN_AUDIT_LOGS[:limit]
-    return {
-        "count": len(combined_logs),
-        "audit_logs": combined_logs
-    }
-
-
-# ---------------------------------------------------------------------------
-# PLACEMENT ANALYSIS ACCESS MANAGEMENT
-# ---------------------------------------------------------------------------
+# --- Placement Analysis Gate & Whitelist Endpoints ---
 
 @router.get("/placement/overview")
-async def get_placement_access_overview(
-    admin: AuthUser = Depends(require_admin)
-):
+async def get_placement_access_overview(admin: AuthUser = Depends(require_admin)):
     """
-    Returns full placement access data: whitelisted users, active invite codes, and recent session logs.
+    Returns full whitelist status, active invite codes, and recent studio sessions.
     """
     from routers.placement_analysis import get_access_store, ADMIN_EMAILS
     store = get_access_store()
-    whitelisted = store.get("whitelisted_emails", [])
-    invite_codes = store.get("invite_codes", [])
-    recent_sessions = store.get("verified_log", [])[-50:]
+
+    whitelisted_users = store.get("whitelisted_emails", [])
+    invite_codes = store.get("invite_codes", ["IITB-VIP-2026", "IITB-CAMPUS-PASS", "DAY1-CONSULTING-PASS"])
+    recent_sessions = store.get("active_sessions", [])
 
     return {
-        "total_whitelisted": len(whitelisted),
+        "total_whitelisted": len(whitelisted_users),
         "total_invite_codes": len(invite_codes),
-        "whitelisted_users": whitelisted,
+        "whitelisted_users": whitelisted_users,
         "invite_codes": invite_codes,
         "recent_sessions": recent_sessions,
-        "admin_emails": list(ADMIN_EMAILS)
+        "admin_emails": ADMIN_EMAILS
     }
 
 
@@ -532,44 +895,42 @@ async def grant_placement_access(
     admin: AuthUser = Depends(require_admin)
 ):
     """
-    Grants Placement Analysis access to a candidate/user email.
+    Admin explicitly whitelists an email for direct Placement Analysis access.
     """
-    from routers.placement_analysis import get_access_store, save_access_store
-    email_clean = body.email.strip().lower()
-    if not email_clean or "@" not in email_clean:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
-
+    from routers.placement_analysis import get_access_store, save_access_store, ADMIN_EMAILS
     store = get_access_store()
-    users = store.get("whitelisted_emails", [])
     
-    existing = next((u for u in users if u.get("email", "").lower() == email_clean), None)
-    if existing:
-        existing["role"] = body.role or "authorized_user"
-        existing["notes"] = body.notes or "Granted by Admin"
-        existing["updated_at"] = datetime.now(timezone.utc).isoformat()
-    else:
-        users.append({
-            "email": email_clean,
-            "role": body.role or "authorized_user",
-            "notes": body.notes or "Granted by Admin",
-            "granted_at": datetime.now(timezone.utc).isoformat(),
-            "granted_by": admin.email
-        })
-        
-    store["whitelisted_emails"] = users
+    clean_email = body.email.lower().strip()
+    if not clean_email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+
+    # Remove existing if any
+    store["whitelisted_emails"] = [
+        u for u in store.get("whitelisted_emails", [])
+        if u.get("email", "").lower() != clean_email
+    ]
+
+    new_entry = {
+        "email": clean_email,
+        "role": body.role or ("admin" if clean_email in ADMIN_EMAILS else "authorized_user"),
+        "notes": body.notes or "Granted via Admin Console",
+        "granted_at": datetime.now(timezone.utc).isoformat(),
+        "granted_by": admin.email
+    }
+    store["whitelisted_emails"].append(new_entry)
     save_access_store(store)
 
     _record_audit_log(
         admin_email=admin.email,
         action="GRANT_PLACEMENT_ACCESS",
-        target_user_id=body.user_id or email_clean,
-        details={"email": email_clean, "role": body.role, "notes": body.notes}
+        target_user_id=clean_email,
+        details=new_entry
     )
 
     return {
         "status": "success",
-        "message": f"Placement Analysis access successfully granted to {email_clean}",
-        "user": next((u for u in users if u.get("email", "").lower() == email_clean), None)
+        "message": f"Placement Analysis access granted to {clean_email}",
+        "user": new_entry
     }
 
 
@@ -579,31 +940,33 @@ async def revoke_placement_access(
     admin: AuthUser = Depends(require_admin)
 ):
     """
-    Revokes Placement Analysis access from a user email.
+    Admin revokes Placement Analysis access for a specific email.
     """
     from routers.placement_analysis import get_access_store, save_access_store, ADMIN_EMAILS
-    email_clean = body.email.strip().lower()
+    clean_email = body.email.lower().strip()
 
-    if email_clean in ADMIN_EMAILS:
-        raise HTTPException(status_code=400, detail="Cannot revoke placement access for system administrators.")
+    if clean_email in ADMIN_EMAILS:
+        raise HTTPException(status_code=400, detail="Cannot revoke Placement Analysis access for SuperAdmin")
 
     store = get_access_store()
-    users = store.get("whitelisted_emails", [])
-    
-    updated_users = [u for u in users if u.get("email", "").lower() != email_clean]
-    store["whitelisted_emails"] = updated_users
+    initial_len = len(store.get("whitelisted_emails", []))
+    store["whitelisted_emails"] = [
+        u for u in store.get("whitelisted_emails", [])
+        if u.get("email", "").lower() != clean_email
+    ]
     save_access_store(store)
 
     _record_audit_log(
         admin_email=admin.email,
         action="REVOKE_PLACEMENT_ACCESS",
-        target_user_id=body.user_id or email_clean,
-        details={"email": email_clean}
+        target_user_id=clean_email,
+        details={"reason": "Admin manual revocation"}
     )
 
     return {
         "status": "success",
-        "message": f"Placement Analysis access revoked for {email_clean}"
+        "message": f"Placement Analysis access revoked for {clean_email}",
+        "removed_count": initial_len - len(store["whitelisted_emails"])
     }
 
 
@@ -613,20 +976,17 @@ async def create_placement_invite_code(
     admin: AuthUser = Depends(require_admin)
 ):
     """
-    Creates a new invite passcode for Placement Analysis.
+    Admin creates a custom or generated invite passcode for the Placement Analysis Studio.
     """
+    import secrets
     from routers.placement_analysis import get_access_store, save_access_store
-    import random
-    import string
-
-    code = body.code_name.strip().upper() if body.code_name else f"IITB-VIP-{''.join(random.choices(string.ascii_uppercase + string.digits, k=4))}"
-    
     store = get_access_store()
-    codes = store.get("invite_codes", [])
-    if code not in codes:
-        codes.append(code)
-        store["invite_codes"] = codes
-        save_access_store(store)
+
+    code = (body.code_name or f"IITB-VIP-{secrets.token_hex(3).upper()}").strip().upper()
+    current_codes = set(store.get("invite_codes", []))
+    current_codes.add(code)
+    store["invite_codes"] = list(current_codes)
+    save_access_store(store)
 
     _record_audit_log(
         admin_email=admin.email,
@@ -637,39 +997,65 @@ async def create_placement_invite_code(
 
     return {
         "status": "success",
-        "message": f"Invite code '{code}' created successfully.",
         "code": code,
-        "invite_codes": codes
+        "invite_codes": store["invite_codes"]
     }
 
 
 @router.delete("/placement/invite-code")
 async def delete_placement_invite_code(
-    code: str = Query(...),
+    code: str,
     admin: AuthUser = Depends(require_admin)
 ):
     """
-    Deletes an invite passcode for Placement Analysis.
+    Admin deletes an invite passcode.
     """
     from routers.placement_analysis import get_access_store, save_access_store
-    code_clean = code.strip().upper()
-
     store = get_access_store()
-    codes = store.get("invite_codes", [])
-    if code_clean in codes:
-        codes.remove(code_clean)
-        store["invite_codes"] = codes
-        save_access_store(store)
+
+    clean_code = code.strip().upper()
+    store["invite_codes"] = [c for c in store.get("invite_codes", []) if c.upper() != clean_code]
+    save_access_store(store)
 
     _record_audit_log(
         admin_email=admin.email,
         action="DELETE_PLACEMENT_INVITE_CODE",
-        target_user_id=code_clean,
-        details={"code": code_clean}
+        target_user_id=clean_code,
+        details={"code": clean_code}
     )
 
     return {
         "status": "success",
-        "message": f"Invite code '{code_clean}' removed.",
-        "invite_codes": codes
+        "message": f"Deleted invite code {clean_code}",
+        "invite_codes": store["invite_codes"]
+    }
+
+
+# --- Audit Logs & System Health ---
+
+@router.get("/audit-logs")
+async def list_admin_audit_logs(
+    limit: int = Query(50, le=200),
+    admin: AuthUser = Depends(require_admin)
+):
+    """
+    Returns chronological log of all admin operations.
+    """
+    supabase = get_supabase()
+    logs = []
+
+    if supabase:
+        try:
+            res = supabase.table("admin_audit_logs").select("*").order("created_at", desc=True).limit(limit).execute()
+            if res.data:
+                logs = res.data
+        except Exception:
+            pass
+
+    if not logs:
+        logs = _ADMIN_AUDIT_LOGS[:limit]
+
+    return {
+        "count": len(logs),
+        "audit_logs": logs
     }
