@@ -82,7 +82,7 @@ export default function BillingPage() {
       const order = await createPaymentOrder(planKey);
 
       // 2. Check if sandbox simulation key or live Razorpay
-      const isSandboxSim = !order.key_id || order.key_id.startsWith("rzp_test_internprep");
+      const isSandboxSim = Boolean(order.is_simulated || !order.key_id || order.key_id.startsWith("rzp_test_internprep"));
 
       if (isSandboxSim) {
         // Instant Sandbox Activation

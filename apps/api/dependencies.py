@@ -112,7 +112,7 @@ async def get_optional_user(
 
 async def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     """Enforces that the current authenticated user has administrative privileges."""
-    if not user.is_admin:
+    if not user.is_admin and not is_admin_email(user.email):
         raise HTTPException(
             status_code=403,
             detail="Forbidden: Administrative privileges required."

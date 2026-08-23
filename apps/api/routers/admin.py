@@ -209,12 +209,27 @@ async def grant_user_entitlement(
 ):
     """
     Admin grants a subscription tier to a user (with optional custom duration).
+    Accepts either user_id UUID or user email.
     """
+    supabase = get_supabase()
+    target_user_id = body.user_id
+    target_email = body.user_email or (body.user_id if "@" in body.user_id else "")
+
+    # If user passed email as user_id, resolve UUID from profiles
+    if "@" in body.user_id and supabase:
+        try:
+            p_res = supabase.table("profiles").select("id, email").eq("email", body.user_id.lower().strip()).limit(1).execute()
+            if p_res.data and len(p_res.data) > 0:
+                target_user_id = p_res.data[0]["id"]
+                target_email = p_res.data[0]["email"]
+        except Exception:
+            pass
+
     plan = DEFAULT_PLANS.get(body.plan_key)
     duration_days = body.custom_days or (plan.get("duration_days") if plan else 30)
 
     success = EntitlementService.grant_entitlement(
-        user_id=body.user_id,
+        user_id=target_user_id,
         plan_key=body.plan_key,
         duration_days=duration_days,
         source="admin_grant",
@@ -227,18 +242,19 @@ async def grant_user_entitlement(
     _record_audit_log(
         admin_email=admin.email,
         action="GRANT_ENTITLEMENT",
-        target_user_id=body.user_id,
+        target_user_id=target_user_id,
         details={
             "plan_key": body.plan_key,
             "duration_days": duration_days,
+            "target_email": target_email,
             "reason": body.reason
         }
     )
 
-    updated_entitlement = EntitlementService.get_active_entitlement(user_id=body.user_id, user_email=body.user_email)
+    updated_entitlement = EntitlementService.get_active_entitlement(user_id=target_user_id, user_email=target_email)
     return {
         "status": "success",
-        "message": f"Successfully granted {body.plan_key} to user {body.user_id}",
+        "message": f"Successfully granted {body.plan_key} to user {target_email or target_user_id}",
         "entitlement": updated_entitlement
     }
 

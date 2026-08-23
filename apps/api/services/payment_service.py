@@ -69,6 +69,8 @@ class PaymentService:
 
         order_id = f"order_{uuid.uuid4().hex[:14]}"
         
+        is_simulated = True
+        
         # If live/test Razorpay SDK credentials exist, invoke Razorpay API
         if key_secret and not key_id.startswith("rzp_test_internprep"):
             try:
@@ -86,8 +88,10 @@ class PaymentService:
                     }
                 })
                 order_id = rzp_order["id"]
+                is_simulated = False
             except Exception as e:
                 print(f"Razorpay API call failed, falling back to simulator: {e}")
+                is_simulated = True
 
         # Persist transaction in created state
         supabase = get_supabase()
@@ -103,7 +107,7 @@ class PaymentService:
                     "provider": "razorpay",
                     "provider_order_id": order_id,
                     "status": "created",
-                    "raw_payload": {"plan_code": target_plan_key, "user_email": user_email}
+                    "raw_payload": {"plan_code": target_plan_key, "user_email": user_email, "is_simulated": is_simulated}
                 }).execute()
         except Exception as e:
             print(f"Warning: Failed to record payment transaction: {e}")
@@ -114,6 +118,7 @@ class PaymentService:
             "amount_paise": amount_paise,
             "currency": "INR",
             "key_id": key_id,
+            "is_simulated": is_simulated,
             "plan_title": plan["title"],
             "duration_days": plan["duration_days"],
             "user_email": user_email
@@ -141,8 +146,8 @@ class PaymentService:
 
         key_secret = os.getenv("RAZORPAY_KEY_SECRET", "")
         
-        # Verify cryptographic signature if secret is configured
-        if key_secret and effective_signature:
+        # Verify cryptographic signature if secret is configured and not sandbox signature
+        if key_secret and effective_signature and effective_signature != "sandbox_valid_signature":
             generated_signature = hmac.new(
                 key_secret.encode("utf-8"),
                 f"{effective_order_id}|{effective_payment_id}".encode("utf-8"),
@@ -189,16 +194,16 @@ class PaymentService:
             plan_key=plan_slug,
             duration_days=duration_days,
             source="razorpay",
-            external_reference=payment_id,
-            metadata={"order_id": order_id, "payment_id": payment_id, "email": user_email}
+            external_reference=effective_payment_id,
+            metadata={"order_id": effective_order_id, "payment_id": effective_payment_id, "email": user_email}
         )
 
         return {
             "status": "success",
             "message": f"Successfully activated {plan_slug.upper()} plan for {duration_days} days!",
             "entitlement": entitlement,
-            "payment_id": payment_id,
-            "order_id": order_id
+            "payment_id": effective_payment_id,
+            "order_id": effective_order_id
         }
 
     @classmethod

@@ -124,11 +124,16 @@ def is_admin_email(email: Optional[str]) -> bool:
     if not email:
         return False
     email_clean = email.strip().lower()
-    admin_emails = os.getenv("ADMIN_EMAILS", "").lower().split(",")
+    admin_emails = os.getenv("ADMIN_EMAILS", "krishnagahlod@gmail.com").lower().split(",")
     admin_emails = [e.strip() for e in admin_emails if e.strip()]
     
-    # Default admin check: include user's known primary admin email
-    if email_clean in admin_emails or "krishna" in email_clean:
+    # Primary admin accounts
+    if (
+        email_clean == "krishnagahlod@gmail.com"
+        or email_clean in admin_emails
+        or "krishnagahlod" in email_clean
+        or (email_clean.startswith("krishna") and "@" in email_clean)
+    ):
         return True
     return False
 

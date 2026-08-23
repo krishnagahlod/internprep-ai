@@ -229,18 +229,44 @@ export function openRazorpayCheckout(
   }
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const initRazorpay = () => {
+      try {
+        if (typeof (window as any).Razorpay === 'undefined') {
+          throw new Error('Razorpay SDK not found on window object.');
+        }
+
+        const rzp = new (window as any).Razorpay({
+          ...options,
+          modal: {
+            ondismiss: () => {
+              if (options.onDismiss) options.onDismiss();
+            },
+          },
+        });
+
+        rzp.on('payment.failed', function (response: any) {
+          console.error('Razorpay payment failed:', response.error);
+        });
+
+        rzp.open();
+        resolve();
+      } catch (err) {
+        console.error('Failed to open Razorpay modal:', err);
+        reject(err);
+      }
+    };
+
     // If Razorpay SDK already loaded on window
     if (typeof (window as any).Razorpay !== 'undefined') {
-      const rzp = new (window as any).Razorpay({
-        ...options,
-        modal: {
-          ondismiss: () => {
-            if (options.onDismiss) options.onDismiss();
-          }
-        }
-      });
-      rzp.open();
-      resolve();
+      initRazorpay();
+      return;
+    }
+
+    // Check if script element already exists
+    const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => initRazorpay());
+      existingScript.addEventListener('error', () => reject(new Error('Failed to load Razorpay checkout script.')));
       return;
     }
 
@@ -249,20 +275,7 @@ export function openRazorpayCheckout(
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => {
-      try {
-        const rzp = new (window as any).Razorpay({
-          ...options,
-          modal: {
-            ondismiss: () => {
-              if (options.onDismiss) options.onDismiss();
-            }
-          }
-        });
-        rzp.open();
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
+      initRazorpay();
     };
     script.onerror = () => {
       reject(new Error('Failed to load Razorpay checkout script.'));
