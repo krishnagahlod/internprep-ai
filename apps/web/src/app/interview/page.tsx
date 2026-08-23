@@ -77,6 +77,7 @@ function InterviewEngine() {
     limit?: number
     used?: number
     resetAt?: string
+    featureKey?: string
   }>({})
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -350,6 +351,15 @@ function InterviewEngine() {
       
       if (data.new_phase) {
         setCurrentPhase(data.new_phase)
+      }
+
+      if (data.is_paywall_locked) {
+        setPaywallMeta({
+          title: "Trial Preview Completed • Unlock Full Mock Interview",
+          description: "You've completed the 4-question trial preview! Unlock the full 45-minute technical session, dynamic follow-ups, and dimensional AI scorecard with rubrics.",
+          featureKey: "mock_interview"
+        })
+        setPaywallOpen(true)
       }
 
     } catch (error) {
@@ -806,6 +816,7 @@ function InterviewEngine() {
         onClose={() => setPaywallOpen(false)}
         title={paywallMeta.title}
         description={paywallMeta.description}
+        featureKey={paywallMeta.featureKey}
         limit={paywallMeta.limit}
         used={paywallMeta.used}
         resetAt={paywallMeta.resetAt}

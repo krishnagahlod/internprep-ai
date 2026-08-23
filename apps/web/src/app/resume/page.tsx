@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List } from "lucide-react"
+import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageSquare, X, Send, Activity, ShieldAlert, Target, Copy, Lightbulb, ChevronDown, ChevronUp, Brain, Columns, List, Crown, Lock, Sparkles, Zap } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
@@ -120,7 +120,29 @@ export default function ResumePage() {
     limit?: number
     used?: number
     resetAt?: string
+    featureKey?: string
   }>({})
+  const [entitlement, setEntitlement] = useState<any | null>(null)
+
+  useEffect(() => {
+    import("@/lib/billing-api").then(({ fetchUserEntitlement }) => {
+      fetchUserEntitlement()
+        .then((res) => {
+          if (res?.entitlement) {
+            setEntitlement(res.entitlement);
+          }
+        })
+        .catch(() => {});
+    });
+  }, [user]);
+
+  const isProUser = Boolean(
+    entitlement?.plan_key?.startsWith("pro") ||
+    entitlement?.plan_key === "lifetime" ||
+    entitlement?.plan_key === "admin" ||
+    entitlement?.is_admin ||
+    entitlement?.is_iitb
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -764,135 +786,175 @@ export default function ResumePage() {
                         {isExpanded && (
                           <div className="p-4 pt-0 space-y-4">
                             {bullets.map((bullet: any, idx: number) => {
+                              const isBlurredTeaser = !isProUser && idx > 0;
                               const sev = getSeverityColors(bullet.severity);
                               const verbColor = getVerbColors(bullet.action_verb_rating);
                               
                               return (
-                                <div key={idx} className="glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all mb-4 border border-black/5 dark:border-white/5 shadow-sm">
-                                  <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sev.edge}`} />
-                                  
-                                  <div className="p-5 pl-6">
-                                    {/* Original Bullet */}
-                                    <div className="mb-6">
-                                      <div className="flex justify-between items-start mb-3 gap-4">
-                                        <h4 className="text-lg font-semibold leading-relaxed text-foreground/90 flex-1">"{bullet.original_bullet}"</h4>
-                                        <div className="flex flex-col items-end gap-2 shrink-0">
-                                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border shadow-sm`}>
-                                            {bullet.severity} Priority
-                                          </span>
-                                          <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
-                                            {Math.round(bullet.confidence > 1 ? bullet.confidence : bullet.confidence * 100)}% Confidence
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
+                                <div key={idx} className="relative">
+                                  <div className={`glass-card dark:bg-neutral-900/60 rounded-xl overflow-hidden relative group transition-all mb-4 border border-black/5 dark:border-white/5 shadow-sm ${
+                                    isBlurredTeaser ? "filter blur-[6px] select-none pointer-events-none opacity-40" : ""
+                                  }`}>
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${sev.edge}`} />
                                     
-                                    {/* Analysis Section */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                      {/* Left Column: Issues & Tags */}
-                                      <div className="space-y-3 bg-black/5 dark:bg-white/5 rounded-xl p-4 border border-black/10 dark:border-white/10 shadow-sm">
-                                        <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Detected Issues</h5>
-                                        
-                                        <div className="flex items-start gap-2 mb-3">
-                                          <div className={`mt-0.5 px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor} shadow-sm border border-black/5 dark:border-white/5 shrink-0`}>
-                                            Verb: {bullet.action_verb_rating}
+                                    <div className="p-5 pl-6">
+                                      {/* Original Bullet */}
+                                      <div className="mb-6">
+                                        <div className="flex justify-between items-start mb-3 gap-4">
+                                          <h4 className="text-lg font-semibold leading-relaxed text-foreground/90 flex-1">"{bullet.original_bullet}"</h4>
+                                          <div className="flex flex-col items-end gap-2 shrink-0">
+                                            <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase ${sev.bg} ${sev.text} ${sev.border} border shadow-sm`}>
+                                              {bullet.severity} Priority
+                                            </span>
+                                            <span className="text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">
+                                              {Math.round(bullet.confidence > 1 ? bullet.confidence : bullet.confidence * 100)}% Confidence
+                                            </span>
                                           </div>
-                                          {bullet.action_verb_alternatives?.length > 0 && (
-                                            <p className="text-xs text-muted-foreground leading-tight pt-0.5">
-                                              Consider: <span className="font-medium text-foreground">{bullet.action_verb_alternatives.join(", ")}</span>
-                                            </p>
-                                          )}
                                         </div>
-                                        
-                                        {bullet.best_practice_violations?.map((violation: string, i: number) => (
-                                          <div key={`rule-${i}`} className="flex items-start gap-2 text-red-700 dark:text-red-400">
-                                            <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                                            <p className="text-xs font-medium leading-tight">{violation}</p>
-                                          </div>
-                                        ))}
-                                        
-                                        {bullet.structural_issues?.map((issue: string, i: number) => (
-                                          <div key={`struct-${i}`} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                                            <p className="text-xs font-medium leading-tight">{issue}</p>
-                                          </div>
-                                        ))}
-                                        
-                                        {/* Fallback if no issues */}
-                                        {(!bullet.best_practice_violations?.length && !bullet.structural_issues?.length && bullet.action_verb_rating === "strong") && (
-                                          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                                            <CheckCircle2 className="h-4 w-4" />
-                                            <p className="text-xs font-medium">Structurally sound.</p>
-                                          </div>
-                                        )}
                                       </div>
-
-                                      {/* Right Column: AI Critique */}
-                                      <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between ${sev.bg} ${sev.border} ${sev.text}`}>
-                                        <div className="space-y-3 mb-4">
-                                          <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 opacity-80">
-                                            <Brain className="h-4 w-4" /> AI Critique
-                                          </h5>
-                                          <p className="text-sm leading-relaxed">{bullet.critique}</p>
+                                      
+                                      {/* Analysis Section */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        {/* Left Column: Issues & Tags */}
+                                        <div className="space-y-3 bg-black/5 dark:bg-white/5 rounded-xl p-4 border border-black/10 dark:border-white/10 shadow-sm">
+                                          <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Detected Issues</h5>
                                           
-                                          {bullet.metrics_hint && (
-                                            <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10">
-                                              <p className="text-xs flex items-start gap-2">
-                                                <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
-                                                <span><strong className="opacity-90">Hint:</strong> {bullet.metrics_hint}</span>
+                                          <div className="flex items-start gap-2 mb-3">
+                                            <div className={`mt-0.5 px-2 py-1 text-[10px] uppercase font-bold rounded ${verbColor} shadow-sm border border-black/5 dark:border-white/5 shrink-0`}>
+                                              Verb: {bullet.action_verb_rating}
+                                            </div>
+                                            {bullet.action_verb_alternatives?.length > 0 && (
+                                              <p className="text-xs text-muted-foreground leading-tight pt-0.5">
+                                                Consider: <span className="font-medium text-foreground">{bullet.action_verb_alternatives.join(", ")}</span>
                                               </p>
+                                            )}
+                                          </div>
+                                          
+                                          {bullet.best_practice_violations?.map((violation: string, i: number) => (
+                                            <div key={`rule-${i}`} className="flex items-start gap-2 text-red-700 dark:text-red-400">
+                                              <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                                              <p className="text-xs font-medium leading-tight">{violation}</p>
+                                            </div>
+                                          ))}
+                                          
+                                          {bullet.structural_issues?.map((issue: string, i: number) => (
+                                            <div key={`struct-${i}`} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                                              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                              <p className="text-xs font-medium leading-tight">{issue}</p>
+                                            </div>
+                                          ))}
+                                          
+                                          {/* Fallback if no issues */}
+                                          {(!bullet.best_practice_violations?.length && !bullet.structural_issues?.length && bullet.action_verb_rating === "strong") && (
+                                            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                                              <CheckCircle2 className="h-4 w-4" />
+                                              <p className="text-xs font-medium">Structurally sound.</p>
                                             </div>
                                           )}
                                         </div>
-                                        
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline" 
-                                          className="w-full bg-background/50 hover:bg-background border-black/10 dark:border-white/10 shadow-sm transition-all hover:shadow-md"
-                                          onClick={() => startWorkshop(bullet)}
-                                        >
-                                          <MessageSquare className="h-4 w-4 mr-2" /> Open Workshop
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Suggested Rewrite */}
-                                    {bullet.suggested_rewrite && (
-                                      <div className="p-4 md:p-5 rounded-xl mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 shadow-sm relative overflow-hidden">
-                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
-                                        <div className="flex justify-between items-center mb-3">
-                                          <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase">
-                                            <CheckCircle2 className="h-4 w-4" /> Suggested Rewrite
+
+                                        {/* Right Column: AI Critique */}
+                                        <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between ${sev.bg} ${sev.border} ${sev.text}`}>
+                                          <div className="space-y-3 mb-4">
+                                            <h5 className="text-xs font-bold uppercase tracking-wider flex items-center gap-2 opacity-80">
+                                              <Brain className="h-4 w-4" /> AI Critique
+                                            </h5>
+                                            <p className="text-sm leading-relaxed">{bullet.critique}</p>
+                                            
+                                            {bullet.metrics_hint && (
+                                              <div className="pt-3 mt-3 border-t border-black/10 dark:border-white/10">
+                                                <p className="text-xs flex items-start gap-2">
+                                                  <Lightbulb className="h-4 w-4 shrink-0 mt-0.5 opacity-70" />
+                                                  <span><strong className="opacity-90">Hint:</strong> {bullet.metrics_hint}</span>
+                                                </p>
+                                              </div>
+                                            )}
                                           </div>
+                                          
                                           <Button 
-                                            variant="ghost" 
                                             size="sm" 
-                                            className="h-6 text-xs px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400"
-                                            onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
+                                            variant="outline" 
+                                            className="w-full bg-background/50 hover:bg-background border-black/10 dark:border-white/10 shadow-sm transition-all hover:shadow-md"
+                                            onClick={() => startWorkshop(bullet)}
                                           >
-                                            <Copy className="h-3 w-3 mr-1" /> Copy
+                                            <MessageSquare className="h-4 w-4 mr-2" /> Open Workshop
                                           </Button>
                                         </div>
-                                        <p className="text-base font-medium text-emerald-950 dark:text-emerald-100 leading-relaxed">
-                                          {bullet.suggested_rewrite}
-                                        </p>
                                       </div>
-                                    )}
+                                      
+                                      {/* Suggested Rewrite */}
+                                      {bullet.suggested_rewrite && (
+                                        <div className="p-4 md:p-5 rounded-xl mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 shadow-sm relative overflow-hidden">
+                                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
+                                          <div className="flex justify-between items-center mb-3">
+                                            <div className="flex items-center gap-2 text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase">
+                                              <CheckCircle2 className="h-4 w-4" /> Suggested Rewrite
+                                            </div>
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              className="h-6 text-xs px-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-400"
+                                              onClick={() => navigator.clipboard.writeText(bullet.suggested_rewrite)}
+                                            >
+                                              <Copy className="h-3 w-3 mr-1" /> Copy
+                                            </Button>
+                                          </div>
+                                          <p className="text-base font-medium text-emerald-950 dark:text-emerald-100 leading-relaxed">
+                                            {bullet.suggested_rewrite}
+                                          </p>
+                                        </div>
+                                      )}
 
-                                    {/* Benchmark */}
-                                    {bullet.golden_comparison && (
-                                      <div className="px-5 py-4 rounded-xl bg-primary/5 border border-primary/10">
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2 opacity-70">
-                                          <Target className="h-3 w-3" />
-                                          Benchmark Inspiration
-                                        </p>
-                                        <p className="text-sm text-primary/80 italic leading-relaxed">"{bullet.golden_comparison}"</p>
-                                      </div>
-                                    )}
+                                      {/* Benchmark */}
+                                      {bullet.golden_comparison && (
+                                        <div className="px-5 py-4 rounded-xl bg-primary/5 border border-primary/10">
+                                          <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2 flex items-center gap-2 opacity-70">
+                                            <Target className="h-3 w-3" />
+                                            Benchmark Inspiration
+                                          </p>
+                                          <p className="text-sm text-primary/80 italic leading-relaxed">"{bullet.golden_comparison}"</p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               )
                             })}
+
+                            {!isProUser && bullets.length > 1 && (
+                              <div className="relative z-10 my-4 p-6 rounded-2xl bg-card border-2 border-primary/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-3.5">
+                                  <div className="h-10 w-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shrink-0">
+                                    <Crown className="h-5 w-5" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                      <span>Unlock {bullets.length - 1} More Deep Line-by-Line AI Rewrites</span>
+                                      <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded-full border border-primary/20">
+                                        Free Preview
+                                      </span>
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Get complete STAR impact bullet reconstructions, quantitative metrics fixes, and recruiter red-flag removal.
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  onClick={() => {
+                                    setPaywallMeta({
+                                      title: "Unlock Deep Line-by-Line Resume Analysis",
+                                      description: "Get full line-by-line AI reconstructions, quantified bullet fixes, and target consulting/finance recruiter insights.",
+                                      featureKey: "resume_analysis"
+                                    });
+                                    setPaywallOpen(true);
+                                  }}
+                                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs px-5 shrink-0 shadow-md gap-2"
+                                >
+                                  <span>Unlock Full Analysis (₹49 or Pro)</span>
+                                  <ArrowRight className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

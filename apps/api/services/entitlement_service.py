@@ -76,9 +76,9 @@ DEFAULT_FEATURE_LIMITS = {
         "placement_intelligence": 5
     },
     "iitb_free": {
-        "resume_analysis": 30,
-        "mock_interview": 15,
-        "bullet_refine": 200,
+        "resume_analysis": 10,
+        "mock_interview": 10,
+        "bullet_refine": 100,
         "placement_intelligence": -1  # unlimited
     },
     "pro": {

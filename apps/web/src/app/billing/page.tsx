@@ -441,7 +441,7 @@ export default function BillingPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Multi-Device Sync (Up to 3 devices)</span>
+                    <span>Single Active Device Security</span>
                   </li>
                 </ul>
               </div>
@@ -591,6 +591,110 @@ export default function BillingPage() {
                 </Button>
               </div>
             </motion.div>
+          </div>
+        </div>
+
+        {/* 1-Time Micro Top-Ups Grid */}
+        <div className="space-y-4 pt-4">
+          <div className="text-center space-y-1">
+            <h2 className="text-xl font-bold tracking-tight">Need a Quick Boost? 1-Time Top-Up Passes</h2>
+            <p className="text-xs text-muted-foreground">
+              No recurring commitment • Instant credit top-up • Purchased top-up credits never expire
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            {/* Single Resume Scan */}
+            <div className="rounded-xl border border-border/80 bg-card p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all">
+              <div className="space-y-3">
+                <div className="h-9 w-9 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">Single Resume Scan</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Full ATS critique & line-by-line AI reconstruct</p>
+                </div>
+                <div className="text-2xl font-extrabold text-foreground py-1">₹49</div>
+              </div>
+              <Button
+                onClick={() => handleCheckout("topup_resume_1")}
+                disabled={checkoutLoading !== null}
+                variant="outline"
+                size="sm"
+                className="w-full mt-4 font-semibold text-xs border-blue-500/30 hover:bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              >
+                {checkoutLoading === "topup_resume_1" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Buy Single Scan (₹49)"}
+              </Button>
+            </div>
+
+            {/* Single Mock Interview */}
+            <div className="rounded-xl border border-border/80 bg-card p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all">
+              <div className="space-y-3">
+                <div className="h-9 w-9 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">Single Mock Interview</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">1 Full 45-min case interview + dimensional rubric</p>
+                </div>
+                <div className="text-2xl font-extrabold text-foreground py-1">₹79</div>
+              </div>
+              <Button
+                onClick={() => handleCheckout("topup_mock_1")}
+                disabled={checkoutLoading !== null}
+                variant="outline"
+                size="sm"
+                className="w-full mt-4 font-semibold text-xs border-purple-500/30 hover:bg-purple-500/10 text-purple-600 dark:text-purple-400"
+              >
+                {checkoutLoading === "topup_mock_1" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Buy Single Mock (₹79)"}
+              </Button>
+            </div>
+
+            {/* 5-Pack Resume Reviews */}
+            <div className="rounded-xl border border-border/80 bg-card p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all">
+              <div className="space-y-3">
+                <div className="h-9 w-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">5-Pack Resume Reviews</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">5 Deep critiques with ATS optimization</p>
+                </div>
+                <div className="text-2xl font-extrabold text-foreground py-1">₹199</div>
+              </div>
+              <Button
+                onClick={() => handleCheckout("topup_resume_5")}
+                disabled={checkoutLoading !== null}
+                variant="outline"
+                size="sm"
+                className="w-full mt-4 font-semibold text-xs border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              >
+                {checkoutLoading === "topup_resume_5" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Buy 5-Pack (₹199)"}
+              </Button>
+            </div>
+
+            {/* 3-Pack Mock Interviews */}
+            <div className="rounded-xl border border-border/80 bg-card p-5 flex flex-col justify-between shadow-sm hover:border-primary/40 transition-all">
+              <div className="space-y-3">
+                <div className="h-9 w-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Crown className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-foreground">3-Pack Mock Interviews</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">3 Complete technical/case interviews + scorecards</p>
+                </div>
+                <div className="text-2xl font-extrabold text-foreground py-1">₹199</div>
+              </div>
+              <Button
+                onClick={() => handleCheckout("topup_mock_3")}
+                disabled={checkoutLoading !== null}
+                variant="outline"
+                size="sm"
+                className="w-full mt-4 font-semibold text-xs border-amber-500/30 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              >
+                {checkoutLoading === "topup_mock_3" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Buy 3 Mocks (₹199)"}
+              </Button>
+            </div>
           </div>
         </div>
 

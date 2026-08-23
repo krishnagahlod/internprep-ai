@@ -9,34 +9,109 @@ from fastapi import HTTPException
 from services.db import get_supabase
 from services.entitlement_service import EntitlementService
 
-# Standard SaaS Tier Offerings
+from services.usage_service import UsageService
+
+# Standard SaaS Tier Offerings & Micro-Transactions
 PRICING_PLANS = {
+    # Full Subscriptions
     "pro_1m": {
         "slug": "pro",
         "plan_code": "pro_1m",
-        "title": "InternPrep Pro (1 Month)",
+        "type": "subscription",
+        "title": "1-Month Sprint Pass",
         "duration_days": 30,
         "amount_inr": 299,
         "amount_paise": 29900,
-        "description": "30-day full access to elevated resume analysis, AI mock interviews, and point bank"
+        "description": "30-day full access with 30 resume reviews, 15 mock interviews, and 200 bullet variants"
     },
     "pro_3m": {
         "slug": "pro",
         "plan_code": "pro_3m",
+        "type": "subscription",
         "title": "Placement Season Pass (3 Months)",
         "duration_days": 90,
         "amount_inr": 699,
         "amount_paise": 69900,
-        "description": "90-day comprehensive access across Phase 1 & 2 campus placement cycles"
+        "description": "90-day comprehensive access covering Phase 1 & Phase 2 campus placement drives"
+    },
+    "pro_season": {
+        "slug": "pro",
+        "plan_code": "pro_season",
+        "type": "subscription",
+        "title": "Placement Season Pass",
+        "duration_days": 90,
+        "amount_inr": 699,
+        "amount_paise": 69900,
+        "description": "90-day comprehensive access covering Phase 1 & Phase 2 campus placement drives"
     },
     "pro_1y": {
         "slug": "pro",
         "plan_code": "pro_1y",
-        "title": "Placement Master Pass (1 Year)",
+        "type": "subscription",
+        "title": "Comprehensive Master Pass (1 Year)",
         "duration_days": 365,
         "amount_inr": 1499,
         "amount_paise": 149900,
-        "description": "365-day full year career preparation pass with unlimited company dossiers"
+        "description": "365-day year-round career preparation with unlimited company dossiers"
+    },
+    "pro_master": {
+        "slug": "pro",
+        "plan_code": "pro_master",
+        "type": "subscription",
+        "title": "Comprehensive Master Pass",
+        "duration_days": 365,
+        "amount_inr": 1499,
+        "amount_paise": 149900,
+        "description": "365-day year-round career preparation with unlimited company dossiers"
+    },
+    # Micro-Transactions & Top-Ups
+    "topup_resume_1": {
+        "slug": "topup",
+        "plan_code": "topup_resume_1",
+        "type": "topup",
+        "feature_key": "resume_analysis",
+        "credits": 1,
+        "title": "Single Deep Resume Scan",
+        "duration_days": 0,
+        "amount_inr": 49,
+        "amount_paise": 4900,
+        "description": "1 Instant deep ATS scan with full line-by-line AI reconstruct & unblurred feedback"
+    },
+    "topup_mock_1": {
+        "slug": "topup",
+        "plan_code": "topup_mock_1",
+        "type": "topup",
+        "feature_key": "mock_interview",
+        "credits": 1,
+        "title": "Single Full Mock Interview",
+        "duration_days": 0,
+        "amount_inr": 79,
+        "amount_paise": 7900,
+        "description": "1 Full 45-minute AI case/domain interview session with comprehensive scorecard"
+    },
+    "topup_resume_5": {
+        "slug": "topup",
+        "plan_code": "topup_resume_5",
+        "type": "topup",
+        "feature_key": "resume_analysis",
+        "credits": 5,
+        "title": "5-Pack Resume Reviews",
+        "duration_days": 0,
+        "amount_inr": 199,
+        "amount_paise": 19900,
+        "description": "5 Full deep resume critiques with ATS optimization (Never expires)"
+    },
+    "topup_mock_3": {
+        "slug": "topup",
+        "plan_code": "topup_mock_3",
+        "type": "topup",
+        "feature_key": "mock_interview",
+        "credits": 3,
+        "title": "3-Pack Mock Interviews",
+        "duration_days": 0,
+        "amount_inr": 199,
+        "amount_paise": 19900,
+        "description": "3 Complete technical/consulting case mock interviews with rubrics (Never expires)"
     }
 }
 
@@ -83,7 +158,8 @@ class PaymentService:
                         "user_id": user_id,
                         "user_email": user_email,
                         "plan_code": target_plan_key,
-                        "duration_days": str(plan["duration_days"])
+                        "product_type": plan.get("type", "subscription"),
+                        "duration_days": str(plan.get("duration_days", 0))
                     }
                 })
                 order_id = rzp_order["id"]
@@ -112,7 +188,7 @@ class PaymentService:
                     "user_id": user_id,
                     "product": "internprep_ai",
                     "plan_slug": plan["slug"],
-                    "duration_days": plan["duration_days"],
+                    "duration_days": plan.get("duration_days", 0),
                     "amount_inr": plan["amount_inr"],
                     "currency": "INR",
                     "provider": "razorpay",
@@ -131,8 +207,9 @@ class PaymentService:
             "key_id": key_id,
             "is_simulated": is_simulated,
             "plan_title": plan["title"],
-            "duration_days": plan["duration_days"],
-            "user_email": user_email
+            "duration_days": plan.get("duration_days", 0),
+            "user_email": user_email,
+            "product_type": plan.get("type", "subscription")
         }
 
     @classmethod
@@ -149,7 +226,7 @@ class PaymentService:
         signature: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Verifies payment authenticity, enforces idempotency, and activates Pro entitlement.
+        Verifies payment authenticity, enforces idempotency, and activates Pro entitlement or adds top-up credits.
         """
         effective_order_id = razorpay_order_id or order_id or ""
         effective_payment_id = razorpay_payment_id or payment_id or ""
@@ -184,8 +261,10 @@ class PaymentService:
 
         # Idempotency check: verify if payment was already captured
         supabase = get_supabase()
-        duration_days = PRICING_PLANS.get(plan_key, {}).get("duration_days", 30)
-        plan_slug = plan_key or "pro"
+        item_plan = PRICING_PLANS.get(plan_key, PRICING_PLANS["pro_1m"])
+        duration_days = item_plan.get("duration_days", 30)
+        plan_slug = item_plan.get("slug", "pro")
+        product_type = item_plan.get("type", "subscription")
 
         if supabase:
             try:
@@ -214,10 +293,26 @@ class PaymentService:
             except Exception as e:
                 print(f"Transaction update error: {e}")
 
-        # Grant Pro entitlement with automatic extension if user is already active
+        # Handle Micro-Transactions / Top-Ups
+        if product_type == "topup":
+            feature_key = item_plan.get("feature_key", "resume_analysis")
+            credits = item_plan.get("credits", 1)
+            new_bal = UsageService.add_topup_credits(user_id=user_id, feature_key=feature_key, credits=credits)
+            entitlement = EntitlementService.get_active_entitlement(user_id=user_id, user_email=user_email)
+            return {
+                "status": "success",
+                "message": f"🎉 Successfully added {credits} {item_plan['title']} credits! New balance: {new_bal}",
+                "entitlement": entitlement,
+                "topup": item_plan,
+                "credits_added": credits,
+                "payment_id": effective_payment_id,
+                "order_id": effective_order_id
+            }
+
+        # Handle Subscription Pass Grant
         entitlement = EntitlementService.grant_entitlement(
             user_id=user_id,
-            plan_key=plan_slug,
+            plan_key=plan_key or plan_slug,
             duration_days=duration_days,
             source="razorpay",
             external_reference=effective_payment_id,
@@ -226,7 +321,7 @@ class PaymentService:
 
         return {
             "status": "success",
-            "message": f"Successfully activated {plan_slug.upper()} plan for {duration_days} days!",
+            "message": f"🎉 Successfully activated {item_plan['title']} for {duration_days} days!",
             "entitlement": entitlement,
             "payment_id": effective_payment_id,
             "order_id": effective_order_id

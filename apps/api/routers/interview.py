@@ -47,6 +47,9 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     new_phase: str
+    is_paywall_locked: Optional[bool] = False
+    turn_count: Optional[int] = 0
+    max_turns: Optional[int] = 20
 
 class StartDomainRequest(BaseModel):
     user_id: Optional[str] = None
@@ -69,7 +72,7 @@ class EndSessionRequest(BaseModel):
     session_id: str
 
 @router.post("/start_case", response_model=StartCaseResponse)
-@limiter.limit("3/hour")
+@limiter.limit("10/hour")
 async def start_case_endpoint(
     request: Request,
     body: StartCaseRequest,
@@ -101,7 +104,7 @@ async def start_case_endpoint(
         full_context = f"PROBLEM STATEMENT: {problem_statement}\n\nGOLD STANDARD SOLUTION:\n{solution_transcript}"
         initial_phase = "introduction"
         
-        # Generate the opening message
+        # Generate opening message
         bot_reply, next_phase = generate_case_response(
             history=[],
             current_phase=initial_phase,
@@ -111,7 +114,6 @@ async def start_case_endpoint(
         
         session_id = "temp_session_id"
         if supabase:
-            # Create session in DB
             insert_data = {
                 "interview_type": "case",
                 "status": "in_progress",
@@ -123,7 +125,6 @@ async def start_case_endpoint(
             res = supabase.table("interview_sessions").insert(insert_data).execute()
             if res.data:
                 session_id = res.data[0]["id"]
-                # Save initial bot message
                 supabase.table("session_messages").insert({
                     "session_id": session_id,
                     "role": "assistant",
@@ -157,7 +158,7 @@ async def start_case_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/start_domain", response_model=StartDomainResponse)
-@limiter.limit("3/hour")
+@limiter.limit("10/hour")
 async def start_domain_endpoint(
     request: Request,
     body: StartDomainRequest,
@@ -178,7 +179,6 @@ async def start_domain_endpoint(
     try:
         initial_phase = "introduction"
         
-        # Get resume context if resume_id is provided
         resume_context = "No resume provided."
         file_url = ""
         if body.resume_id and supabase:
@@ -189,7 +189,6 @@ async def start_domain_endpoint(
                 if res.data[0].get("file_url"):
                     file_url = res.data[0]["file_url"]
         
-        # Generate the opening message
         bot_reply, next_phase = generate_domain_interview_response(
             history=[],
             current_phase=initial_phase,
@@ -200,7 +199,6 @@ async def start_domain_endpoint(
         
         session_id = "temp_session_id"
         if supabase:
-            # Create session in DB
             insert_data = {
                 "interview_type": "domain",
                 "status": "in_progress",
@@ -212,7 +210,6 @@ async def start_domain_endpoint(
             res = supabase.table("interview_sessions").insert(insert_data).execute()
             if res.data:
                 session_id = res.data[0]["id"]
-                # Save initial bot message
                 supabase.table("session_messages").insert({
                     "session_id": session_id,
                     "role": "assistant",
@@ -245,11 +242,60 @@ async def start_domain_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat", response_model=ChatResponse)
-@limiter.limit("50/hour")
-async def chat_endpoint(request: Request, body: ChatRequest):
+@limiter.limit("60/hour")
+async def chat_endpoint(
+    request: Request,
+    body: ChatRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
     try:
         history = [{"role": m.role, "content": m.content} for m in body.messages]
+        user_turns = sum(1 for m in history if m.get("role") == "user")
         
+        # Determine user tier
+        is_paid = False
+        if auth_user:
+            if auth_user.is_admin or auth_user.is_iitb:
+                is_paid = True
+            else:
+                ent = EntitlementService.get_active_entitlement(user_id=auth_user.id, user_email=auth_user.email)
+                pk = ent.get("plan_key", "free")
+                if pk.startswith("pro") or pk == "lifetime" or pk == "admin":
+                    is_paid = True
+                else:
+                    # Check topup credits
+                    mock_credits = UsageService.get_topup_balance(auth_user.id, "mock_interview")
+                    if mock_credits > 0:
+                        is_paid = True
+
+        # 1. Free tier teaser cutoff at 4 questions
+        if not is_paid and user_turns >= 4:
+            teaser_reply = (
+                "🎯 **Great progress on this initial phase!** You have completed the 4-question trial preview of this interview session.\n\n"
+                "To continue exploring the remaining technical follow-ups, synthesize your recommendation, and unlock your **Comprehensive AI Scorecard & Rubric**, please upgrade to **InternPrep Pro** or get a **Single Mock Pass (₹79)**."
+            )
+            return ChatResponse(
+                response=teaser_reply,
+                new_phase="trial_limit_reached",
+                is_paywall_locked=True,
+                turn_count=user_turns,
+                max_turns=4
+            )
+
+        # 2. Paid user cap at 18-20 turns with graceful wrap-up
+        if user_turns >= 19:
+            wrapup_reply = (
+                "👏 **Excellent analysis!** We have thoroughly covered the case framework, quantitative estimation, and risk synthesis over our 40-minute session.\n\n"
+                "We have reached the conclusion of this interview. Please click **'End & Generate Scorecard'** below to receive your detailed dimensional evaluation and recruiter feedback!"
+            )
+            return ChatResponse(
+                response=wrapup_reply,
+                new_phase="conclusion",
+                is_paywall_locked=False,
+                turn_count=user_turns,
+                max_turns=20
+            )
+
         dynamic_context = ""
         latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
         if body.case_source and latest_user_msg:
@@ -281,7 +327,6 @@ async def chat_endpoint(request: Request, body: ChatRequest):
         
         if supabase and body.session_id != "temp_session_id":
             # Save user message
-            latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
             if latest_user_msg:
                 supabase.table("session_messages").insert({
                     "session_id": body.session_id,
@@ -300,7 +345,6 @@ async def chat_endpoint(request: Request, body: ChatRequest):
             
             # Update session state if phase changed
             if new_phase != body.current_phase:
-                # Fetch existing case_state
                 sess = supabase.table("interview_sessions").select("case_state").eq("id", body.session_id).execute()
                 if sess.data:
                     case_state = sess.data[0].get("case_state", {})
@@ -310,7 +354,13 @@ async def chat_endpoint(request: Request, body: ChatRequest):
                         "scratchpad_content": body.scratchpad
                     }).eq("id", body.session_id).execute()
         
-        return ChatResponse(response=bot_reply, new_phase=new_phase)
+        return ChatResponse(
+            response=bot_reply,
+            new_phase=new_phase,
+            is_paywall_locked=False,
+            turn_count=user_turns,
+            max_turns=20 if is_paid else 4
+        )
     except Exception as e:
         print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))

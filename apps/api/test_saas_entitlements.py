@@ -7,14 +7,16 @@ from fastapi import HTTPException
 load_dotenv()
 
 from services.entitlement_service import EntitlementService, is_iitb_email, is_admin_email, DEFAULT_PLANS
-from services.usage_service import UsageService, _IN_MEMORY_USAGE_CACHE
+from services.usage_service import UsageService, _IN_MEMORY_USAGE_CACHE, _IN_MEMORY_TOPUP_CREDITS
 from services.session_service import SessionService
 from services.payment_service import PaymentService, PRICING_PLANS
+from services.bullet_cache_service import BulletCacheService
 
 class TestSaasEntitlementsAndMonetization(unittest.TestCase):
     def setUp(self):
         # Reset in-memory test caches
         _IN_MEMORY_USAGE_CACHE.clear()
+        _IN_MEMORY_TOPUP_CREDITS.clear()
 
     def test_iitb_email_recognition(self):
         """Validates that @iitb.ac.in emails are recognized and free users are not."""
@@ -31,14 +33,14 @@ class TestSaasEntitlementsAndMonetization(unittest.TestCase):
         self.assertTrue(is_admin_email("krishnagahlod@gmail.com"))
         self.assertFalse(is_admin_email("random_user@gmail.com"))
 
-    def test_iitb_entitlement_resolution(self):
-        """Ensures IITB emails automatically resolve to iitb_free tier with correct quotas."""
+    def test_iitb_calibrated_entitlement_resolution(self):
+        """Ensures IITB emails automatically resolve to iitb_free tier with calibrated quotas (10 reviews, 10 mocks)."""
         ent = EntitlementService.get_active_entitlement(user_id="test_iitb_123", user_email="student@iitb.ac.in")
         self.assertEqual(ent["plan_key"], "iitb_free")
         self.assertTrue(ent["is_iitb"])
-        self.assertEqual(ent["limits"]["resume_analysis"], 30)
-        self.assertEqual(ent["limits"]["mock_interview"], 15)
-        self.assertEqual(ent["limits"]["bullet_refine"], 200)
+        self.assertEqual(ent["limits"]["resume_analysis"], 10)
+        self.assertEqual(ent["limits"]["mock_interview"], 10)
+        self.assertEqual(ent["limits"]["bullet_refine"], 100)
 
     def test_free_user_entitlement_resolution(self):
         """Ensures non-IITB regular users resolve to free tier."""
@@ -49,27 +51,75 @@ class TestSaasEntitlementsAndMonetization(unittest.TestCase):
         self.assertEqual(ent["limits"]["mock_interview"], 1)
         self.assertEqual(ent["limits"]["bullet_refine"], 10)
 
-    def test_quota_consumption_and_exhaustion(self):
-        """Tests that quota consumption tracks usage and blocks when limit is exceeded."""
-        user_id = "test_quota_user_999"
+    def test_topup_credit_priority_and_consumption(self):
+        """Tests that top-up credits seamlessly extend base quota and are consumed in correct order."""
+        user_id = "test_topup_user_888"
         plan_key = "free"
-        
-        # Free allows 2 resume analyses
-        res1 = UsageService.consume_quota(user_id=user_id, plan_key=plan_key, feature_key="resume_analysis", units=1)
-        self.assertEqual(res1["used_count"], 1)
-        self.assertEqual(res1["remaining_count"], 1)
+        feature_key = "resume_analysis"
 
-        res2 = UsageService.consume_quota(user_id=user_id, plan_key=plan_key, feature_key="resume_analysis", units=1)
-        self.assertEqual(res2["used_count"], 2)
-        self.assertEqual(res2["remaining_count"], 0)
+        # 1. Initially 2 free base reviews
+        quota0 = UsageService.check_quota(user_id, plan_key, feature_key)
+        self.assertEqual(quota0["base_remaining"], 2)
+        self.assertEqual(quota0["topup_credits"], 0)
+        self.assertEqual(quota0["remaining"], 2)
 
-        # 3rd attempt must raise 403 HTTPException with upgrade details
+        # 2. Add 1 top-up review credit (e.g. ₹49 pass)
+        UsageService.add_topup_credits(user_id, feature_key, 1)
+        quota1 = UsageService.check_quota(user_id, plan_key, feature_key)
+        self.assertEqual(quota1["base_remaining"], 2)
+        self.assertEqual(quota1["topup_credits"], 1)
+        self.assertEqual(quota1["remaining"], 3)
+
+        # 3. Consume 1st unit (should consume from base quota)
+        r1 = UsageService.consume_quota(user_id, plan_key, feature_key, units=1)
+        self.assertEqual(r1["base_remaining"], 1)
+        self.assertEqual(r1["topup_credits"], 1)
+        self.assertEqual(r1["remaining"], 2)
+
+        # 4. Consume 2nd unit (should exhaust base quota)
+        r2 = UsageService.consume_quota(user_id, plan_key, feature_key, units=1)
+        self.assertEqual(r2["base_remaining"], 0)
+        self.assertEqual(r2["topup_credits"], 1)
+        self.assertEqual(r2["remaining"], 1)
+
+        # 5. Consume 3rd unit (should consume top-up credit)
+        r3 = UsageService.consume_quota(user_id, plan_key, feature_key, units=1)
+        self.assertEqual(r3["base_remaining"], 0)
+        self.assertEqual(r3["topup_credits"], 0)
+        self.assertEqual(r3["remaining"], 0)
+
+        # 6. 4th attempt must be blocked
         with self.assertRaises(HTTPException) as ctx:
-            UsageService.consume_quota(user_id=user_id, plan_key=plan_key, feature_key="resume_analysis", units=1)
-        
+            UsageService.consume_quota(user_id, plan_key, feature_key, units=1)
         self.assertEqual(ctx.exception.status_code, 403)
-        self.assertIn("reached your", ctx.exception.detail["message"].lower())
-        self.assertTrue(ctx.exception.detail["upgrade_required"])
+
+    def test_bullet_cache_hashing_and_partitioning(self):
+        """Tests deterministic SHA-256 bullet normalization and partition caching."""
+        bullet_a = "  - Led a team of 5 engineers to build a high-throughput API in Python, decreasing latency by 35%. "
+        bullet_b = "Managed cross-functional product roadmap for Q3 enterprise release."
+
+        hash_a = BulletCacheService.get_bullet_hash(bullet_a)
+        self.assertTrue(len(hash_a) == 64)
+
+        # Cache critique for bullet A
+        BulletCacheService.cache_bullet_critique(
+            raw_bullet=bullet_a,
+            score=88,
+            critique={"strengths": ["Strong metrics"], "weaknesses": []},
+            suggested_rewrites=["Architected scalable Python API service..."]
+        )
+
+        # Retrieve cached bullet
+        cached = BulletCacheService.get_cached_bullet(bullet_a)
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached["score"], 88)
+        self.assertTrue(cached["is_cached"])
+
+        # Partition bullets: bullet A is cached, bullet B is uncached
+        cached_map, uncached_list = BulletCacheService.partition_bullets_by_cache([bullet_a, bullet_b])
+        self.assertIn(bullet_a, cached_map)
+        self.assertIn(bullet_b, uncached_list)
+        self.assertEqual(len(uncached_list), 1)
 
     def test_payment_order_creation_and_simulation(self):
         """Tests order creation and payment verification for Pro pass."""
@@ -121,23 +171,27 @@ class TestSaasEntitlementsAndMonetization(unittest.TestCase):
         self.assertEqual(active_ent["limits"]["mock_interview"], 15)
 
     def test_session_management_and_remote_signout(self):
-        """Tests device recording, active session tracking, and remote logout."""
+        """Tests device recording, strict single-device concurrency revocation, and remote logout."""
         user_id = "test_multi_device_user"
         
+        # User logs in on laptop -> active
         SessionService.record_session(user_id=user_id, session_id="sess_laptop", user_agent="Mozilla/5.0 Mac", client_ip="192.168.1.1")
-        SessionService.record_session(user_id=user_id, session_id="sess_phone", user_agent="Mozilla/5.0 iPhone", client_ip="192.168.1.2")
-        SessionService.record_session(user_id=user_id, session_id="sess_tablet", user_agent="Mozilla/5.0 iPad", client_ip="192.168.1.3")
+        self.assertFalse(SessionService.is_session_revoked("sess_laptop"))
 
+        # User logs in on phone -> laptop is auto-revoked, phone is active
+        SessionService.record_session(user_id=user_id, session_id="sess_phone", user_agent="Mozilla/5.0 iPhone", client_ip="192.168.1.2")
+        self.assertTrue(SessionService.is_session_revoked("sess_laptop"))
         self.assertFalse(SessionService.is_session_revoked("sess_phone"))
 
-        # User clicks "Sign out all other devices" from laptop
-        revoked_count = SessionService.revoke_all_other_sessions(user_id=user_id, current_session_id="sess_laptop")
-        self.assertGreaterEqual(revoked_count, 2)
-
-        # Phone and tablet should now be revoked; laptop must remain valid
+        # User logs in on tablet -> phone is auto-revoked, tablet is active
+        SessionService.record_session(user_id=user_id, session_id="sess_tablet", user_agent="Mozilla/5.0 iPad", client_ip="192.168.1.3")
+        self.assertTrue(SessionService.is_session_revoked("sess_laptop"))
         self.assertTrue(SessionService.is_session_revoked("sess_phone"))
+        self.assertFalse(SessionService.is_session_revoked("sess_tablet"))
+
+        # Manual revoke on tablet
+        SessionService.revoke_session(user_id=user_id, session_id="sess_tablet")
         self.assertTrue(SessionService.is_session_revoked("sess_tablet"))
-        self.assertFalse(SessionService.is_session_revoked("sess_laptop"))
 
 if __name__ == "__main__":
     unittest.main()

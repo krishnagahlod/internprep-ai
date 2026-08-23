@@ -90,9 +90,9 @@ INSERT INTO feature_limits (product, plan_key, feature_key, enabled, limit_value
     ('internprep_ai', 'free', 'bullet_refine', true, 10, 'month'),
     ('internprep_ai', 'free', 'placement_intelligence', true, 5, 'month'),
 
-    -- IITB Free
-    ('internprep_ai', 'iitb_free', 'resume_analysis', true, 30, 'month'),
-    ('internprep_ai', 'iitb_free', 'mock_interview', true, 15, 'month'),
+    -- IITB Free (Calibrated Partner Quota)
+    ('internprep_ai', 'iitb_free', 'resume_analysis', true, 10, 'month'),
+    ('internprep_ai', 'iitb_free', 'mock_interview', true, 10, 'month'),
     ('internprep_ai', 'iitb_free', 'bullet_refine', true, 200, 'month'),
     ('internprep_ai', 'iitb_free', 'placement_intelligence', true, -1, 'month'),
 
@@ -241,7 +241,43 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_target ON admin_audit_logs(target_use
 CREATE INDEX IF NOT EXISTS idx_admin_audit_admin ON admin_audit_logs(admin_user_id, created_at DESC);
 
 -- -----------------------------------------------------------------------------
--- 8. ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. USER TOP-UP CREDITS (MICRO-TRANSACTIONS)
+-- Non-expiring purchased credit balances (single reviews, packs, mocks)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_topup_credits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    product TEXT NOT NULL DEFAULT 'internprep_ai',
+    feature_key TEXT NOT NULL,                  -- 'resume_analysis' | 'mock_interview'
+    credits_remaining INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_user_topup UNIQUE (user_id, product, feature_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_topup_user ON user_topup_credits(user_id, product);
+
+-- -----------------------------------------------------------------------------
+-- 9. BULLET CRITIQUE CACHE (INCREMENTAL RESUME RE-ANALYSIS COST REDUCTION)
+-- Semantic/Hash cache for individual resume bullet critiques
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bullet_critique_cache (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bullet_hash TEXT NOT NULL,                  -- SHA-256 of normalized bullet text
+    raw_bullet TEXT NOT NULL,
+    critique JSONB NOT NULL DEFAULT '{}'::jsonb,
+    score INT NOT NULL DEFAULT 70,
+    suggested_rewrites JSONB NOT NULL DEFAULT '[]'::jsonb,
+    hit_count INT NOT NULL DEFAULT 1,
+    last_hit_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_bullet_hash UNIQUE (bullet_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bullet_hash ON bullet_critique_cache(bullet_hash);
+
+-- -----------------------------------------------------------------------------
+-- 10. ROW LEVEL SECURITY (RLS) POLICIES
 -- -----------------------------------------------------------------------------
 ALTER TABLE plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entitlements ENABLE ROW LEVEL SECURITY;
@@ -251,12 +287,15 @@ ALTER TABLE usage_event_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_topup_credits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bullet_critique_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Plans & feature limits are readable by all authenticated users
 CREATE POLICY "Public read plans" ON plans FOR SELECT USING (true);
 CREATE POLICY "Public read feature_limits" ON feature_limits FOR SELECT USING (true);
+CREATE POLICY "Public read bullet_cache" ON bullet_critique_cache FOR SELECT USING (true);
 
 -- User-owned reads
 CREATE POLICY "Own entitlements" ON entitlements FOR SELECT USING (auth.uid() = user_id);
@@ -265,6 +304,7 @@ CREATE POLICY "Own usage_event_log" ON usage_event_log FOR SELECT USING (auth.ui
 CREATE POLICY "Own user_sessions" ON user_sessions FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Own payments" ON payment_transactions FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Own subscriptions" ON subscriptions FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Own topup_credits" ON user_topup_credits FOR SELECT USING (auth.uid() = user_id);
 
 -- Admin read/write policies
 CREATE POLICY "Admins full plans" ON plans FOR ALL USING (

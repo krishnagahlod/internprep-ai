@@ -47,12 +47,27 @@ class SessionService:
             "revoked_at": None
         }
 
-        # Track in memory
+        # Enforce strict single-device concurrency: Revoke other sessions for this user
+        if user_id in _ACTIVE_SESSIONS:
+            for old_sess_id in list(_ACTIVE_SESSIONS[user_id].keys()):
+                if old_sess_id != session_id:
+                    _REVOKED_SESSIONS.add(old_sess_id)
+                    _ACTIVE_SESSIONS[user_id].pop(old_sess_id, None)
+
+        # Track new session in memory
         cls.clear_revoked_if_relogin(session_id)
         _ACTIVE_SESSIONS.setdefault(user_id, {})[session_id] = session_record
 
         if supabase:
             try:
+                # Revoke previous sessions in DB
+                supabase.table("user_sessions") \
+                    .update({"revoked_at": now}) \
+                    .eq("user_id", user_id) \
+                    .neq("session_id", session_id) \
+                    .is_("revoked_at", "null") \
+                    .execute()
+
                 supabase.table("user_sessions").upsert({
                     "user_id": user_id,
                     "session_id": session_id,
@@ -60,7 +75,8 @@ class SessionService:
                     "device_name": device_name or "Web Browser",
                     "user_agent": (user_agent or "")[:250],
                     "ip_hash": ip_hash,
-                    "last_seen_at": now
+                    "last_seen_at": now,
+                    "revoked_at": None
                 }, on_conflict="session_id").execute()
             except Exception:
                 pass
