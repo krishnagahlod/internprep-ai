@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2 } from "lucide-react"
+import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2, CreditCard } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
+import { QuotaBadge } from "@/components/quota-badge"
 
 export default function DashboardPage() {
   const { isGuest, user, clearState, setUser } = useAuthStore()
@@ -307,6 +308,11 @@ export default function DashboardPage() {
           </Button>
 
           
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/billing")}>
+            <CreditCard className="mr-3 h-4 w-4 text-primary" />
+            Subscriptions & Quotas
+          </Button>
+
           <div className="pt-4 pb-2">
             <div className="h-px bg-border/50 w-full" />
           </div>
@@ -377,6 +383,10 @@ export default function DashboardPage() {
             <Briefcase className="mr-3 h-4 w-4" />
             Interviews
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/billing"); setIsMobileMenuOpen(false); }}>
+            <CreditCard className="mr-3 h-4 w-4 text-primary" />
+            Subscriptions & Quotas
+          </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/history"); setIsMobileMenuOpen(false); }}>
             <Clock className="mr-3 h-4 w-4" />
             History
@@ -397,6 +407,7 @@ export default function DashboardPage() {
             <span className="text-xl font-bold tracking-tight">InternPrep</span>
           </div>
           <div className="flex items-center gap-2">
+            <QuotaBadge />
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleLogout}>
               <LogOut className="h-5 w-5 text-muted-foreground" />
@@ -411,6 +422,7 @@ export default function DashboardPage() {
               <p className="text-muted-foreground text-lg">Your AI copilot is ready. What are we practicing today?</p>
             </div>
             <div className="flex items-center gap-4">
+              <QuotaBadge />
               <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="hidden md:flex">
                 <Button variant="outline" size="sm" className="rounded-full bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm border-dashed">
                   <Compass className="mr-2 h-4 w-4" /> IITB Resources <ExternalLink className="ml-1 h-3 w-3" />

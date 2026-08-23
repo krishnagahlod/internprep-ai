@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
@@ -6,7 +6,9 @@ from agents.case_interviewer import generate_case_response, generate_hint, get_r
 from agents.domain_interviewer import generate_domain_interview_response
 from services.rag import retrieve_context
 from supabase import create_client
-from dependencies import limiter, posthog_client
+from dependencies import limiter, posthog_client, AuthUser, get_optional_user
+from services.entitlement_service import EntitlementService
+from services.usage_service import UsageService
 
 router = APIRouter(prefix="/interview", tags=["interview"])
 
@@ -68,7 +70,24 @@ class EndSessionRequest(BaseModel):
 
 @router.post("/start_case", response_model=StartCaseResponse)
 @limiter.limit("3/hour")
-async def start_case_endpoint(request: Request, body: StartCaseRequest):
+async def start_case_endpoint(
+    request: Request,
+    body: StartCaseRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="mock_interview",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     try:
         random_case_dict = get_random_case(body.case_type)
         if not random_case_dict:
@@ -98,8 +117,8 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
                 "status": "in_progress",
                 "case_state": {"current_phase": next_phase, "case_id": random_case_dict.get("id")}
             }
-            if body.user_id:
-                insert_data["user_id"] = body.user_id
+            if effective_user_id:
+                insert_data["user_id"] = effective_user_id
                 
             res = supabase.table("interview_sessions").insert(insert_data).execute()
             if res.data:
@@ -112,9 +131,9 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
                     "phase": initial_phase
                 }).execute()
         
-        if posthog_client and body.user_id:
+        if posthog_client and effective_user_id:
             posthog_client.capture(
-                distinct_id=body.user_id, 
+                distinct_id=effective_user_id, 
                 event='interview_started', 
                 properties={
                     'interview_type': 'case',
@@ -131,13 +150,31 @@ async def start_case_endpoint(request: Request, body: StartCaseRequest):
             initial_message=bot_reply,
             initial_phase=next_phase
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error starting case: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/start_domain", response_model=StartDomainResponse)
 @limiter.limit("3/hour")
-async def start_domain_endpoint(request: Request, body: StartDomainRequest):
+async def start_domain_endpoint(
+    request: Request,
+    body: StartDomainRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="mock_interview",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
     try:
         initial_phase = "introduction"
         

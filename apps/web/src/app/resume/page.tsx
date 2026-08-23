@@ -11,6 +11,7 @@ import { UploadCloud, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft, MessageS
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CreatorBadge } from "@/components/creator-badge"
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from "@/components/ui/resizable"
+import { PaywallModal } from "@/components/paywall-modal"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -111,6 +112,16 @@ export default function ResumePage() {
   const { setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
   const router = useRouter()
 
+  // Paywall Modal State
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallMeta, setPaywallMeta] = useState<{
+    title?: string
+    description?: string
+    limit?: number
+    used?: number
+    resetAt?: string
+  }>({})
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [workshopMessages])
@@ -186,8 +197,23 @@ export default function ResumePage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to analyze resume")
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 403 || errorData.detail?.upgrade_required) {
+          const detail = typeof errorData.detail === 'object' ? errorData.detail : {}
+          setPaywallMeta({
+            title: "Resume Analysis Limit Reached",
+            description: detail.message || (typeof errorData.detail === 'string' ? errorData.detail : "You have reached your quota limit for resume analyses. Upgrade to Pro for 30 analyses/month."),
+            limit: detail.limit,
+            used: detail.used,
+            resetAt: detail.reset_at
+          })
+          setPaywallOpen(true)
+          clearInterval(progressInterval)
+          setIsUploading(false)
+          setProgress(0)
+          return
+        }
+        throw new Error(typeof errorData.detail === "string" ? errorData.detail : "Failed to analyze resume")
       }
 
       const data = await response.json()
@@ -252,8 +278,23 @@ export default function ResumePage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to analyze section")
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 403 || errorData.detail?.upgrade_required) {
+          const detail = typeof errorData.detail === 'object' ? errorData.detail : {}
+          setPaywallMeta({
+            title: "Resume Section Analysis Limit Reached",
+            description: detail.message || (typeof errorData.detail === 'string' ? errorData.detail : "You have reached your quota limit for resume analyses. Upgrade to Pro for 30 analyses/month."),
+            limit: detail.limit,
+            used: detail.used,
+            resetAt: detail.reset_at
+          })
+          setPaywallOpen(true)
+          clearInterval(progressInterval)
+          setIsUploading(false)
+          setProgress(0)
+          return
+        }
+        throw new Error(typeof errorData.detail === "string" ? errorData.detail : "Failed to analyze section")
       }
 
       const data = await response.json()
@@ -978,6 +1019,16 @@ export default function ResumePage() {
           </form>
         </div>
       </div>
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        title={paywallMeta.title}
+        description={paywallMeta.description}
+        limit={paywallMeta.limit}
+        used={paywallMeta.used}
+        resetAt={paywallMeta.resetAt}
+      />
     </div>
   )
 }

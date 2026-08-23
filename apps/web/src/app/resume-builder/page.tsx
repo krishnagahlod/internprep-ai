@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { AlertTriangle, AlertCircle, UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info, Lightbulb, Compass, ListOrdered, ArrowRight, Gauge, CheckSquare } from "lucide-react"
+import { PaywallModal } from "@/components/paywall-modal"
 
 // Types
 type Achievement = {
@@ -211,7 +212,17 @@ function ResumeBuilderPageContent() {
 
   
   // API Base
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:10000"
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+  // Paywall Modal State
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallMeta, setPaywallMeta] = useState<{
+    title?: string
+    description?: string
+    limit?: number
+    used?: number
+    resetAt?: string
+  }>({})
 
   const [mounted, setMounted] = useState(false)
   
@@ -427,6 +438,20 @@ function ResumeBuilderPageContent() {
           setSingleCoachingTips(tips)
         }
       } else {
+        const errorData = await res.json().catch(() => ({}))
+        if (res.status === 403 || errorData.detail?.upgrade_required) {
+          const detail = typeof errorData.detail === 'object' ? errorData.detail : {}
+          setPaywallMeta({
+            title: "Bullet Generation Limit Reached",
+            description: detail.message || (typeof errorData.detail === 'string' ? errorData.detail : "You have reached your quota limit for AI bullet refinements. Upgrade to Pro for 200 bullet variants/month."),
+            limit: detail.limit,
+            used: detail.used,
+            resetAt: detail.reset_at
+          })
+          setPaywallOpen(true)
+          setIsGenerating(false)
+          return
+        }
         alert("Failed to connect to AI generation server. Please try again.")
       }
     } catch (e) {
@@ -469,6 +494,20 @@ function ResumeBuilderPageContent() {
           setCustomOverviewLines({})
         }
       } else {
+        const errorData = await res.json().catch(() => ({}))
+        if (res.status === 403 || errorData.detail?.upgrade_required) {
+          const detail = typeof errorData.detail === 'object' ? errorData.detail : {}
+          setPaywallMeta({
+            title: "Section Generation Limit Reached",
+            description: detail.message || (typeof errorData.detail === 'string' ? errorData.detail : "You have reached your quota limit for AI bullet refinements. Upgrade to Pro for 200 bullet variants/month."),
+            limit: detail.limit,
+            used: detail.used,
+            resetAt: detail.reset_at
+          })
+          setPaywallOpen(true)
+          setIsComposerGenerating(false)
+          return
+        }
         alert("Failed to connect to AI generation server. Please try again.")
       }
     } catch (e) { 
@@ -3423,6 +3462,16 @@ function ResumeBuilderPageContent() {
           )}
         </DialogContent>
       </Dialog>
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        title={paywallMeta.title}
+        description={paywallMeta.description}
+        limit={paywallMeta.limit}
+        used={paywallMeta.used}
+        resetAt={paywallMeta.resetAt}
+      />
     </div>
   )
 }

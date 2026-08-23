@@ -4,7 +4,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import resume, interview, feedback, gratitude, resume_builder, placement_analysis
+from routers import resume, interview, feedback, gratitude, resume_builder, placement_analysis, billing, admin
 import os
 import sentry_sdk
 
@@ -44,6 +44,8 @@ app.include_router(interview.router)
 app.include_router(feedback.router)
 app.include_router(gratitude.router)
 app.include_router(placement_analysis.router)
+app.include_router(billing.router)
+app.include_router(admin.router)
 
 from dependencies import limiter
 from slowapi import _rate_limit_exceeded_handler

@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Mic, Send, PenTool, ArrowLeft, Loader2, Volume2, VolumeX, Lightbulb, FileText, Bot, User, Play, Clock, CheckCircle2, ExternalLink } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import dynamic from "next/dynamic"
+import { PaywallModal } from "@/components/paywall-modal"
 
 // Dynamically import Excalidraw to prevent SSR hydration errors
 const ExcalidrawWrapper = dynamic(
@@ -69,6 +70,14 @@ function InterviewEngine() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(false)
   const [interviewMode, setInterviewMode] = useState<"case" | "domain">("case")
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  const [paywallMeta, setPaywallMeta] = useState<{
+    title?: string
+    description?: string
+    limit?: number
+    used?: number
+    resetAt?: string
+  }>({})
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -190,6 +199,20 @@ function InterviewEngine() {
           incrementGuestInterview()
         }
       } else {
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 403 || errorData.detail?.upgrade_required) {
+          const detail = typeof errorData.detail === 'object' ? errorData.detail : {}
+          setPaywallMeta({
+            title: "Mock Interview Limit Reached",
+            description: detail.message || (typeof errorData.detail === 'string' ? errorData.detail : "You have reached your mock interview quota. Upgrade to Pro for 15 live mock sessions every month."),
+            limit: detail.limit,
+            used: detail.used,
+            resetAt: detail.reset_at
+          })
+          setPaywallOpen(true)
+          setShowSetupModal(true)
+          return
+        }
         setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin?" }])
       }
     } catch (e) {
@@ -777,6 +800,16 @@ function InterviewEngine() {
         </div>
         )}
       </div>
+
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        title={paywallMeta.title}
+        description={paywallMeta.description}
+        limit={paywallMeta.limit}
+        used={paywallMeta.used}
+        resetAt={paywallMeta.resetAt}
+      />
     </div>
   )
 }

@@ -1,11 +1,13 @@
 import io
 import json
 import asyncio
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
-from dependencies import limiter, posthog_client
+from dependencies import limiter, posthog_client, AuthUser, get_current_user, get_optional_user, require_feature_access
+from services.entitlement_service import EntitlementService
+from services.usage_service import UsageService
 from agents.resume_analyzer import analyze_resume_text, run_workshop_turn, parse_resume_structural
 
 def extract_pdf_raw_text(pdf_bytes: bytes) -> str:
@@ -47,6 +49,7 @@ class WorkshopRequest(BaseModel):
     resume_phase: Optional[str] = "placement"
     messages: List[WorkshopMessage]
     overall_context: Optional[str] = None
+    user_id: Optional[str] = None
 
 class WorkshopResponse(BaseModel):
     response: str
@@ -155,8 +158,13 @@ async def analyze_resume(
     file: UploadFile = File(...),
     target_role: str = Form("consult"),
     resume_phase: str = Form("placement"),
-    user_id: Optional[str] = Form(None)
+    user_id: Optional[str] = Form(None),
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
+    # Resolve user identity
+    effective_user_id = auth_user.id if auth_user else (user_id if user_id and user_id != "guest" else None)
+    user_email = auth_user.email if auth_user else None
+
     # Strict PDF Validation
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
@@ -166,6 +174,19 @@ async def analyze_resume(
     file.file.seek(0)
     if file_size > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Max size is 5MB.")
+
+    # Quota evaluation for authenticated deep analysis
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=user_email)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="resume_analysis",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
         
     try:
         pdf_bytes = await file.read()
@@ -180,11 +201,11 @@ async def analyze_resume(
             
         # Check Cache for authenticated users
         from agents.resume_analyzer import supabase
-        if supabase and user_id:
+        if supabase and effective_user_id:
             try:
                 cached_res = supabase.table("resume_analyses") \
                     .select("analysis_data") \
-                    .eq("user_id", user_id) \
+                    .eq("user_id", effective_user_id) \
                     .eq("target_role", target_role) \
                     .eq("resume_text", text) \
                     .order("created_at", desc=True) \
@@ -208,12 +229,10 @@ async def analyze_resume(
         analysis_dict = json.loads(analysis_json_str)
         
         # Save to database if user is authenticated and analysis is complete
-        if supabase and user_id and analysis_dict.get("bullets"):
+        if supabase and effective_user_id and analysis_dict.get("bullets"):
             try:
-                # We do an upsert or just insert, but since we bypassed a bad cache, let's just insert for now 
-                # (or ideally update if it existed, but insert is fine since we select the first one).
                 supabase.table("resume_analyses").insert({
-                    "user_id": user_id,
+                    "user_id": effective_user_id,
                     "resume_text": text,
                     "target_role": target_role,
                     "analysis_data": analysis_dict
@@ -237,7 +256,24 @@ async def analyze_resume(
 
 @router.post("/workshop", response_model=WorkshopResponse)
 @limiter.limit("20/hour")
-async def resume_workshop(request: Request, body: WorkshopRequest):
+async def resume_workshop(
+    request: Request,
+    body: WorkshopRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     try:
         result = await asyncio.wait_for(
             asyncio.to_thread(
@@ -266,7 +302,24 @@ class AnalyzeSectionRequest(BaseModel):
 
 @router.post("/analyze-section")
 @limiter.limit("10/hour")
-async def analyze_resume_section(request: Request, body: AnalyzeSectionRequest):
+async def analyze_resume_section(
+    request: Request,
+    body: AnalyzeSectionRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="resume_analysis",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     try:
         from agents.resume_analyzer import analyze_resume_section_text
         
@@ -314,6 +367,7 @@ class ATSFixBulletRequest(BaseModel):
     mode: Optional[str] = "iitb_placement"
     missing_keyword: Optional[str] = None
     target_length: Optional[int] = None
+    user_id: Optional[str] = None
 
 
 @router.post("/ats-check")
@@ -365,7 +419,24 @@ async def ats_check(
 
 @router.post("/ats-fix-bullet")
 @limiter.limit("30/hour")
-async def ats_fix_bullet_endpoint(request: Request, body: ATSFixBulletRequest):
+async def ats_fix_bullet_endpoint(
+    request: Request,
+    body: ATSFixBulletRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     try:
         from agents.ats_engine import refine_ats_bullet
         result = await asyncio.to_thread(

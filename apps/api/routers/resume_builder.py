@@ -1,10 +1,12 @@
 import io
 import json
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request, Body, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
-from dependencies import limiter
+from dependencies import limiter, AuthUser, get_optional_user, get_current_user
+from services.entitlement_service import EntitlementService
+from services.usage_service import UsageService
 from agents.achievement_engine import (
     extract_achievements_from_pdf,
     extract_achievements_from_text,
@@ -98,6 +100,7 @@ class EditBulletRequest(BaseModel):
 class MetricChatRequest(BaseModel):
     achievement_id: str
     messages: List[Dict[str, str]]
+    user_id: Optional[str] = None
 
 class RefineBulletRequest(BaseModel):
     bullet_text: str
@@ -105,6 +108,7 @@ class RefineBulletRequest(BaseModel):
     target_role: str
     preserve_length: Optional[bool] = False
     target_char_length: Optional[int] = None
+    user_id: Optional[str] = None
 
 class StrategyRequest(BaseModel):
     user_id: str
@@ -327,7 +331,24 @@ def delete_achievement(ach_id: str):
 # Generate and Save
 @router.post("/generate")
 @limiter.limit("10/minute")
-async def generate_bullets(request: Request, req: GenerateBulletsRequest):
+async def generate_bullets(
+    request: Request,
+    req: GenerateBulletsRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     from dependencies import get_supabase; supabase = get_supabase()
     try:
         # Fetch achievement
@@ -378,13 +399,32 @@ async def generate_bullets(request: Request, req: GenerateBulletsRequest):
                 "coaching_tips": coaching_tips
             }
         return {"bullets": [], "coaching_tips": []}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in generate_bullets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate-section")
 @limiter.limit("10/minute")
-async def generate_section_bullets_api(request: Request, req: GenerateSectionRequest):
+async def generate_section_bullets_api(
+    request: Request,
+    req: GenerateSectionRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1,
+                request_id=request.headers.get("x-request-id")
+            )
+
     from dependencies import get_supabase; supabase = get_supabase()
     try:
         if not req.achievement_ids:
@@ -406,6 +446,8 @@ async def generate_section_bullets_api(request: Request, req: GenerateSectionReq
         )
         
         return variants_data
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in generate_section_bullets: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -462,7 +504,22 @@ def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/metric-chat")
-def metric_chat(req: MetricChatRequest):
+def metric_chat(
+    req: MetricChatRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1
+            )
+
     from dependencies import get_supabase; supabase = get_supabase()
     try:
         ach_res = supabase.table('achievements').select("*").eq('id', req.achievement_id).execute()
@@ -471,12 +528,29 @@ def metric_chat(req: MetricChatRequest):
         
         result = run_metric_reconstruction_turn(ach_res.data[0], req.messages)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in metric_chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/refine-bullet")
-def refine_bullet(req: RefineBulletRequest):
+def refine_bullet(
+    req: RefineBulletRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    if effective_user_id:
+        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+        plan_key = entitlement.get("plan_key", "free")
+        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+            UsageService.consume_quota(
+                user_id=effective_user_id,
+                plan_key=plan_key,
+                feature_key="bullet_refine",
+                units=1
+            )
+
     try:
         result = refine_bullet_with_ai(
             req.bullet_text,
@@ -486,6 +560,8 @@ def refine_bullet(req: RefineBulletRequest):
             target_char_length=req.target_char_length
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in refine_bullet: {e}")
         raise HTTPException(status_code=500, detail=str(e))
