@@ -1,201 +1,215 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Check, Info, ArrowRight, Zap, ShieldAlert } from "lucide-react";
+import { ArrowRight, ShieldCheck, Check, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-const PASSES = [
+const MICRO_PASSES = [
   {
-    name: "Single Resume Scan",
-    price: "49",
-    credits: "1 Resume Intelligence Audit",
-    features: [
-      "Full ATS parser breakdown",
-      "6-dimension radar scoring",
-      "Instant bullet rewrites",
-      "Cross-question prediction"
+    name: "Single Resume Audit",
+    price: "₹49",
+    billing: "One-time payment",
+    badge: "Non-Expiring",
+    credits: "1 Full Ingestion & 6-Dimension Scorecard",
+    highlights: [
+      "Complete ATS parser compatibility breakdown",
+      "Line-by-line Google XYZ formula rewrites",
+      "Interviewer cross-question prediction",
+      "PDF export with highlighted score tags"
     ],
+    cta: "Purchase Resume Pass",
     isPopular: false
   },
   {
     name: "Single Mock Pass",
-    price: "79",
-    credits: "1 Voice Mock Interview",
-    features: [
-      "Any track (Consulting/Tech/Fin)",
-      "45-minute simulated pressure test",
-      "Excalidraw whiteboard integration",
-      "Detailed rubric debrief"
+    price: "₹79",
+    billing: "One-time payment",
+    badge: "Most Popular",
+    credits: "1 Full 45-Min Voice Mock Session",
+    highlights: [
+      "Target track (Consulting / Tech / Finance / PM)",
+      "Live dynamic partner pushback & interruptions",
+      "Integrated Excalidraw digital whiteboard",
+      "Comprehensive transcript & rubric debrief"
     ],
+    cta: "Purchase Mock Pass",
     isPopular: true
   },
   {
-    name: "The Hustler Pack",
-    price: "199",
-    credits: "3 Mocks + 5 Resumes",
-    features: [
-      "3 Full Mock Interviews",
-      "5 Resume Intelligence Audits",
-      "Non-expiring credits",
-      "Priority AI processing"
+    name: "Placement Sprint Pack",
+    price: "₹199",
+    billing: "One-time payment",
+    badge: "Save 45%",
+    credits: "3 Mock Passes + 5 Resume Audits",
+    highlights: [
+      "3 Full 45-minute Voice Mock Sessions",
+      "5 Complete Resume Intelligence Audits",
+      "Permanent non-expiring credit balance",
+      "Access to Top 50 Campus Case Solutions"
     ],
+    cta: "Get Sprint Pack",
     isPopular: false
   }
 ];
 
-const SUBSCRIPTIONS = [
+const SUBSCRIPTION_PLANS = [
   {
-    name: "1 Month Cram",
-    price: "299",
-    period: "per month",
-    features: [
-      "Unlimited Resume Audits",
-      "10 Mock Interviews / month",
-      "Full Casebook access",
-      "Historical analytics"
+    name: "Monthly Prep",
+    price: "₹299",
+    billing: "Billed monthly",
+    badge: "Self-Paced",
+    credits: "Unlimited Resumes + 10 Mocks / mo",
+    highlights: [
+      "Unlimited Resume Intelligence Audits",
+      "10 Voice Mock Interview Passes / month",
+      "Full Campus Casebook Vault access",
+      "Historical progression analytics"
     ],
+    cta: "Start Monthly",
     isPopular: false
   },
   {
-    name: "3 Month Sprint",
-    price: "699",
-    period: "for 3 months",
-    features: [
-      "Unlimited Resume Audits",
-      "35 Mock Interviews total",
-      "Full Casebook access",
-      "Interview replay recordings",
-      "Best for Placement Season"
+    name: "Placement Season Pass",
+    price: "₹699",
+    billing: "Billed for 3 months",
+    badge: "Campus Favorite",
+    credits: "Unlimited Resumes + 35 Mocks Total",
+    highlights: [
+      "Unlimited Resume Intelligence Audits",
+      "35 Voice Mock Sessions total",
+      "Complete 400+ Campus Casebook Directory",
+      "Peer cohort percentile benchmarking",
+      "Valid throughout placement semester"
     ],
+    cta: "Get Season Pass",
     isPopular: true
-  },
-  {
-    name: "1 Year Mastery",
-    price: "1,499",
-    period: "per year",
-    features: [
-      "Unlimited Resume Audits",
-      "Unlimited Mock Interviews",
-      "All Casebooks & Frameworks",
-      "1-on-1 Human Expert Review (1x)",
-      "Guaranteed early access to new features"
-    ],
-    isPopular: false
   }
 ];
 
 export function PricingSection() {
-  const [billingType, setBillingType] = useState<"passes" | "subscription">("passes");
-
-  const plans = billingType === "passes" ? PASSES : SUBSCRIPTIONS;
+  const [pricingMode, setPricingMode] = useState<"passes" | "subscription">("passes");
+  const plans = pricingMode === "passes" ? MICRO_PASSES : SUBSCRIPTION_PLANS;
 
   return (
-    <section id="pricing" className="py-24 relative overflow-hidden bg-muted/20">
+    <section id="pricing" className="py-24 border-b border-white/[0.08] bg-[#08090A]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <h2 className="text-3xl md:text-5xl font-bold font-outfit tracking-tight text-foreground mb-4">
-            Transparent Pricing. <span className="text-transparent bg-clip-text bg-gradient-premium">No Traps.</span>
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            Buy exactly what you need with non-expiring top-up passes, or go all-in with a subscription.
-          </p>
+        {/* Section Tag */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-400 font-bold">
+            [TRANSPARENT PRICING]
+          </span>
+          <span className="text-xs font-mono-tech text-zinc-500">NO HIDDEN SUBSCRIPTION TRAPS</span>
         </div>
 
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-6 max-w-3xl">
+          Purchase exact credits when you need them, or activate a Season Pass.
+        </h2>
+
+        <p className="text-sm sm:text-base text-zinc-400 mb-12 max-w-2xl font-sans">
+          Top-up passes never expire. Your credits remain in your account permanently until used.
+        </p>
+
         {/* Toggle Switch */}
-        <div className="flex justify-center mb-12">
-          <div className="inline-flex items-center p-1 bg-background rounded-full border border-border shadow-sm">
+        <div className="flex items-center gap-2 mb-12">
+          <div className="p-1 rounded-lg bg-[#0E1013] border border-white/[0.08] inline-flex">
             <button
-              onClick={() => setBillingType("passes")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                billingType === "passes"
-                  ? "bg-foreground text-background shadow-md"
-                  : "text-muted-foreground hover:text-foreground"
+              onClick={() => setPricingMode("passes")}
+              className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
+                pricingMode === "passes"
+                  ? "bg-white/10 text-white font-semibold border border-white/10"
+                  : "text-zinc-400 hover:text-white"
               }`}
             >
               1-Time Top-Up Passes
             </button>
             <button
-              onClick={() => setBillingType("subscription")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                billingType === "subscription"
-                  ? "bg-foreground text-background shadow-md"
-                  : "text-muted-foreground hover:text-foreground"
+              onClick={() => setPricingMode("subscription")}
+              className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
+                pricingMode === "subscription"
+                  ? "bg-white/10 text-white font-semibold border border-white/10"
+                  : "text-zinc-400 hover:text-white"
               }`}
             >
-              Full Subscriptions
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/15 text-violet-600 dark:text-violet-400">
-                SAVE 40%
-              </span>
+              Semester Subscriptions
             </button>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan, idx) => (
-            <motion.div
-              key={plan.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: idx * 0.1 }}
-              className={`relative flex flex-col p-8 rounded-3xl transition-all duration-300 ${
-                plan.isPopular
-                  ? "bg-gradient-to-b from-violet-500/5 to-transparent border-2 border-violet-500 shadow-xl shadow-violet-500/10 scale-105 z-10"
-                  : "bg-white dark:bg-zinc-950 border border-border hover:border-violet-500/50"
+        {/* Pricing Cards Grid */}
+        <div className={`grid gap-6 ${pricingMode === "passes" ? "md:grid-cols-3" : "md:grid-cols-2 max-w-4xl"}`}>
+          {plans.map((p, idx) => (
+            <div
+              key={idx}
+              className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
+                p.isPopular
+                  ? "bg-[#121418] border-emerald-500/50 shadow-[0_0_24px_rgba(16,185,129,0.1)]"
+                  : "bg-[#0E1013] border-white/[0.08]"
               }`}
             >
-              {plan.isPopular && (
-                <div className="absolute -top-4 left-0 right-0 flex justify-center">
-                  <span className="bg-gradient-premium text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-violet-500/25">
-                    <Zap className="w-3 h-3" /> Most Popular
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between text-xs font-mono-tech mb-4">
+                  <span className="text-zinc-400 font-semibold uppercase">{p.name}</span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] ${
+                    p.isPopular
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : "bg-white/[0.04] text-zinc-400 border border-white/[0.06]"
+                  }`}>
+                    {p.badge}
                   </span>
                 </div>
-              )}
 
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-foreground mb-2">{plan.name}</h3>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-extrabold text-foreground tracking-tight font-outfit">₹{plan.price}</span>
-                  {'period' in plan && <span className="text-sm font-medium text-muted-foreground">/ {plan.period}</span>}
+                {/* Price */}
+                <div className="mb-4">
+                  <div className="text-3xl sm:text-4xl font-bold text-white font-mono-tech">{p.price}</div>
+                  <div className="text-xs text-zinc-500 font-mono-tech mt-1">{p.billing}</div>
                 </div>
-                {'credits' in plan && (
-                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-2">
-                    {plan.credits}
-                  </p>
-                )}
-              </div>
 
-              <div className="flex-1 space-y-4 mb-8">
-                {plan.features.map((feature, fIdx) => (
-                  <div key={fIdx} className="flex items-start gap-3 text-sm">
-                    <div className="mt-0.5 rounded-full p-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-                      <Check className="w-3.5 h-3.5 stroke-[3]" />
+                {/* Credit Summary */}
+                <div className="p-2.5 rounded bg-[#16181D] border border-white/[0.04] text-xs font-mono-tech text-emerald-400 font-medium mb-6">
+                  {p.credits}
+                </div>
+
+                {/* Feature Checklist */}
+                <div className="space-y-2.5 mb-8 text-xs text-zinc-300 font-sans">
+                  {p.highlights.map((h, hIdx) => (
+                    <div key={hIdx} className="flex items-start gap-2">
+                      <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{h}</span>
                     </div>
-                    <span className="text-muted-foreground font-medium">{feature}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
-              <Button 
-                variant={plan.isPopular ? "default" : "outline"} 
-                className={`w-full rounded-xl py-6 font-semibold group ${
-                  plan.isPopular ? "bg-foreground text-background hover:bg-foreground/90" : ""
-                }`}
-              >
-                {billingType === "passes" ? "Get Top-Up Pass" : "Start Subscription"}
-                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </motion.div>
+              {/* Action Button */}
+              <Link href="/billing" className="w-full">
+                <Button
+                  size="sm"
+                  className={`w-full h-10 rounded-md text-xs font-semibold font-mono-tech transition-all ${
+                    p.isPopular
+                      ? "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                      : "bg-white/10 hover:bg-white/15 text-white border border-white/10"
+                  }`}
+                >
+                  {p.cta}
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
           ))}
         </div>
 
-        <div className="mt-12 text-center flex flex-col items-center justify-center gap-2">
-           <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-background px-4 py-2 rounded-full border border-border">
-              <ShieldAlert className="w-4 h-4 text-violet-500" />
-              Top-up passes <strong className="text-foreground">never expire</strong> and remain in your account permanently.
-           </div>
+        {/* Security & Lifetime Guarantee */}
+        <div className="mt-12 p-4 rounded-lg bg-[#0E1013] border border-white/[0.06] flex flex-wrap items-center justify-between gap-4 text-xs font-mono-tech text-zinc-400">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <span>Razorpay Secure Encrypted 256-Bit Checkout</span>
+          </div>
+          <div className="text-zinc-500">
+            Micro top-up credits remain valid permanently with zero expiry.
+          </div>
         </div>
 
       </div>

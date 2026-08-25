@@ -1,150 +1,123 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { LayoutTemplate, BookOpen, Target, BarChart3, ChevronRight, PenTool } from "lucide-react";
+import { BookOpen, BarChart3, ArrowRight, Database, TrendingUp, Check } from "lucide-react";
 import Link from "next/link";
+
+const CASEBOOKS = [
+  { name: "IIT Bombay Consult Club Casebook", cases: "48 Solved Cases", tag: "FMCG / Tech / PE" },
+  { name: "IIM Ahmedabad Placement Compendium", cases: "64 Solved Cases", tag: "Market Entry & M&A" },
+  { name: "IIT Delhi Strategy & Operations Vault", cases: "42 Solved Cases", tag: "Supply Chain & Pricing" },
+  { name: "ISB Hyderabad PE / Due Diligence Pack", cases: "38 Solved Cases", tag: "Growth Equity & Turnaround" }
+];
 
 export function ToolsBentoSection() {
   return (
-    <section className="py-24 relative overflow-hidden bg-background">
+    <section id="casebooks" className="py-24 border-b border-white/[0.08] bg-[#08090A]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold font-outfit tracking-tight text-foreground mb-4">
-            The Complete <span className="text-transparent bg-clip-text bg-gradient-premium">Placement Ecosystem.</span>
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            Everything you need from your first draft to your final round. All powered by a unified AI intelligence layer.
-          </p>
+        {/* Section Tag */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-400 font-bold">
+            [ECOSYSTEM 03]
+          </span>
+          <span className="text-xs font-mono-tech text-zinc-500">PLACEMENTS KNOWLEDGE VAULT</span>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 auto-rows-[280px]">
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-16 max-w-3xl">
+          Historical campus casebooks and cohort placement benchmarks.
+        </h2>
+
+        <div className="grid md:grid-cols-2 gap-8">
           
-          {/* Bento Box 1: Resume Builder (Large - 2 cols) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="md:col-span-2 glass-panel bg-white/40 dark:bg-zinc-900/40 border border-black/5 dark:border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-violet-500/30 transition-colors"
-          >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/10 blur-3xl rounded-full pointer-events-none group-hover:bg-violet-500/20 transition-colors duration-500" />
-            
-            <div className="relative z-10 flex flex-col h-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                  <LayoutTemplate className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground font-outfit">Resume Builder Studio</h3>
+          {/* Panel 1: Casebook Vault */}
+          <div className="rounded-xl border border-white/[0.08] bg-[#0E1013] p-7 space-y-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="h-9 w-9 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <BookOpen className="h-5 w-5" />
               </div>
-              <p className="text-muted-foreground max-w-md mb-6">
-                Placement-compliant, LaTeX-grade single-page templates. Real-time AI bullet copilot and instant high-res PDF generation that passes every ATS check.
-              </p>
-              
-              <div className="mt-auto flex items-end justify-between">
-                <Link href="/resume" className="inline-flex items-center text-sm font-bold text-violet-600 dark:text-violet-400 hover:text-violet-500">
-                  Try the Builder <ChevronRight className="w-4 h-4 ml-1" />
-                </Link>
-                
-                {/* Visual Decorative Element */}
-                <div className="hidden sm:flex bg-background border border-border rounded-lg shadow-lg p-3 w-48 opacity-70 group-hover:opacity-100 transition-opacity rotate-2 translate-y-4">
-                  <div className="space-y-2 w-full">
-                    <div className="h-2 bg-muted rounded w-1/3" />
-                    <div className="h-1.5 bg-muted rounded w-full" />
-                    <div className="h-1.5 bg-muted rounded w-5/6" />
-                    <div className="h-1.5 bg-muted rounded w-4/6" />
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Campus Casebook Ecosystem</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed font-sans">
+                  Access 400+ real interview cases asked during Day 1 placements at IIT Bombay, IIM Ahmedabad, and ISB. Interactive step-by-step solutions with partner rubrics.
+                </p>
+              </div>
+
+              {/* Casebook Items */}
+              <div className="space-y-2 pt-2">
+                {CASEBOOKS.map((cb, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg bg-[#14161B] border border-white/[0.04] flex items-center justify-between text-xs font-mono-tech"
+                  >
+                    <div>
+                      <div className="text-zinc-200 font-semibold">{cb.name}</div>
+                      <div className="text-zinc-500 text-[11px]">{cb.tag}</div>
+                    </div>
+                    <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      {cb.cases}
+                    </span>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
-          </motion.div>
 
-          {/* Bento Box 2: ATS Checker (Small - 1 col) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="glass-panel bg-white/40 dark:bg-zinc-900/40 border border-black/5 dark:border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-cyan-500/30 transition-colors flex flex-col"
-          >
-             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-2xl rounded-full pointer-events-none group-hover:bg-cyan-500/20 transition-colors duration-500" />
-             
-             <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Target className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground font-outfit">Quick ATS Match</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6 flex-1">
-                Paste any job description and your resume to get an instant keyword gap analysis. Don't let the ATS filter you out before human review.
-              </p>
-              
-              <Link href="/dashboard" className="inline-flex items-center text-sm font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-500">
-                  Scan Now <ChevronRight className="w-4 h-4 ml-1" />
+            <div className="pt-4 border-t border-white/[0.06]">
+              <Link href="/casebooks" className="inline-flex items-center text-xs font-mono-tech text-emerald-400 hover:text-emerald-300">
+                Browse Full Casebook Directory <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
-          </motion.div>
+            </div>
+          </div>
 
-          {/* Bento Box 3: Casebook Library (Small - 1 col) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="glass-panel bg-white/40 dark:bg-zinc-900/40 border border-black/5 dark:border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-emerald-500/30 transition-colors flex flex-col"
-          >
-             <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none group-hover:bg-emerald-500/20 transition-colors duration-500" />
-             
-             <div className="flex items-center gap-3 mb-4 relative z-10">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground font-outfit">Casebook Ecosystem</h3>
+          {/* Panel 2: Cohort Analytics */}
+          <div className="rounded-xl border border-white/[0.08] bg-[#0E1013] p-7 space-y-6 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="h-9 w-9 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                <BarChart3 className="h-5 w-5" />
               </div>
-              <p className="text-sm text-muted-foreground mb-6 flex-1 relative z-10">
-                A highly curated library of IIT/IIM casebooks, MBB frameworks, and market sizing cheat sheets to supplement your mock practice.
-              </p>
-              
-              <Link href="/casebooks" className="inline-flex items-center text-sm font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 relative z-10">
-                  Browse Cases <ChevronRight className="w-4 h-4 ml-1" />
-              </Link>
-          </motion.div>
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Placement Cohort Analytics</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed font-sans">
+                  Benchmark your performance against thousands of past candidate turns. Know exactly where your structuring, speed, and technical depth rank before Day 1.
+                </p>
+              </div>
 
-          {/* Bento Box 4: Performance Analytics (Large - 2 cols) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="md:col-span-2 glass-panel bg-white/40 dark:bg-zinc-900/40 border border-black/5 dark:border-white/5 rounded-3xl p-8 relative overflow-hidden group hover:border-amber-500/30 transition-colors"
-          >
-            <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-amber-500/10 blur-3xl rounded-full pointer-events-none group-hover:bg-amber-500/20 transition-colors duration-500" />
-            
-            <div className="relative z-10 flex flex-col h-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                  <BarChart3 className="w-5 h-5" />
+              {/* Metric Breakdown Table */}
+              <div className="p-4 rounded-lg bg-[#14161B] border border-white/[0.04] space-y-3 font-mono-tech text-xs">
+                <div className="flex justify-between items-center pb-2 border-b border-white/[0.06] text-zinc-500 text-[11px]">
+                  <span>METRIC CRITERIA</span>
+                  <span>YOUR PERFORMANCE</span>
+                  <span>TOP 5% BENCHMARK</span>
                 </div>
-                <h3 className="text-xl font-bold text-foreground font-outfit">Performance Analytics</h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Case Structuring Speed</span>
+                  <span className="text-emerald-400 font-bold">1m 14s</span>
+                  <span className="text-zinc-400">1m 30s</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Math Calculation Error Rate</span>
+                  <span className="text-emerald-400 font-bold">0.0%</span>
+                  <span className="text-zinc-400">&lt; 4.0%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-300">Pushback Retention</span>
+                  <span className="text-emerald-400 font-bold">96%</span>
+                  <span className="text-zinc-400">88%</span>
+                </div>
               </div>
-              <p className="text-muted-foreground max-w-md mb-6">
-                Track your historical score charts, session replays, and weakness diagnostic heatmaps. See exactly when you are ready to face the real interview.
-              </p>
-              
-              <div className="mt-auto flex items-end justify-between">
-                <Link href="/dashboard" className="inline-flex items-center text-sm font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500">
-                  View Analytics <ChevronRight className="w-4 h-4 ml-1" />
-                </Link>
-                
-                {/* Visual Decorative Element */}
-                <div className="hidden sm:flex items-end gap-2 h-20 opacity-70 group-hover:opacity-100 transition-opacity mr-4">
-                  <div className="w-6 bg-amber-500/40 rounded-t-sm h-[40%]" />
-                  <div className="w-6 bg-amber-500/60 rounded-t-sm h-[60%]" />
-                  <div className="w-6 bg-amber-500/80 rounded-t-sm h-[80%]" />
-                  <div className="w-6 bg-amber-500 rounded-t-sm h-[100%]" />
-                </div>
+
+              <div className="p-3 rounded-lg bg-[#121418] border border-white/[0.06] text-xs font-mono-tech text-zinc-400 flex items-center justify-between">
+                <span>PROJECTED DAY 1 SHORTLIST PROBABILITY</span>
+                <span className="text-emerald-400 font-bold text-sm">94.8% (Tier-1 Ready)</span>
               </div>
             </div>
-          </motion.div>
+
+            <div className="pt-4 border-t border-white/[0.06]">
+              <Link href="/dashboard/analytics" className="inline-flex items-center text-xs font-mono-tech text-blue-400 hover:text-blue-300">
+                View Placement Analytics Demo <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
 
         </div>
       </div>

@@ -1,89 +1,83 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FileText, Mic, Medal } from "lucide-react";
+import { UploadCloud, Mic2, Award } from "lucide-react";
 
 const STEPS = [
   {
-    title: "Audit & Refine Your Resume",
-    description: "Upload your existing PDF. Our AI evaluates every bullet against 6 key dimensions, highlights red flags, and instantly rewrites generic phrases into quantified, high-impact statements.",
-    icon: FileText,
-    color: "violet"
+    step: "01",
+    tag: "RESUME AUDIT",
+    title: "Ingest and Audit Your Resume",
+    description: "Upload your current PDF draft. The system evaluates every line against 6 recruiter dimensions, flags unquantified claims, and predicts partner cross-questions.",
+    icon: UploadCloud,
+    codePreview: "[SCAN] 18 bullet points parsed • 4 passive verbs detected • 3 metrics quantified"
   },
   {
-    title: "Train in High-Stakes Mocks",
-    description: "Launch a live, voice-activated mock interview. The AI acts as a Partner, pushing back on your assumptions while you structure your thoughts on the integrated digital whiteboard.",
-    icon: Mic,
-    color: "cyan"
+    step: "02",
+    tag: "LIVE SIMULATION",
+    title: "Train in Voice-First Pressure Mocks",
+    description: "Engage in live voice-enabled mock interviews. The AI assumes a McKinsey Partner or FAANG Staff Engineer persona, interrupting and testing your logic in real time.",
+    icon: Mic2,
+    codePreview: "[VOICE] Latency: 142ms • Interruption at Turn 04 • Whiteboard sync: Active"
   },
   {
-    title: "Debrief & Walk In Confident",
-    description: "Review your post-interview scorecard. Identify exactly where your logic failed, track your progress over time, and practice targeted drills before the real thing.",
-    icon: Medal,
-    color: "emerald"
+    step: "03",
+    tag: "DEBRIEF & OFFER",
+    title: "Debrief Against Placement Rubrics",
+    description: "Review your comprehensive post-session scorecard. Identify structural weaknesses, review transcript highlights, and walk into Day 1 placement rounds fully calibrated.",
+    icon: Award,
+    codePreview: "[SCORE] MECE: 9.6/10 • Business Acumen: 9.2/10 • Verdict: Strong Hire"
   }
 ];
 
 export function HowItWorks() {
   return (
-    <section className="py-24 relative overflow-hidden">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-24 border-b border-white/[0.08] bg-[#08090A]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-5xl font-bold font-outfit tracking-tight text-foreground mb-4">
-            From Draft to <span className="text-transparent bg-clip-text bg-gradient-premium">Offer Letter.</span>
-          </h2>
-          <p className="text-lg text-muted-foreground">
-            A battle-tested 3-step pipeline designed to secure Day 1 placements.
-          </p>
+        {/* Section Tag */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-400 font-bold">
+            [WORKFLOW]
+          </span>
+          <span className="text-xs font-mono-tech text-zinc-500">METHODOLOGY</span>
         </div>
 
-        <div className="relative">
-          {/* Vertical Timeline Line */}
-          <div className="absolute left-6 md:left-[50%] top-8 bottom-8 w-px bg-border -translate-x-[0.5px]" />
-          
-          <div className="space-y-16">
-            {STEPS.map((step, idx) => {
-              const Icon = step.icon;
-              const isEven = idx % 2 === 0;
-              
-              return (
-                <motion.div 
-                  key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-100px" }}
-                  transition={{ duration: 0.6 }}
-                  className={`relative flex flex-col md:flex-row items-start ${isEven ? 'md:flex-row' : 'md:flex-row-reverse'} gap-8 md:gap-16`}
-                >
-                  {/* Timeline Node */}
-                  <div className={`absolute left-6 md:left-[50%] top-6 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full border-4 border-background bg-${step.color}-500 flex items-center justify-center z-10 shadow-[0_0_15px_rgba(var(--color-${step.color}-500),0.5)]`}>
-                    <div className="w-2 h-2 rounded-full bg-white" />
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-16 max-w-3xl">
+          Three structured stages from unquantified draft to Day 1 offer.
+        </h2>
+
+        {/* 3-Step Grid */}
+        <div className="grid md:grid-cols-3 gap-6">
+          {STEPS.map((s, idx) => {
+            const Icon = s.icon;
+            return (
+              <div
+                key={idx}
+                className="rounded-xl border border-white/[0.08] bg-[#0E1013] p-6 space-y-5 flex flex-col justify-between"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs font-mono-tech text-zinc-500">
+                    <span className="text-emerald-400 font-bold">STEP {s.step}</span>
+                    <span>{s.tag}</span>
                   </div>
 
-                  {/* Content Box */}
-                  <div className={`ml-16 md:ml-0 md:w-1/2 ${isEven ? 'md:pr-12 text-left md:text-right' : 'md:pl-12 text-left'}`}>
-                    <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl bg-${step.color}-500/10 text-${step.color}-500 mb-4`}>
-                      <Icon className="w-6 h-6" />
-                    </div>
-                    <div className="flex items-center gap-3 mb-2 md:hidden">
-                       <span className="text-sm font-black text-muted-foreground">STEP 0{idx + 1}</span>
-                    </div>
-                    <div className={`hidden md:flex items-center gap-3 mb-2 ${isEven ? 'justify-end' : 'justify-start'}`}>
-                       <span className="text-sm font-black text-muted-foreground">STEP 0{idx + 1}</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-foreground mb-3 font-outfit">{step.title}</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {step.description}
-                    </p>
-                  </div>
-                  
-                  {/* Empty space for the other half */}
-                  <div className="hidden md:block md:w-1/2" />
-                </motion.div>
-              );
-            })}
-          </div>
+                  <h3 className="text-lg font-bold text-white leading-snug">
+                    {s.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed font-sans">
+                    {s.description}
+                  </p>
+                </div>
+
+                {/* Console Log Preview */}
+                <div className="p-2.5 rounded bg-[#14161B] border border-white/[0.04] text-[11px] font-mono-tech text-zinc-400 truncate">
+                  {s.codePreview}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

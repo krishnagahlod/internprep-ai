@@ -1,35 +1,43 @@
 import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 
-const inter = Inter({
+const fontSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const outfit = Outfit({
+const fontDisplay = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  variable: "--font-display",
+  weight: ["600", "700", "800"],
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "InternPrep AI | Master the Interview. Built for Day 1.",
-  description: "A battle-tested AI copilot for Consulting Cases, Tech System Design, Finance, and Product. Voice-enabled practice, digital whiteboard integration, and recruiter-grade resume intelligence.",
+  title: "InternPrep AI — Placement & Interview Engineering Platform",
+  description: "The interview engine calibrated to actual partner rubrics. Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
   openGraph: {
-    title: "InternPrep AI | Master the Interview",
-    description: "Voice-enabled mock interviews and AI resume intelligence engineered for Day 1 placements.",
+    title: "InternPrep AI — Placement & Interview Engineering Platform",
+    description: "Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
     type: "website",
     siteName: "InternPrep AI",
   },
   twitter: {
     card: "summary_large_image",
-    title: "InternPrep AI | Master the Interview",
-    description: "Voice-enabled mock interviews and AI resume intelligence engineered for Day 1 placements.",
+    title: "InternPrep AI — Placement & Interview Engineering Platform",
+    description: "Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
   },
-  keywords: ["Interview Prep", "AI Mock Interview", "Resume Builder", "Consulting Cases", "Tech Interviews"],
+  keywords: ["Interview Prep", "AI Mock Interview", "Case Interview", "Resume Intelligence", "IIT Bombay Placements", "Consulting", "Finance"],
 };
 
 export default function RootLayout({
@@ -38,16 +46,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${outfit.variable} font-sans antialiased selection:bg-primary/20 selection:text-primary bg-background text-foreground`}
+        className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-400 bg-background text-foreground`}
         suppressHydrationWarning
       >
         <PostHogProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
-            enableSystem
+            defaultTheme="dark"
+            enableSystem={false}
             disableTransitionOnChange
           >
             {children}

@@ -1,126 +1,137 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FileSearch, Activity, FileCheck, ArrowRight, TrendingUp, AlertCircle, Target, Zap } from "lucide-react";
+import { CheckCircle2, AlertCircle, ArrowRight, FileCheck, ShieldAlert, Cpu, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 const DIMENSIONS = [
-  { name: "Impact & Action", score: 92, color: "bg-violet-500" },
-  { name: "Brevity & Clarity", score: 85, color: "bg-cyan-500" },
-  { name: "Quantifiability", score: 98, color: "bg-emerald-500" },
-  { name: "Technical Depth", score: 76, color: "bg-blue-500" },
-  { name: "Leadership", score: 88, color: "bg-amber-500" },
-  { name: "Format & Grammar", score: 100, color: "bg-rose-500" },
+  { name: "Metric Density & Scale", score: "96%", status: "Optimal" },
+  { name: "High-Agency Action Verbs", score: "92%", status: "Optimal" },
+  { name: "Technical Architecture Clarity", score: "88%", status: "Good" },
+  { name: "Cross-Question Vulnerability", score: "12%", status: "Low Risk" },
+  { name: "ATS Parser Compatibility", score: "100%", status: "Perfect" },
 ];
 
 export function ResumeIntelligenceSection() {
   return (
-    <section id="resume-intelligence" className="py-24 relative overflow-hidden bg-muted/30 border-y border-border/50">
+    <section id="resume-intelligence" className="py-24 border-b border-white/[0.08] bg-[#08090A]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
+        {/* Section Tag */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-400 font-bold">
+            [CORE ENGINE 02]
+          </span>
+          <span className="text-xs font-mono-tech text-zinc-500">RESUME INTELLIGENCE</span>
+        </div>
+
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-16 max-w-3xl">
+          Line-by-line audit calibrated against Google & McKinsey hiring standards.
+        </h2>
+
+        {/* 2-Column Deep Dive */}
+        <div className="grid lg:grid-cols-12 gap-10 items-start">
           
-          {/* Content Left */}
-          <div className="space-y-8">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
-              <FileSearch className="w-3.5 h-3.5" />
-              Resume Intelligence Engine
-            </div>
-            
-            <h2 className="text-3xl md:text-5xl font-bold font-outfit tracking-tight text-foreground leading-[1.1]">
-              Stop guessing what <br className="hidden md:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-premium">recruiters want.</span>
-            </h2>
-            
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Our ATS parser doesn't just check for keywords. It analyzes the structural integrity of every bullet point, grades them across 6 dimensions, and predicts the exact cross-questions a Partner will ask you on Day 1.
+          {/* Left Column: Dimensions & Core Logic */}
+          <div className="lg:col-span-5 space-y-8">
+            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed font-sans">
+              Most candidates get rejected before the interview because their bullets lack quantification and high-agency action verbs. InternPrep audits every line against 6 recruiter dimensions.
             </p>
 
-            <ul className="space-y-4">
-              {[
-                { icon: Zap, text: "Sub-second 1-click bullet rewrites to MBB standards" },
-                { icon: Target, text: "Job Description match scoring to expose keyword gaps" },
-                { icon: Activity, text: "6-Dimension Radar audit (Impact, Brevity, Quantifiability)" },
-              ].map((item, idx) => (
-                <li key={idx} className="flex items-start gap-3">
-                  <div className="mt-1 bg-primary/10 p-1 rounded-md text-primary shrink-0">
-                    <item.icon className="w-4 h-4" />
+            {/* 6-Dimension Scoreboard */}
+            <div className="p-4 rounded-lg bg-[#0E1013] border border-white/[0.08] space-y-3 font-mono-tech text-xs">
+              <div className="text-zinc-400 uppercase text-[11px] pb-1 border-b border-white/[0.06] flex justify-between">
+                <span>AUDIT DIMENSION</span>
+                <span>BENCHMARK SCORE</span>
+              </div>
+              {DIMENSIONS.map((dim, i) => (
+                <div key={i} className="flex justify-between items-center py-1">
+                  <span className="text-zinc-300">{dim.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-400 font-bold">{dim.score}</span>
+                    <span className="text-[10px] text-zinc-500 bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/[0.06]">
+                      {dim.status}
+                    </span>
                   </div>
-                  <span className="text-foreground font-medium">{item.text}</span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
 
-            <div className="pt-4">
-              <Link href="/login">
-                <Button size="lg" className="rounded-full bg-foreground text-background hover:bg-foreground/90 font-semibold px-8">
-                  Audit My Resume Now
-                  <ArrowRight className="ml-2 w-4 h-4" />
+            <div className="space-y-3 text-xs text-zinc-300 font-sans">
+              <div className="flex items-start gap-2">
+                <Cpu className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span>Predicts the exact cross-questions an interviewer will ask based on your bullet points.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <FileCheck className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span>Google XYZ Formula enforcement: Accomplished [X], as measured by [Y], by doing [Z].</span>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Link href="/resume">
+                <Button size="sm" className="h-9 px-4 rounded-md bg-white text-zinc-950 hover:bg-zinc-200 text-xs font-semibold">
+                  Run Full Resume Audit
+                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
               </Link>
             </div>
           </div>
 
-          {/* Visual Right (Radar & Critique Demo) */}
-          <div className="relative">
-            {/* Background Glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/20 to-cyan-500/20 blur-3xl -z-10 rounded-full" />
-            
-            <div className="glass-panel bg-white/70 dark:bg-zinc-950/70 border border-black/10 dark:border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden">
-              <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-gradient-premium rounded-xl flex items-center justify-center shadow-inner">
-                    <FileCheck className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-foreground">ATS Diagnostic Report</h4>
-                    <p className="text-xs text-muted-foreground">johndoe_resume_v4.pdf</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-black text-emerald-500 font-outfit">84<span className="text-sm text-muted-foreground">/100</span></div>
-                  <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">Strong Match</p>
-                </div>
-              </div>
+          {/* Right Column: Live Line-by-Line Scanner Console */}
+          <div className="lg:col-span-7 rounded-xl border border-white/[0.08] bg-[#0E1013] overflow-hidden space-y-0">
+            {/* Header */}
+            <div className="px-4 py-2.5 bg-[#14161B] border-b border-white/[0.06] flex items-center justify-between text-xs font-mono-tech text-zinc-400">
+              <span>SCANNER CONSOLE: IITB PLACEMENT TEMPLATE</span>
+              <span className="text-emerald-400 font-bold">TOTAL SCORE: 94/100</span>
+            </div>
 
-              {/* 6-Dimension Bars */}
-              <div className="space-y-4 mb-6">
-                <h5 className="text-xs font-bold uppercase text-muted-foreground tracking-wider mb-2">6-Axis Evaluation</h5>
-                {DIMENSIONS.map((dim, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <div className="w-32 text-xs font-medium text-foreground truncate">{dim.name}</div>
-                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        whileInView={{ width: `${dim.score}%` }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 1, delay: 0.2 + (idx * 0.1), ease: "easeOut" }}
-                        className={`h-full ${dim.color} rounded-full`}
-                      />
-                    </div>
-                    <div className="w-8 text-right text-xs font-bold text-muted-foreground">{dim.score}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Recruiter Cross-Question Preview */}
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-2 text-amber-700 dark:text-amber-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span className="text-xs font-bold uppercase tracking-wider">Red Flag Detected (Bullet 3)</span>
+            <div className="p-6 space-y-4 font-sans">
+              {/* Scanned Bullet Item 1 */}
+              <div className="p-4 rounded-lg bg-[#14161B] border border-white/[0.06] space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono-tech">
+                  <span className="text-zinc-400 font-semibold">BULLET 01 • QUANTITATIVE FINANCE</span>
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Score: 98/100
+                  </span>
                 </div>
-                <p className="text-sm font-medium text-foreground italic mb-2">
-                  "Led a team of 5 to redesign the internal dashboard..."
+                <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-sans">
+                  "Designed an automated statistical arbitrage strategy backtested across 5 years of tick data, generating an annualized Sharpe ratio of 2.84 with 14% max drawdown."
                 </p>
-                <div className="text-xs text-muted-foreground bg-background/50 p-2 rounded-lg border border-border">
-                  <strong className="text-foreground">Predicted Recruiter Question:</strong> "You said you 'led' the redesign, but what specific technical or product contribution did you make vs the other 4 team members?"
+                <div className="text-[11px] font-mono-tech text-zinc-500 pt-1">
+                  TAGS: <span className="text-zinc-300">Sharpe 2.84, Tick Data, Risk Management</span>
                 </div>
               </div>
 
+              {/* Scanned Bullet Item 2 */}
+              <div className="p-4 rounded-lg bg-[#14161B] border border-white/[0.06] space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono-tech">
+                  <span className="text-zinc-400 font-semibold">BULLET 02 • SYSTEM SCALING</span>
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Score: 96/100
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-200 leading-relaxed font-sans">
+                  "Architected an event-driven Kafka ingestion pipeline processing 85,000 events/sec, cutting peak database write locks by 74%."
+                </p>
+                <div className="text-[11px] font-mono-tech text-zinc-500 pt-1">
+                  TAGS: <span className="text-zinc-300">Kafka, 85k events/sec, Lock Reduction</span>
+                </div>
+              </div>
+
+              {/* Cross-Question Warning */}
+              <div className="p-3 rounded-md bg-[#181A20] border border-white/[0.06] text-xs font-mono-tech text-zinc-300 space-y-1">
+                <div className="text-amber-400 font-bold flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED PARTNER CROSS-QUESTION
+                </div>
+                <div className="text-zinc-400">
+                  "How did you account for transaction slippage and exchange fees when calculating that 2.84 Sharpe ratio?"
+                </div>
+              </div>
             </div>
           </div>
-          
+
         </div>
       </div>
     </section>

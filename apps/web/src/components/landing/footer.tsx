@@ -1,91 +1,168 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Terminal, ShieldCheck, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export function Footer() {
+  const [modalType, setModalType] = useState<"privacy" | "terms" | "methodology" | null>(null);
+
   return (
-    <footer className="bg-background border-t border-border pt-16 pb-8">
+    <footer className="border-t border-white/[0.08] bg-[#060709] text-zinc-400 text-xs py-14">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-16">
+        
+        {/* Main Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           
-          {/* Brand Column */}
-          <div className="col-span-2 lg:col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-lg bg-gradient-premium p-px flex items-center justify-center">
-                <div className="h-full w-full bg-white dark:bg-zinc-950 rounded-[7px] flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
+          {/* Brand Col */}
+          <div className="col-span-2 space-y-4">
+            <Link href="/" className="flex items-center gap-2 text-white font-mono-tech font-bold text-sm">
+              <div className="h-6 w-6 rounded bg-white/10 border border-white/15 flex items-center justify-center text-emerald-400">
+                <Terminal className="h-3.5 w-3.5" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-foreground font-outfit">
-                InternPrep<span className="text-gradient">.AI</span>
-              </span>
+              <span>InternPrep.ai</span>
             </Link>
-            <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-              The only AI interview copilot calibrated to MBB and FAANG rubrics. Master your cases, system designs, and resume in one unified platform.
+            <p className="text-zinc-500 max-w-sm text-xs leading-relaxed font-sans">
+              The interview intelligence engine calibrated to McKinsey, BCG, and FAANG hiring rubrics. Built for Day 1 placement prep.
             </p>
-            <div className="flex flex-col gap-2">
-               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                  </span>
-                  All systems operational
-               </div>
+            <div className="flex items-center gap-2 text-[11px] font-mono-tech text-zinc-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              <span>All evaluation pipelines operating at &lt; 150ms latency</span>
             </div>
           </div>
 
-          {/* Product Links */}
-          <div>
-            <h4 className="font-semibold text-foreground mb-4">Product</h4>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link href="#mock-interviews" className="hover:text-foreground transition-colors">Mock Interviews</Link></li>
-              <li><Link href="#resume-intelligence" className="hover:text-foreground transition-colors">Resume Intelligence</Link></li>
-              <li><Link href="/resume" className="hover:text-foreground transition-colors">Resume Builder Studio</Link></li>
-              <li><Link href="/casebooks" className="hover:text-foreground transition-colors">Casebook Ecosystem</Link></li>
-              <li><Link href="#pricing" className="hover:text-foreground transition-colors">Pricing & Top-Ups</Link></li>
+          {/* Core Modules */}
+          <div className="space-y-3 font-sans">
+            <div className="font-mono-tech text-zinc-200 text-xs font-semibold uppercase">Platform</div>
+            <ul className="space-y-2 text-zinc-500">
+              <li><Link href="#simulator" className="hover:text-zinc-300 transition-colors">Voice Simulator</Link></li>
+              <li><Link href="#resume-intelligence" className="hover:text-zinc-300 transition-colors">Resume Intelligence</Link></li>
+              <li><Link href="/resume" className="hover:text-zinc-300 transition-colors">Resume Studio</Link></li>
+              <li><Link href="#casebooks" className="hover:text-zinc-300 transition-colors">Campus Casebooks</Link></li>
+              <li><Link href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing & Credits</Link></li>
             </ul>
           </div>
 
-          {/* Resources Links */}
-          <div>
-            <h4 className="font-semibold text-foreground mb-4">Resources</h4>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link href="#" className="hover:text-foreground transition-colors">MBB Interview Guide</Link></li>
-              <li><Link href="#" className="hover:text-foreground transition-colors">FAANG System Design</Link></li>
-              <li><Link href="#" className="hover:text-foreground transition-colors">Resume Action Verbs</Link></li>
-              <li><Link href="#faq" className="hover:text-foreground transition-colors">Help & FAQ</Link></li>
+          {/* Resources */}
+          <div className="space-y-3 font-sans">
+            <div className="font-mono-tech text-zinc-200 text-xs font-semibold uppercase">Resources</div>
+            <ul className="space-y-2 text-zinc-500">
+              <li><Link href="#faq" className="hover:text-zinc-300 transition-colors">FAQ & Specs</Link></li>
+              <li><Link href="/interview" className="hover:text-zinc-300 transition-colors">Live Drill Console</Link></li>
+              <li><Link href="/casebooks" className="hover:text-zinc-300 transition-colors">IIT Bombay Casebook</Link></li>
+              <li><Link href="/casebooks" className="hover:text-zinc-300 transition-colors">IIM Ahmedabad Vault</Link></li>
             </ul>
           </div>
 
-          {/* Legal Links */}
-          <div>
-            <h4 className="font-semibold text-foreground mb-4">Legal</h4>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              <li><Link href="#" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
-              <li><Link href="#" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
-              <li><Link href="#" className="hover:text-foreground transition-colors">Refund Policy</Link></li>
+          {/* Legal & Security */}
+          <div className="space-y-3 font-sans">
+            <div className="font-mono-tech text-zinc-200 text-xs font-semibold uppercase">Trust & Legal</div>
+            <ul className="space-y-2 text-zinc-500">
+              <li>
+                <button onClick={() => setModalType("privacy")} className="hover:text-zinc-300 transition-colors text-left">
+                  Privacy Policy
+                </button>
+              </li>
+              <li>
+                <button onClick={() => setModalType("terms")} className="hover:text-zinc-300 transition-colors text-left">
+                  Terms of Service
+                </button>
+              </li>
+              <li>
+                <button onClick={() => setModalType("methodology")} className="hover:text-zinc-300 transition-colors text-left">
+                  Evaluation Methodology
+                </button>
+              </li>
             </ul>
+          </div>
+
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono-tech text-zinc-600">
+          <div>
+            © {new Date().getFullYear()} InternPrep AI Inc. All rights reserved.
+          </div>
+          <div className="flex items-center gap-4 text-zinc-500">
+            <span>IIT BOMBAY PLACEMENTS EDITION</span>
+            <span>•</span>
+            <span>SECURE RAZORPAY SSL</span>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-border/50 gap-4">
-          <p className="text-sm text-muted-foreground text-center md:text-left">
-            © {new Date().getFullYear()} InternPrep AI. All rights reserved. Built for Day 1.
-          </p>
-          <div className="flex items-center gap-4 text-muted-foreground">
-            <Link href="#" className="hover:text-foreground transition-colors">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
-            </Link>
-            <Link href="#" className="hover:text-foreground transition-colors">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-            </Link>
-            <Link href="#" className="hover:text-foreground transition-colors">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-            </Link>
-          </div>
-        </div>
       </div>
+
+      {/* Privacy Policy Dialog */}
+      <Dialog open={modalType === "privacy"} onOpenChange={(open) => !open && setModalType(null)}>
+        <DialogContent className="max-w-2xl bg-[#0E1013] border border-white/15 text-zinc-200 p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white font-mono-tech">Privacy Policy</DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">Effective as of 2026. Last updated February 2026.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-xs text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+            <p>
+              InternPrep AI ("we", "us", "our") takes user data privacy with extreme seriousness. This policy outlines how user resumes, audio transcripts, and session telemetry are processed.
+            </p>
+            <h4 className="font-semibold text-white">1. Data Ingestion & Resume Parsing</h4>
+            <p>
+              PDF resumes uploaded to the platform are processed exclusively in isolated, transient execution environments. We do not sell your personal data or resume records to third-party recruiters without your explicit affirmative opt-in.
+            </p>
+            <h4 className="font-semibold text-white">2. Voice Transcripts & LLM Processing</h4>
+            <p>
+              Live voice recordings are transcribed via secure low-latency speech APIs and evaluated against calibration rubrics. User interview audio is not used to train public foundation models.
+            </p>
+            <h4 className="font-semibold text-white">3. Security & Payments</h4>
+            <p>
+              Payment processing for top-up passes and subscriptions is handled by Razorpay with 256-bit TLS encryption. We never store credit card numbers on our servers.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terms of Service Dialog */}
+      <Dialog open={modalType === "terms"} onOpenChange={(open) => !open && setModalType(null)}>
+        <DialogContent className="max-w-2xl bg-[#0E1013] border border-white/15 text-zinc-200 p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white font-mono-tech">Terms of Service</DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">Applicable to all users and campus accounts.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-xs text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+            <h4 className="font-semibold text-white">1. Credit Validity & Top-Up Passes</h4>
+            <p>
+              1-Time Top-Up Passes (including Single Resume Audits and Single Mock Passes) do not expire and remain accessible in your account balance permanently.
+            </p>
+            <h4 className="font-semibold text-white">2. Platform Usage</h4>
+            <p>
+              InternPrep AI is an educational interview simulation tool. While calibrated to rigorous partner rubrics, actual placement outcomes depend on individual candidate performance during official campus placement rounds.
+            </p>
+            <h4 className="font-semibold text-white">3. Cancellation & Refunds</h4>
+            <p>
+              Unused top-up credits are eligible for refunds within 7 days of purchase upon contacting support if technical issues prevented session completion.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Methodology Dialog */}
+      <Dialog open={modalType === "methodology"} onOpenChange={(open) => !open && setModalType(null)}>
+        <DialogContent className="max-w-2xl bg-[#0E1013] border border-white/15 text-zinc-200 p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-white font-mono-tech">Evaluation Methodology</DialogTitle>
+            <DialogDescription className="text-xs text-zinc-400">How InternPrep AI scores candidate turns.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-xs text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+            <h4 className="font-semibold text-white">1. MECE Structuring Calibration</h4>
+            <p>
+              Cases are evaluated based on Mutually Exclusive, Collectively Exhaustive principles. Sub-branches are graded on logical completeness, root-cause depth, and numerical defensibility.
+            </p>
+            <h4 className="font-semibold text-white">2. Google XYZ Formula for Resumes</h4>
+            <p>
+              Bullet points are scored on: Accomplished [X], as measured by [Y], by doing [Z]. Missing scale or unquantified claims trigger low-confidence flags and auto-suggest metric enrichments.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </footer>
   );
 }
