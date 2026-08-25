@@ -16,13 +16,20 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "InternPrep AI - IITB Internship Assistant",
-  description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students. Master your non-core interviews with precision.",
+  title: "InternPrep AI | Master the Interview. Built for Day 1.",
+  description: "A battle-tested AI copilot for Consulting Cases, Tech System Design, Finance, and Product. Voice-enabled practice, digital whiteboard integration, and recruiter-grade resume intelligence.",
   openGraph: {
-    title: "InternPrep AI - IITB Internship Assistant",
-    description: "AI-powered resume reviews and case interview mock sessions designed for IIT Bombay students.",
+    title: "InternPrep AI | Master the Interview",
+    description: "Voice-enabled mock interviews and AI resume intelligence engineered for Day 1 placements.",
     type: "website",
+    siteName: "InternPrep AI",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "InternPrep AI | Master the Interview",
+    description: "Voice-enabled mock interviews and AI resume intelligence engineered for Day 1 placements.",
+  },
+  keywords: ["Interview Prep", "AI Mock Interview", "Resume Builder", "Consulting Cases", "Tech Interviews"],
 };
 
 export default function RootLayout({
