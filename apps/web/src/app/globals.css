@@ -30,53 +30,61 @@
 
 @layer base {
   :root {
-    --background: 220 14% 4%;        /* #08090A - Deep obsidian */
-    --foreground: 0 0% 95%;          /* #F2F2F2 - Crisp high-contrast white */
+    --background: 210 20% 98%;      /* #F8F9FA - Swiss editorial off-white */
+    --foreground: 222 47% 11%;      /* #0F172A - Deep crisp slate */
     
-    --card: 220 13% 7%;              /* #0F1013 - Level 1 dark surface */
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 100%;              /* #FFFFFF - Crisp white */
+    --card-foreground: 222 47% 11%;
     
-    --popover: 220 13% 7%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     
-    --primary: 158 64% 52%;          /* #10B981 - Precision Emerald */
-    --primary-foreground: 220 14% 4%;
+    --primary: 158 64% 42%;         /* #059669 - Technical Emerald (light tuned) */
+    --primary-foreground: 0 0% 100%;
     
-    --secondary: 220 11% 11%;        /* #18191E - Level 2 dark surface */
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 210 20% 94%;       /* #ECEEF1 - Subtle gray */
+    --secondary-foreground: 222 47% 11%;
     
-    --muted: 220 11% 11%;
-    --muted-foreground: 220 9% 60%;  /* #91949D - Crisp neutral secondary text */
+    --muted: 210 20% 94%;           /* #ECEEF1 */
+    --muted-foreground: 215 16% 45%;/* #64748B - Neutral slate */
     
-    --accent: 217 91% 60%;           /* #3B82F6 - Precision Electric Blue */
-    --accent-foreground: 0 0% 95%;
+    --accent: 217 91% 55%;          /* #2563EB - Electric Blue */
+    --accent-foreground: 0 0% 100%;
     
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
     
-    --border: 220 10% 16%;           /* #23252B - Precision 1px border */
-    --input: 220 10% 16%;
-    --ring: 158 64% 52%;
+    --border: 214 24% 88%;          /* #DDE2E8 - Crisp 1px border */
+    --input: 214 24% 88%;
+    --ring: 158 64% 42%;
   }
 
   .dark {
-    --background: 220 14% 4%;
-    --foreground: 0 0% 95%;
-    --card: 220 13% 7%;
-    --card-foreground: 0 0% 95%;
+    --background: 220 14% 4%;        /* #08090A - Obsidian */
+    --foreground: 0 0% 96%;          /* #F4F4F5 - High contrast white */
+    
+    --card: 220 13% 7%;              /* #0F1013 - Level 1 dark surface */
+    --card-foreground: 0 0% 96%;
+    
     --popover: 220 13% 7%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 158 64% 52%;
+    --popover-foreground: 0 0% 96%;
+    
+    --primary: 158 64% 52%;          /* #10B981 - Precision Emerald (dark tuned) */
     --primary-foreground: 220 14% 4%;
-    --secondary: 220 11% 11%;
-    --secondary-foreground: 0 0% 95%;
+    
+    --secondary: 220 11% 11%;        /* #16181D - Level 2 dark surface */
+    --secondary-foreground: 0 0% 96%;
+    
     --muted: 220 11% 11%;
-    --muted-foreground: 220 9% 60%;
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 95%;
+    --muted-foreground: 220 9% 60%;  /* #91949D */
+    
+    --accent: 217 91% 60%;           /* #3B82F6 - Electric Blue */
+    --accent-foreground: 0 0% 96%;
+    
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 10% 16%;
+    
+    --border: 220 10% 16%;           /* #23252B - 1px border */
     --input: 220 10% 16%;
     --ring: 158 64% 52%;
   }
@@ -103,25 +111,48 @@
 /* Precision Technical & Studio Utilities */
 @layer utilities {
   .surface-panel {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  .dark .surface-panel {
     background-color: #0F1013;
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
   
   .surface-card {
-    background-color: #121316;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .surface-card:hover {
+    background-color: hsl(var(--muted) / 0.5);
+    border-color: hsl(var(--border) / 0.8);
+  }
+
+  .dark .surface-card {
+    background-color: #121316;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .dark .surface-card:hover {
     background-color: #16181D;
     border-color: rgba(255, 255, 255, 0.14);
   }
 
   .tech-grid {
     background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  }
+
+  .dark .tech-grid {
     background-image: 
       linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
       linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
@@ -140,14 +171,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #08090A;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: hsl(var(--muted-foreground) / 0.25);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: hsl(var(--muted-foreground) / 0.45);
 }

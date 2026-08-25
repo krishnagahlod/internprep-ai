@@ -15,7 +15,7 @@ import { Footer } from "@/components/landing/footer";
 export default function Home() {
   return (
     <SmoothScroll>
-      <div className="flex flex-col min-h-screen bg-[#08090A] text-white selection:bg-emerald-500/20 selection:text-emerald-300">
+      <div className="flex flex-col min-h-screen bg-background text-foreground selection:bg-emerald-500/20 selection:text-emerald-600 dark:selection:text-emerald-300 transition-colors">
         <LandingNavbar />
         <main className="flex-1">
           <Hero />

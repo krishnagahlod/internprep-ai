@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, ShieldCheck, Check, Zap } from "lucide-react";
+import { ArrowRight, ShieldCheck, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -13,10 +13,10 @@ const MICRO_PASSES = [
     badge: "Non-Expiring",
     credits: "1 Full Ingestion & 6-Dimension Scorecard",
     highlights: [
-      "Complete ATS parser compatibility breakdown",
+      "Full ATS parser compatibility report",
       "Line-by-line Google XYZ formula rewrites",
       "Interviewer cross-question prediction",
-      "PDF export with highlighted score tags"
+      "Interactive workshop rewrite co-pilot"
     ],
     cta: "Purchase Resume Pass",
     isPopular: false
@@ -30,7 +30,7 @@ const MICRO_PASSES = [
     highlights: [
       "Target track (Consulting / Tech / Finance / PM)",
       "Live dynamic partner pushback & interruptions",
-      "Integrated Excalidraw digital whiteboard",
+      "Instant Cerebras response (<150ms)",
       "Comprehensive transcript & rubric debrief"
     ],
     cta: "Purchase Mock Pass",
@@ -40,13 +40,13 @@ const MICRO_PASSES = [
     name: "Placement Sprint Pack",
     price: "₹199",
     billing: "One-time payment",
-    badge: "Save 45%",
+    badge: "Best Value",
     credits: "3 Mock Passes + 5 Resume Audits",
     highlights: [
       "3 Full 45-minute Voice Mock Sessions",
       "5 Complete Resume Intelligence Audits",
       "Permanent non-expiring credit balance",
-      "Access to Top 50 Campus Case Solutions"
+      "Detailed historical scorecard tracking"
     ],
     cta: "Get Sprint Pack",
     isPopular: false
@@ -62,8 +62,8 @@ const SUBSCRIPTION_PLANS = [
     credits: "Unlimited Resumes + 10 Mocks / mo",
     highlights: [
       "Unlimited Resume Intelligence Audits",
-      "10 Voice Mock Interview Passes / month",
-      "Full Campus Casebook Vault access",
+      "10 Mock Interview Sessions / month",
+      "ATS checker & Resume Studio access",
       "Historical progression analytics"
     ],
     cta: "Start Monthly",
@@ -73,13 +73,13 @@ const SUBSCRIPTION_PLANS = [
     name: "Placement Season Pass",
     price: "₹699",
     billing: "Billed for 3 months",
-    badge: "Campus Favorite",
+    badge: "Semester Favorite",
     credits: "Unlimited Resumes + 35 Mocks Total",
     highlights: [
       "Unlimited Resume Intelligence Audits",
-      "35 Voice Mock Sessions total",
-      "Complete 400+ Campus Casebook Directory",
-      "Peer cohort percentile benchmarking",
+      "35 Mock Interview Sessions total",
+      "Full ATS & Resume Studio tool suite",
+      "Priority API queue for instant responses",
       "Valid throughout placement semester"
     ],
     cta: "Get Season Pass",
@@ -92,34 +92,34 @@ export function PricingSection() {
   const plans = pricingMode === "passes" ? MICRO_PASSES : SUBSCRIPTION_PLANS;
 
   return (
-    <section id="pricing" className="py-24 border-b border-white/[0.08] bg-[#08090A]">
+    <section id="pricing" className="py-20 border-b border-border bg-background transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Tag */}
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-400 font-bold">
-            [TRANSPARENT PRICING]
+          <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
+            [PRICING]
           </span>
-          <span className="text-xs font-mono-tech text-zinc-500">NO HIDDEN SUBSCRIPTION TRAPS</span>
+          <span className="text-xs font-mono-tech text-muted-foreground">TRANSPARENT PASSES</span>
         </div>
 
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-6 max-w-3xl">
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-4 max-w-3xl">
           Purchase exact credits when you need them, or activate a Season Pass.
         </h2>
 
-        <p className="text-sm sm:text-base text-zinc-400 mb-12 max-w-2xl font-sans">
+        <p className="text-sm sm:text-base text-muted-foreground mb-10 max-w-2xl font-sans">
           Top-up passes never expire. Your credits remain in your account permanently until used.
         </p>
 
         {/* Toggle Switch */}
-        <div className="flex items-center gap-2 mb-12">
-          <div className="p-1 rounded-lg bg-[#0E1013] border border-white/[0.08] inline-flex">
+        <div className="flex items-center gap-2 mb-10">
+          <div className="p-1 rounded-lg bg-muted/60 border border-border inline-flex">
             <button
               onClick={() => setPricingMode("passes")}
               className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
                 pricingMode === "passes"
-                  ? "bg-white/10 text-white font-semibold border border-white/10"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-card text-foreground font-semibold shadow-xs border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               1-Time Top-Up Passes
@@ -128,8 +128,8 @@ export function PricingSection() {
               onClick={() => setPricingMode("subscription")}
               className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
                 pricingMode === "subscription"
-                  ? "bg-white/10 text-white font-semibold border border-white/10"
-                  : "text-zinc-400 hover:text-white"
+                  ? "bg-card text-foreground font-semibold shadow-xs border border-border"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Semester Subscriptions
@@ -144,18 +144,18 @@ export function PricingSection() {
               key={idx}
               className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
                 p.isPopular
-                  ? "bg-[#121418] border-emerald-500/50 shadow-[0_0_24px_rgba(16,185,129,0.1)]"
-                  : "bg-[#0E1013] border-white/[0.08]"
+                  ? "bg-card border-emerald-500 shadow-sm"
+                  : "bg-card border-border shadow-xs"
               }`}
             >
               <div>
                 {/* Header */}
                 <div className="flex items-center justify-between text-xs font-mono-tech mb-4">
-                  <span className="text-zinc-400 font-semibold uppercase">{p.name}</span>
+                  <span className="text-muted-foreground font-semibold uppercase">{p.name}</span>
                   <span className={`px-2 py-0.5 rounded text-[11px] ${
                     p.isPopular
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : "bg-white/[0.04] text-zinc-400 border border-white/[0.06]"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold"
+                      : "bg-muted text-muted-foreground border border-border"
                   }`}>
                     {p.badge}
                   </span>
@@ -163,20 +163,20 @@ export function PricingSection() {
 
                 {/* Price */}
                 <div className="mb-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-white font-mono-tech">{p.price}</div>
-                  <div className="text-xs text-zinc-500 font-mono-tech mt-1">{p.billing}</div>
+                  <div className="text-3xl sm:text-4xl font-bold text-foreground font-mono-tech">{p.price}</div>
+                  <div className="text-xs text-muted-foreground font-mono-tech mt-1">{p.billing}</div>
                 </div>
 
                 {/* Credit Summary */}
-                <div className="p-2.5 rounded bg-[#16181D] border border-white/[0.04] text-xs font-mono-tech text-emerald-400 font-medium mb-6">
+                <div className="p-2.5 rounded bg-muted/50 border border-border text-xs font-mono-tech text-emerald-600 dark:text-emerald-400 font-medium mb-6">
                   {p.credits}
                 </div>
 
                 {/* Feature Checklist */}
-                <div className="space-y-2.5 mb-8 text-xs text-zinc-300 font-sans">
+                <div className="space-y-2.5 mb-8 text-xs text-muted-foreground font-sans">
                   {p.highlights.map((h, hIdx) => (
                     <div key={hIdx} className="flex items-start gap-2">
-                      <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                       <span>{h}</span>
                     </div>
                   ))}
@@ -189,8 +189,8 @@ export function PricingSection() {
                   size="sm"
                   className={`w-full h-10 rounded-md text-xs font-semibold font-mono-tech transition-all ${
                     p.isPopular
-                      ? "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                      : "bg-white/10 hover:bg-white/15 text-white border border-white/10"
+                      ? "bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-sm"
+                      : "bg-foreground text-background hover:bg-foreground/90"
                   }`}
                 >
                   {p.cta}
@@ -202,13 +202,13 @@ export function PricingSection() {
         </div>
 
         {/* Security & Lifetime Guarantee */}
-        <div className="mt-12 p-4 rounded-lg bg-[#0E1013] border border-white/[0.06] flex flex-wrap items-center justify-between gap-4 text-xs font-mono-tech text-zinc-400">
+        <div className="mt-10 p-4 rounded-lg bg-card border border-border flex flex-wrap items-center justify-between gap-4 text-xs font-mono-tech text-muted-foreground shadow-xs">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span>Razorpay Secure Encrypted 256-Bit Checkout</span>
           </div>
-          <div className="text-zinc-500">
-            Micro top-up credits remain valid permanently with zero expiry.
+          <div className="text-muted-foreground">
+            Top-up credits never expire and remain permanently in your account.
           </div>
         </div>
 

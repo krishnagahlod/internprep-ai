@@ -24,20 +24,20 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InternPrep AI — Placement & Interview Engineering Platform",
-  description: "The interview engine calibrated to actual partner rubrics. Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
+  title: "InternPrep AI — Day 1 Placement & Case Interview Platform",
+  description: "Rigorous case interview simulations and adaptive resume intelligence engineered for Day 1 placements at IIT Bombay and premier campuses.",
   openGraph: {
-    title: "InternPrep AI — Placement & Interview Engineering Platform",
-    description: "Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
+    title: "InternPrep AI — Day 1 Placement & Case Interview Platform",
+    description: "Rigorous case interview simulations and adaptive resume intelligence engineered for Day 1 placements.",
     type: "website",
     siteName: "InternPrep AI",
   },
   twitter: {
     card: "summary_large_image",
-    title: "InternPrep AI — Placement & Interview Engineering Platform",
-    description: "Practice high-stakes case interviews with voice-activated pushback, real-time MECE rubrics, and line-by-line resume intelligence.",
+    title: "InternPrep AI — Day 1 Placement & Case Interview Platform",
+    description: "Rigorous case interview simulations and adaptive resume intelligence engineered for Day 1 placements.",
   },
-  keywords: ["Interview Prep", "AI Mock Interview", "Case Interview", "Resume Intelligence", "IIT Bombay Placements", "Consulting", "Finance"],
+  keywords: ["Interview Prep", "AI Mock Interview", "Case Interview", "Resume Intelligence", "IIT Bombay Placements", "Consulting Cases"],
 };
 
 export default function RootLayout({
@@ -46,16 +46,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-400 bg-background text-foreground`}
+        className={`${fontSans.variable} ${fontDisplay.variable} ${fontMono.variable} font-sans antialiased selection:bg-emerald-500/20 selection:text-emerald-600 dark:selection:text-emerald-300 bg-background text-foreground transition-colors duration-150`}
         suppressHydrationWarning
       >
         <PostHogProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="dark"
-            enableSystem={false}
+            defaultTheme="system"
+            enableSystem
             disableTransitionOnChange
           >
             {children}
