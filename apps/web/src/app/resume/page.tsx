@@ -108,6 +108,7 @@ export default function ResumePage() {
   const [isWorkshopLoading, setIsWorkshopLoading] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [savedVaultId, setSavedVaultId] = useState<string | null>(null)
+  const [expandedBulletDetails, setExpandedBulletDetails] = useState<Record<string, boolean>>({})
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore()
@@ -356,12 +357,52 @@ export default function ResumePage() {
     setTimeout(() => setSavedVaultId(null), 2000);
   };
 
-  const getSeverityBadge = (severity: string) => {
+  const toggleBulletDetails = (key: string) => {
+    setExpandedBulletDetails((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getSeverityConfig = (severity: string) => {
     switch(severity?.toLowerCase()) {
-      case 'critical': return { bg: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20', edge: 'bg-red-500' };
-      case 'major': return { bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20', edge: 'bg-amber-500' };
-      case 'minor': return { bg: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20', edge: 'bg-yellow-500' };
-      default: return { bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20', edge: 'bg-emerald-500' };
+      case 'critical':
+        return {
+          label: 'CRITICAL FIX REQUIRED',
+          cardBorder: 'border-l-4 border-l-red-500',
+          badgeBg: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+          draftBg: 'bg-red-500/5 dark:bg-red-500/10 border-red-500/25 text-foreground',
+          draftLabel: 'RAW DRAFT (NEEDS CRITICAL REVISION):',
+          draftLabelColor: 'text-red-600 dark:text-red-400',
+          isGood: false
+        };
+      case 'major':
+        return {
+          label: 'MAJOR UPGRADE SUGGESTED',
+          cardBorder: 'border-l-4 border-l-amber-500',
+          badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+          draftBg: 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/25 text-foreground',
+          draftLabel: 'RAW DRAFT (HIGH IMPACT POTENTIAL):',
+          draftLabelColor: 'text-amber-600 dark:text-amber-400',
+          isGood: false
+        };
+      case 'minor':
+        return {
+          label: 'MINOR POLISH RECOMMENDED',
+          cardBorder: 'border-l-4 border-l-blue-500',
+          badgeBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+          draftBg: 'bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/20 text-foreground',
+          draftLabel: 'RAW DRAFT (MINOR TWEAKS SUGGESTED):',
+          draftLabelColor: 'text-blue-600 dark:text-blue-400',
+          isGood: false
+        };
+      default:
+        return {
+          label: 'VERIFIED STRONG - DAY 1 PASS',
+          cardBorder: 'border-l-4 border-l-emerald-500',
+          badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+          draftBg: 'bg-muted/30 border-border/80 text-foreground',
+          draftLabel: 'ORIGINAL BULLET (DAY 1 BENCHMARK PASSED):',
+          draftLabelColor: 'text-emerald-600 dark:text-emerald-400',
+          isGood: true
+        };
     }
   };
 
@@ -654,24 +695,28 @@ export default function ResumePage() {
                         <div className="p-4 space-y-4">
                           {bullets.map((b: any, idx: number) => {
                             const isBlurred = !isProUser && idx > 0;
-                            const badge = getSeverityBadge(b.severity);
+                            const config = getSeverityConfig(b.severity);
                             const rewriteText = b.suggested_rewrite || "";
                             const bulletKey = `${sectionName}-${idx}`;
                             const isCopied = copiedId === bulletKey;
                             const isSaved = savedVaultId === bulletKey;
+                            const isExpanded = Boolean(expandedBulletDetails[bulletKey]);
 
                             return (
                               <div 
                                 key={idx} 
-                                className={`p-5 rounded-xl border border-border bg-background space-y-4 relative transition-all hover:border-border/80 shadow-xs ${
+                                className={`p-5 rounded-xl border border-border bg-card space-y-3.5 relative transition-all hover:border-border/80 shadow-xs ${config.cardBorder} ${
                                   isBlurred ? "filter blur-[5px] select-none pointer-events-none opacity-40" : ""
                                 }`}
                               >
                                 {/* Header Row */}
                                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono-tech">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold border ${badge.bg}`}>
-                                      {b.severity?.toUpperCase() || "AUDIT"}
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border text-[10px] uppercase">
+                                      {b.section_type || sectionName}
+                                    </span>
+                                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold border ${config.badgeBg}`}>
+                                      {config.label}
                                     </span>
                                     {b.action_verb_rating && (
                                       <span className={`px-2 py-0.5 rounded text-[10px] border ${
@@ -681,30 +726,53 @@ export default function ResumePage() {
                                           ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
                                           : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                                       }`}>
-                                        Verb: {b.action_verb_rating.toUpperCase()}
+                                        VERB: {b.action_verb_rating.toUpperCase()}
                                       </span>
                                     )}
                                   </div>
 
-                                  <button
-                                    onClick={() => startWorkshop(b)}
-                                    className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-mono-tech flex items-center gap-1 border border-emerald-500/20 font-semibold transition-colors"
-                                  >
-                                    <Brain className="h-3.5 w-3.5" /> AI Rewrite Workshop →
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    {config.isGood && (
+                                      <button
+                                        onClick={() => handleCopy(b.original_bullet, bulletKey)}
+                                        className={`px-2.5 py-1 rounded text-xs font-mono-tech flex items-center gap-1 transition-all ${
+                                          isCopied
+                                            ? "bg-emerald-600 text-white font-bold"
+                                            : "bg-card hover:bg-muted text-foreground border border-border"
+                                        }`}
+                                      >
+                                        {isCopied ? (
+                                          <>
+                                            <CheckCircle2 className="h-3 w-3" /> Copied!
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Copy className="h-3 w-3" /> Copy Point
+                                          </>
+                                        )}
+                                      </button>
+                                    )}
+
+                                    <button
+                                      onClick={() => startWorkshop(b)}
+                                      className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-mono-tech flex items-center gap-1 border border-emerald-500/20 font-semibold transition-colors"
+                                    >
+                                      <Brain className="h-3.5 w-3.5" /> AI Rewrite Workshop →
+                                    </button>
+                                  </div>
                                 </div>
 
-                                {/* Raw Draft (No forced quotes) */}
-                                <div className="p-3.5 rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 text-xs font-sans text-foreground space-y-1">
-                                  <span className="text-[10px] font-mono-tech text-red-600 dark:text-red-400 block font-bold tracking-wider">
-                                    RAW DRAFT:
+                                {/* Raw / Original Bullet Display */}
+                                <div className={`p-3.5 rounded-lg border text-xs font-sans space-y-1 ${config.draftBg}`}>
+                                  <span className={`text-[10px] font-mono-tech block font-bold tracking-wider ${config.draftLabelColor}`}>
+                                    {config.draftLabel}
                                   </span>
                                   <p className="leading-relaxed">{b.original_bullet}</p>
                                 </div>
 
-                                {/* Rule Breaks & Structural Issues Tags */}
+                                {/* Rule Breaks & Structural Issues (for items needing fix) */}
                                 {((b.structural_issues && b.structural_issues.length > 0) || (b.best_practice_violations && b.best_practice_violations.length > 0)) && (
-                                  <div className="flex flex-wrap gap-1.5 pt-1">
+                                  <div className="flex flex-wrap gap-1.5 pt-0.5">
                                     {b.structural_issues?.map((issue: string, i: number) => (
                                       <span key={`struct-${i}`} className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-[10px] font-mono-tech font-semibold flex items-center gap-1">
                                         <AlertCircle className="h-3 w-3" /> {issue}
@@ -718,39 +786,12 @@ export default function ResumePage() {
                                   </div>
                                 )}
 
-                                {/* Diagnostic Critique */}
-                                {b.critique && (
-                                  <p className="text-xs text-muted-foreground font-sans leading-relaxed">
-                                    <span className="font-mono-tech font-semibold text-foreground">[CRITIQUE]</span> {b.critique}
-                                  </p>
-                                )}
-
-                                {/* Action Verb Power Alternatives */}
-                                {b.action_verb_alternatives && b.action_verb_alternatives.length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
-                                    <span className="text-muted-foreground text-[11px]">POWER VERB UPGRADES:</span>
-                                    {b.action_verb_alternatives.map((verb: string, vIdx: number) => (
-                                      <span key={vIdx} className="px-2 py-0.5 rounded bg-muted text-foreground text-[11px] font-bold border border-border">
-                                        {verb}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {/* Metric Guidance Hint */}
-                                {b.metrics_hint && (
-                                  <div className="p-2.5 rounded-md bg-muted/40 border border-border text-xs font-sans text-muted-foreground flex items-start gap-2">
-                                    <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                                    <span><strong className="font-mono-tech text-foreground text-[11px]">METRIC GUIDANCE:</strong> {b.metrics_hint}</span>
-                                  </div>
-                                )}
-
-                                {/* Golden Rewrite (Google XYZ Pass) */}
-                                {rewriteText && (
+                                {/* Benchmark Golden Rewrite (Directly visible for non-good points, or if rewrite differs) */}
+                                {rewriteText && !config.isGood && (
                                   <div className="p-3.5 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 text-xs font-sans space-y-2">
                                     <div className="flex items-center justify-between text-[10px] font-mono-tech">
                                       <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-wider flex items-center gap-1.5">
-                                        <CheckCircle2 className="h-3.5 w-3.5" /> GOLDEN REWRITE (GOOGLE XYZ PASS):
+                                        <CheckCircle2 className="h-3.5 w-3.5" /> TIER-1 BENCHMARK REWRITE:
                                       </span>
                                       
                                       {/* Action Buttons: Copy & Save */}
@@ -789,26 +830,77 @@ export default function ResumePage() {
                                     </div>
 
                                     <p className="font-medium text-foreground leading-relaxed">{rewriteText}</p>
+                                  </div>
+                                )}
 
-                                    {b.golden_comparison && (
-                                      <div className="text-[11px] font-mono-tech text-muted-foreground pt-1 border-t border-emerald-500/20">
-                                        BENCHMARK ALIGNMENT: <span className="text-foreground">{b.golden_comparison}</span>
-                                      </div>
+                                {/* Collapsible Toggle for Deep Details & Critique */}
+                                <div>
+                                  <button
+                                    onClick={() => toggleBulletDetails(bulletKey)}
+                                    className="text-[11px] font-mono-tech text-muted-foreground hover:text-foreground flex items-center gap-1 pt-1 transition-colors"
+                                  >
+                                    {isExpanded ? (
+                                      <>
+                                        <ChevronUp className="h-3.5 w-3.5" /> Hide Diagnostic Details
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ChevronDown className="h-3.5 w-3.5" /> View Diagnostic Details & Reasoning
+                                      </>
                                     )}
-                                  </div>
-                                )}
+                                  </button>
 
-                                {/* Predicted Interviewer Question */}
-                                {b.predicted_questions && b.predicted_questions.length > 0 && (
-                                  <div className="p-3 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs font-mono-tech text-foreground space-y-1">
-                                    <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 text-[11px]">
-                                      <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED INTERVIEWER CROSS-QUESTION
+                                  {isExpanded && (
+                                    <div className="mt-3 pt-3 border-t border-border/60 space-y-3 animate-in fade-in-50 duration-150">
+                                      {/* Diagnostic Critique */}
+                                      {b.critique && (
+                                        <p className="text-xs text-muted-foreground font-sans leading-relaxed">
+                                          <span className="font-mono-tech font-semibold text-foreground">[DIAGNOSTIC CRITIQUE]</span> {b.critique}
+                                        </p>
+                                      )}
+
+                                      {/* Action Verb Power Alternatives */}
+                                      {b.action_verb_alternatives && b.action_verb_alternatives.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
+                                          <span className="text-muted-foreground text-[11px]">POWER VERB ALTERNATIVES:</span>
+                                          {b.action_verb_alternatives.map((verb: string, vIdx: number) => (
+                                            <span key={vIdx} className="px-2 py-0.5 rounded bg-muted text-foreground text-[11px] font-bold border border-border">
+                                              {verb}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* Metric Guidance Hint */}
+                                      {b.metrics_hint && (
+                                        <div className="p-2.5 rounded-md bg-muted/40 border border-border text-xs font-sans text-muted-foreground flex items-start gap-2">
+                                          <Lightbulb className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                          <span><strong className="font-mono-tech text-foreground text-[11px]">METRIC GUIDANCE:</strong> {b.metrics_hint}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Benchmark Alignment Quote (if present) */}
+                                      {b.golden_comparison && (
+                                        <div className="p-2.5 rounded-md bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 text-xs font-sans text-muted-foreground">
+                                          <strong className="font-mono-tech text-emerald-600 dark:text-emerald-400 text-[11px] block mb-0.5">DAY 1 BENCHMARK ALIGNMENT:</strong>
+                                          <span className="text-foreground">{b.golden_comparison}</span>
+                                        </div>
+                                      )}
+
+                                      {/* Predicted Interviewer Question */}
+                                      {b.predicted_questions && b.predicted_questions.length > 0 && (
+                                        <div className="p-3 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs font-mono-tech text-foreground space-y-1">
+                                          <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                            <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED INTERVIEWER CROSS-QUESTION
+                                          </div>
+                                          <p className="text-muted-foreground font-sans text-xs">
+                                            "{b.predicted_questions[0]}"
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
-                                    <p className="text-muted-foreground font-sans text-xs">
-                                      "{b.predicted_questions[0]}"
-                                    </p>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                             );
                           })}

@@ -13,7 +13,7 @@ const MICRO_PASSES = [
     credits: "1 Full Ingestion & 6-Dimension Scorecard",
     highlights: [
       "Full ATS parser compatibility report",
-      "Line-by-line Google XYZ formula rewrites",
+      "Line-by-line Tier-1 benchmark rewrites",
       "Interviewer cross-question prediction",
       "Interactive workshop rewrite co-pilot"
     ],

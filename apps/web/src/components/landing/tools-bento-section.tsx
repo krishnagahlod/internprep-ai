@@ -57,7 +57,7 @@ export function ToolsBentoSection() {
                 <div className="p-3.5 rounded-xl bg-muted/40 border border-border space-y-1">
                   <div className="text-[11px] font-mono-tech text-muted-foreground">QUANTIFICATION DENSITY</div>
                   <div className="text-2xl font-bold text-foreground font-mono-tech">96.2%</div>
-                  <div className="text-[10px] text-muted-foreground">Google XYZ formula verified</div>
+                  <div className="text-[10px] text-muted-foreground">Day 1 Placement Verified</div>
                 </div>
               </div>
 

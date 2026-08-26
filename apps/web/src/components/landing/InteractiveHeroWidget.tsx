@@ -288,7 +288,7 @@ export function InteractiveHeroWidget() {
               {/* Tab Header */}
               <div className="flex items-center justify-between pb-3 border-b border-border">
                 <div className="text-xs font-mono-tech text-muted-foreground">
-                  GOOGLE XYZ FORMULA & RESUME REWRITER
+                  DAY 1 PLACEMENT BENCHMARK REWRITER
                 </div>
                 <button
                   onClick={handleNextBullet}

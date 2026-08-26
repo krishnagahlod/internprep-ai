@@ -17,7 +17,7 @@ const PIPELINE_STAGES = [
     inputValue: "Standard 1-Page PDF Resume (Consulting / SDE / Analytics / Quant / PM)",
     telemetry: "ADAPTIVE RAG: 24 bullets parsed • High-density vector matching • 4 weak action verbs flagged",
     outputLabel: "System Output",
-    outputValue: "Line-by-line Google XYZ formula rewrites + Competence Radar (STAR, Quantification, Formatting)",
+    outputValue: "Line-by-line Day 1 benchmark rewrites + Competence Radar (STAR, Quantification, Formatting)",
     actionText: "Try Resume Audit",
     actionLink: "/resume"
   },

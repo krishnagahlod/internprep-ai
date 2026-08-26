@@ -172,9 +172,9 @@ export function Footer() {
             <p>
               Cases and system architecture questions are evaluated based on Mutually Exclusive, Collectively Exhaustive principles. Sub-branches are graded on logical completeness, root-cause depth, and numerical defensibility.
             </p>
-            <h4 className="font-semibold text-foreground font-mono-tech">2. Google XYZ Formula for Resumes</h4>
+            <h4 className="font-semibold text-foreground font-mono-tech">2. Action-Impact Quantification for Resumes</h4>
             <p>
-              Bullet points are scored on: Accomplished [X], as measured by [Y], by doing [Z]. Missing scale or unquantified claims trigger low-confidence flags and auto-suggest metric enrichments.
+              Bullet points are scored on high-agency action verbs, metric density, and quantified business impact. Missing scale or unquantified claims trigger diagnostic flags and auto-suggest benchmark enrichments.
             </p>
           </div>
         </DialogContent>

@@ -27,7 +27,7 @@ const FAQ_ITEMS = [
     categoryLabel: "Resume Intelligence",
     icon: FileText,
     question: "How does the resume intelligence engine evaluate my bullets?",
-    answer: "The engine extracts every achievement from your uploaded PDF and benchmarks it against verified Day 1 placement resumes. It identifies missing scale, flags passive verbs, and generates line-by-line Google XYZ formula rewrites (Accomplished [X], measured by [Y], by doing [Z])."
+    answer: "The engine extracts every achievement from your uploaded PDF and benchmarks it against verified Day 1 placement resumes. It identifies missing scale, flags passive verbs, and generates line-by-line Tier-1 action-impact rewrites with exact quantified benchmarks."
   },
   {
     id: "faq-4",

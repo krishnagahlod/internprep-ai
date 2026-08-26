@@ -447,7 +447,7 @@ export default function AnalyticsPage() {
                 </div>
                 <h3 className="text-sm font-bold text-foreground">Replace 4 Passive Action Verbs</h3>
                 <p className="text-xs text-muted-foreground font-sans leading-relaxed">
-                  Your Work Experience section contains "Helped develop" and "Assisted with". Convert them to Google XYZ high-agency actions.
+                  Your Work Experience section contains "Helped develop" and "Assisted with". Convert them to high-agency Tier-1 placement action verbs.
                 </p>
               </div>
 

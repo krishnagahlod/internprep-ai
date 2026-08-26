@@ -36,7 +36,7 @@ export function ResumeIntelligenceSection() {
           {/* Left Column: Dimensions */}
           <div className="lg:col-span-5 space-y-6">
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed font-sans">
-              Extracts every achievement from your PDF, maps it to verified Day 1 placement cohorts, and outputs line-by-line Google XYZ formula rewrites.
+              Extracts every achievement from your PDF, maps it to verified Day 1 placement cohorts, and outputs line-by-line Tier-1 benchmark rewrites.
             </p>
 
             {/* Score Table */}
@@ -113,7 +113,7 @@ export function ResumeIntelligenceSection() {
                 </p>
                 <div className="text-[11px] font-mono-tech text-muted-foreground pt-1 flex items-center justify-between">
                   <span>STRUCTURE: Action + Context + Quantified Outcome</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Google XYZ Pass</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Day 1 Pass</span>
                 </div>
               </div>
 
@@ -130,7 +130,7 @@ export function ResumeIntelligenceSection() {
                 </p>
                 <div className="text-[11px] font-mono-tech text-muted-foreground pt-1 flex items-center justify-between">
                   <span>STRUCTURE: Scale Metric + Latency Optimization</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Google XYZ Pass</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Day 1 Pass</span>
                 </div>
               </div>
 

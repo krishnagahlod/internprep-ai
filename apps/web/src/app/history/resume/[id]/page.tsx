@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { 
   ArrowLeft, Loader2, CheckCircle2, AlertCircle, ShieldAlert, Target, 
   Brain, Download, Printer, Share2, Sparkles, FileText, ArrowRight,
-  Copy, Check, MessageSquare, X, Send, Bookmark, Filter, Layers, Zap
+  Copy, Check, MessageSquare, X, Send, Bookmark, Filter, Layers, Zap,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import Link from "next/link";
 import { PaywallModal } from "@/components/paywall-modal";
@@ -94,6 +95,7 @@ export default function ResumeHistoryDetail() {
   const [resumeData, setResumeData] = useState<any>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [savedVaultId, setSavedVaultId] = useState<number | null>(null);
+  const [expandedBulletDetails, setExpandedBulletDetails] = useState<Record<number, boolean>>({});
 
   // Section Filtering
   const [selectedSection, setSelectedSection] = useState<string>("all");
@@ -235,6 +237,55 @@ export default function ResumeHistoryDetail() {
     setTimeout(() => setSavedVaultId(null), 2000);
   };
 
+  const toggleBulletDetails = (id: number) => {
+    setExpandedBulletDetails((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const getSeverityConfig = (severity: string) => {
+    switch(severity?.toLowerCase()) {
+      case 'critical':
+        return {
+          label: 'CRITICAL FIX REQUIRED',
+          cardBorder: 'border-l-4 border-l-red-500',
+          badgeBg: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+          draftBg: 'bg-red-500/5 dark:bg-red-500/10 border-red-500/25 text-foreground',
+          draftLabel: 'RAW DRAFT (NEEDS CRITICAL REVISION):',
+          draftLabelColor: 'text-red-600 dark:text-red-400',
+          isGood: false
+        };
+      case 'major':
+        return {
+          label: 'MAJOR UPGRADE SUGGESTED',
+          cardBorder: 'border-l-4 border-l-amber-500',
+          badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+          draftBg: 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/25 text-foreground',
+          draftLabel: 'RAW DRAFT (HIGH IMPACT POTENTIAL):',
+          draftLabelColor: 'text-amber-600 dark:text-amber-400',
+          isGood: false
+        };
+      case 'minor':
+        return {
+          label: 'MINOR POLISH RECOMMENDED',
+          cardBorder: 'border-l-4 border-l-blue-500',
+          badgeBg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+          draftBg: 'bg-blue-500/5 dark:bg-blue-500/10 border-blue-500/20 text-foreground',
+          draftLabel: 'RAW DRAFT (MINOR TWEAKS SUGGESTED):',
+          draftLabelColor: 'text-blue-600 dark:text-blue-400',
+          isGood: false
+        };
+      default:
+        return {
+          label: 'VERIFIED STRONG - DAY 1 PASS',
+          cardBorder: 'border-l-4 border-l-emerald-500',
+          badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+          draftBg: 'bg-muted/30 border-border/80 text-foreground',
+          draftLabel: 'ORIGINAL BULLET (DAY 1 BENCHMARK PASSED):',
+          draftLabelColor: 'text-emerald-600 dark:text-emerald-400',
+          isGood: true
+        };
+    }
+  };
+
   // Workshop Co-Pilot Handlers with Quota Enforcement
   const startWorkshop = (bullet: any) => {
     const WORKSHOP_FREE_LIMIT = 5;
@@ -252,7 +303,7 @@ export default function ResumeHistoryDetail() {
     setActiveWorkshopBullet(bullet);
     setWorkshopMessages([]);
     setWorkshopInput("");
-    sendWorkshopMessage("Please optimize this bullet point to match Day 1 Google XYZ formula standards.", bullet, []);
+    sendWorkshopMessage("Please optimize this bullet point to match Day 1 Tier-1 placement standards.", bullet, []);
   };
 
   const sendWorkshopMessage = async (content: string, bullet = activeWorkshopBullet, history = workshopMessages) => {
@@ -447,7 +498,7 @@ export default function ResumeHistoryDetail() {
                 <span className="font-bold text-red-500">{bulletsList.filter((b: any) => b.severity === 'critical' || b.severity === 'major').length}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-foreground">Google XYZ Passed</span>
+                <span className="text-foreground">Tier-1 Benchmark Met</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">{bulletsList.filter((b: any) => b.severity === 'good').length}</span>
               </div>
             </div>
@@ -479,7 +530,7 @@ export default function ResumeHistoryDetail() {
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
                 <h3 className="text-base font-bold text-foreground font-mono-tech">
-                  Line-by-Line Google XYZ Rewrites
+                  Line-by-Line Benchmark Rewrites
                 </h3>
                 <span className="text-xs font-mono-tech text-muted-foreground">
                   {filteredBullets.length} of {bulletsList.length} Bullets Shown
@@ -523,49 +574,80 @@ export default function ResumeHistoryDetail() {
                 const rewriteText = bullet.suggested_rewrite || "";
                 const isCopied = copiedId === idx;
                 const isSaved = savedVaultId === idx;
+                const config = getSeverityConfig(bullet.severity);
+                const isExpanded = Boolean(expandedBulletDetails[idx]);
 
                 return (
                   <div 
                     key={idx} 
-                    className="p-5 rounded-xl border border-border bg-card space-y-3.5 shadow-xs transition-all hover:border-border/80"
+                    className={`p-5 rounded-xl border border-border bg-card space-y-3.5 shadow-xs transition-all hover:border-border/80 ${config.cardBorder}`}
                   >
                     {/* Bullet Header */}
-                    <div className="flex items-center justify-between text-xs font-mono-tech">
-                      <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border">
-                        {bullet.section_type || "Experience"}
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono-tech">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold border border-border text-[10px] uppercase">
+                          {bullet.section_type || "Experience"}
+                        </span>
+                        
+                        <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold border ${config.badgeBg}`}>
+                          {config.label}
+                        </span>
+
+                        {bullet.action_verb_rating && (
+                          <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                            bullet.action_verb_rating === 'weak' 
+                              ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20' 
+                              : bullet.action_verb_rating === 'moderate'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          }`}>
+                            VERB: {bullet.action_verb_rating.toUpperCase()}
+                          </span>
+                        )}
+                      </div>
                       
                       <div className="flex items-center gap-2">
-                        {bullet.severity === 'good' ? (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> High Metric Rigor
-                          </span>
-                        ) : (
-                          <span className="text-red-500 dark:text-red-400 font-bold flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" /> Weak Action Flagged
-                          </span>
+                        {config.isGood && (
+                          <button
+                            onClick={() => handleCopy(bullet.original_bullet, idx)}
+                            className={`px-2.5 py-1 rounded text-xs font-mono-tech flex items-center gap-1 transition-all ${
+                              isCopied
+                                ? "bg-emerald-600 text-white font-bold"
+                                : "bg-card hover:bg-muted text-foreground border border-border"
+                            }`}
+                          >
+                            {isCopied ? (
+                              <>
+                                <CheckCircle2 className="h-3 w-3" /> Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3" /> Copy Point
+                              </>
+                            )}
+                          </button>
                         )}
 
                         <button
                           onClick={() => startWorkshop(bullet)}
-                          className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-mono-tech flex items-center gap-1 border border-emerald-500/20 transition-colors"
+                          className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-mono-tech flex items-center gap-1 border border-emerald-500/20 font-semibold transition-colors"
                         >
-                          <Brain className="h-3 w-3" /> Co-Pilot Workshop →
+                          <Brain className="h-3.5 w-3.5" /> Co-Pilot Workshop →
                         </button>
                       </div>
                     </div>
 
-                    {/* Original Draft (Clean without quotes) */}
-                    <div className="p-3.5 rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 text-xs font-sans text-foreground space-y-1">
-                      <span className="text-[10px] font-mono-tech text-red-600 dark:text-red-400 block font-bold tracking-wider">
-                        RAW DRAFT:
+                    {/* Original / Raw Draft Display */}
+                    <div className={`p-3.5 rounded-lg border text-xs font-sans space-y-1 ${config.draftBg}`}>
+                      <span className={`text-[10px] font-mono-tech block font-bold tracking-wider ${config.draftLabelColor}`}>
+                        {config.draftLabel}
                       </span>
                       <p className="leading-relaxed">{bullet.original_bullet}</p>
                     </div>
 
-                    {/* Rule Breaks & Structural Issues Tags */}
+                    {/* Rule Breaks & Structural Issues Tags (for items needing fix) */}
                     {((bullet.structural_issues && bullet.structural_issues.length > 0) || (bullet.best_practice_violations && bullet.best_practice_violations.length > 0)) && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
                         {bullet.structural_issues?.map((issue: string, i: number) => (
                           <span key={`struct-${i}`} className="px-2 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 text-[10px] font-mono-tech font-semibold flex items-center gap-1">
                             <AlertCircle className="h-3 w-3" /> {issue}
@@ -579,37 +661,12 @@ export default function ResumeHistoryDetail() {
                       </div>
                     )}
 
-                    {/* Critique */}
-                    <p className="text-xs text-muted-foreground font-sans leading-relaxed">
-                      <span className="font-mono-tech font-semibold text-foreground">[CRITIQUE]</span> {bullet.critique}
-                    </p>
-
-                    {/* Action Verb Power Alternatives */}
-                    {bullet.action_verb_alternatives && bullet.action_verb_alternatives.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
-                        <span className="text-muted-foreground text-[11px]">POWER VERB UPGRADES:</span>
-                        {bullet.action_verb_alternatives.map((verb: string, vIdx: number) => (
-                          <span key={vIdx} className="px-2 py-0.5 rounded bg-muted text-foreground text-[11px] font-bold border border-border">
-                            {verb}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Metric Guidance Hint */}
-                    {bullet.metrics_hint && (
-                      <div className="p-2.5 rounded-md bg-muted/40 border border-border text-xs font-sans text-muted-foreground flex items-start gap-2">
-                        <Sparkles className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                        <span><strong className="font-mono-tech text-foreground text-[11px]">METRIC GUIDANCE:</strong> {bullet.metrics_hint}</span>
-                      </div>
-                    )}
-
-                    {/* Golden Rewrite (Clean without quotes + Copy Button) */}
-                    {rewriteText && (
+                    {/* Tier-1 Benchmark Golden Rewrite (Directly visible for non-good points) */}
+                    {rewriteText && !config.isGood && (
                       <div className="p-3.5 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 text-xs font-sans space-y-2">
                         <div className="flex items-center justify-between text-[10px] font-mono-tech">
                           <span className="text-emerald-600 dark:text-emerald-400 font-bold tracking-wider flex items-center gap-1.5">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> GOLDEN REWRITE (GOOGLE XYZ PASS):
+                            <CheckCircle2 className="h-3.5 w-3.5" /> TIER-1 BENCHMARK REWRITE:
                           </span>
                           
                           {/* Action Buttons: Copy & Save */}
@@ -648,26 +705,77 @@ export default function ResumeHistoryDetail() {
                         </div>
 
                         <p className="font-medium text-foreground leading-relaxed">{rewriteText}</p>
+                      </div>
+                    )}
 
-                        {bullet.golden_comparison && (
-                          <div className="text-[11px] font-mono-tech text-muted-foreground pt-1 border-t border-emerald-500/20">
-                            BENCHMARK ALIGNMENT: <span className="text-foreground">{bullet.golden_comparison}</span>
-                          </div>
+                    {/* Collapsible Toggle for Deep Details & Critique */}
+                    <div>
+                      <button
+                        onClick={() => toggleBulletDetails(idx)}
+                        className="text-[11px] font-mono-tech text-muted-foreground hover:text-foreground flex items-center gap-1 pt-1 transition-colors"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-3.5 w-3.5" /> Hide Diagnostic Details
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3.5 w-3.5" /> View Diagnostic Details & Reasoning
+                          </>
                         )}
-                      </div>
-                    )}
+                      </button>
 
-                    {/* Predicted Interviewer Question */}
-                    {bullet.predicted_questions && bullet.predicted_questions.length > 0 && (
-                      <div className="p-3 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs font-mono-tech text-foreground space-y-1">
-                        <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 text-[11px]">
-                          <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED INTERVIEWER CROSS-QUESTION
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-border/60 space-y-3 animate-in fade-in-50 duration-150">
+                          {/* Diagnostic Critique */}
+                          {bullet.critique && (
+                            <p className="text-xs text-muted-foreground font-sans leading-relaxed">
+                              <span className="font-mono-tech font-semibold text-foreground">[DIAGNOSTIC CRITIQUE]</span> {bullet.critique}
+                            </p>
+                          )}
+
+                          {/* Action Verb Power Alternatives */}
+                          {bullet.action_verb_alternatives && bullet.action_verb_alternatives.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono-tech">
+                              <span className="text-muted-foreground text-[11px]">POWER VERB ALTERNATIVES:</span>
+                              {bullet.action_verb_alternatives.map((verb: string, vIdx: number) => (
+                                <span key={vIdx} className="px-2 py-0.5 rounded bg-muted text-foreground text-[11px] font-bold border border-border">
+                                  {verb}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Metric Guidance Hint */}
+                          {bullet.metrics_hint && (
+                            <div className="p-2.5 rounded-md bg-muted/40 border border-border text-xs font-sans text-muted-foreground flex items-start gap-2">
+                              <Sparkles className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                              <span><strong className="font-mono-tech text-foreground text-[11px]">METRIC GUIDANCE:</strong> {bullet.metrics_hint}</span>
+                            </div>
+                          )}
+
+                          {/* Benchmark Alignment Quote (if present) */}
+                          {bullet.golden_comparison && (
+                            <div className="p-2.5 rounded-md bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 text-xs font-sans text-muted-foreground">
+                              <strong className="font-mono-tech text-emerald-600 dark:text-emerald-400 text-[11px] block mb-0.5">DAY 1 BENCHMARK ALIGNMENT:</strong>
+                              <span className="text-foreground">{bullet.golden_comparison}</span>
+                            </div>
+                          )}
+
+                          {/* Predicted Interviewer Question */}
+                          {bullet.predicted_questions && bullet.predicted_questions.length > 0 && (
+                            <div className="p-3 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs font-mono-tech text-foreground space-y-1">
+                              <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED INTERVIEWER CROSS-QUESTION
+                              </div>
+                              <p className="text-muted-foreground font-sans text-xs">
+                                "{bullet.predicted_questions[0]}"
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-muted-foreground font-sans text-xs">
-                          "{bullet.predicted_questions[0]}"
-                        </p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}
