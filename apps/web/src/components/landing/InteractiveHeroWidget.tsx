@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, RefreshCw, CheckCircle2, AlertTriangle, ArrowRight, Volume2 } from "lucide-react";
+import { Mic, RefreshCw, CheckCircle2, AlertTriangle, ArrowRight, Volume2, Sparkles, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const SAMPLE_BULLETS = [
@@ -23,6 +23,14 @@ const SAMPLE_BULLETS = [
     impact: "$80M Market Entry / C-Suite Sign-off",
   },
   {
+    raw: "Built SQL dashboards and data pipeline for product analytics team.",
+    scoreBefore: 48,
+    critique: "Unquantified volume, missing tooling specifics, no business outcome.",
+    optimized: "Developed automated dbt & Snowflake pipelines ingesting 14M daily event rows, cutting executive reporting latency by 72% for growth team.",
+    scoreAfter: 98,
+    impact: "14M Events / 72% Faster Reporting",
+  },
+  {
     raw: "Helped optimize database queries to make backend run faster.",
     scoreBefore: 51,
     critique: "Unquantified speedup, weak verb 'helped', missing technical architecture.",
@@ -36,7 +44,7 @@ const CASE_SCENARIOS = [
   {
     role: "Management Consulting Track",
     caseTitle: "FMCG Margin Turnaround",
-    turn: "Phase 2: MECE Structuring",
+    turn: "Phase 2: Problem Structuring",
     prompt: "Our client is experiencing a 15% margin erosion in their premium packaged foods division despite rising top-line sales. Walk me through your structure to diagnose whether this is driven by raw material inflation, channel mix, or logistical inefficiencies.",
     candidateResponse: "I will structure this across 3 MECE branches: First, Cost of Goods Sold (COGS) analyzing palm oil & packaging procurement costs; second, Channel Mix dissecting high-margin General Trade vs lower-margin Quick Commerce discounting; third, Freight & Supply Chain bottleneck costs.",
     pushbackPrompt: "Good initial breakdown. However, palm oil prices dropped 4% this quarter while discounting on Quick Commerce rose 35%. How would you pivot your diagnostic prioritization right now?",
@@ -62,9 +70,23 @@ const CASE_SCENARIOS = [
     }
   },
   {
+    role: "Data Science & Analytics Track",
+    caseTitle: "Customer LTV Attribution Model",
+    turn: "Phase 2: Experimentation & Metrics",
+    prompt: "Marketing claims our new onboarding sequence increased 90-day LTV by 22%, but our paid acquisition CAC also rose by 15%. How do you design an attribution framework to verify if the campaign is genuinely net-margin accretive?",
+    candidateResponse: "I will construct a difference-in-differences (DiD) quasi-experiment isolating organic vs paid cohort retention curves, controlling for seasonality and cannibalization of direct traffic, before computing incremental Net Present Value (iNPV).",
+    pushbackPrompt: "If your cohort sample size is constrained in Tier-2 regions with high variance, what statistical test do you use to avoid false-positive conclusions?",
+    scores: {
+      mece: "9.7 / 10",
+      acumen: "9.8 / 10",
+      synthesis: "9.6 / 10",
+      verdict: "Lead Analyst Calibration"
+    }
+  },
+  {
     role: "Quantitative Finance & Valuation Track",
     caseTitle: "LBO Free Cash Flow Mechanics",
-    turn: "Phase 3: Financial Precision",
+    turn: "Phase 3: Financial Modeling",
     prompt: "If CapEx is $10M higher than Depreciation, walk me through how this flows through the three financial statements and its impact on Unlevered Free Cash Flow.",
     candidateResponse: "Income Statement is unaffected initially. On the Cash Flow Statement: Cash from Operations is unchanged, Cash from Investing decreases by $10M. On the Balance Sheet: Cash is down $10M, PP&E is up $10M. Unlevered FCF decreases by $10M.",
     pushbackPrompt: "If the asset was 60% funded via 8% debt with 3-year amortization, how does interest expense flow into Net Income next year assuming a 25% tax rate?",
@@ -266,14 +288,14 @@ export function InteractiveHeroWidget() {
               {/* Tab Header */}
               <div className="flex items-center justify-between pb-3 border-b border-border">
                 <div className="text-xs font-mono-tech text-muted-foreground">
-                  GOOGLE XYZ FORMULA & ADAPTIVE RAG REWRITER
+                  GOOGLE XYZ FORMULA & RESUME REWRITER
                 </div>
                 <button
                   onClick={handleNextBullet}
                   className="flex items-center gap-1.5 text-xs font-mono-tech px-2.5 py-1.5 rounded bg-muted hover:bg-muted/80 text-foreground border border-border focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                 >
                   <RefreshCw className={`h-3 w-3 text-muted-foreground ${isRewriting ? "animate-spin" : ""}`} />
-                  Test Another Bullet
+                  Test Another Bullet ({bulletIndex + 1}/{SAMPLE_BULLETS.length})
                 </button>
               </div>
 
@@ -320,11 +342,14 @@ export function InteractiveHeroWidget() {
 
       {/* Console Bottom Bar */}
       <div className="flex flex-wrap items-center justify-between px-5 py-2.5 bg-muted/60 border-t border-border text-xs font-mono-tech text-muted-foreground">
-        <div className="flex items-center gap-4">
-          <span>BACKEND: FastAPI + Cerebras Llama-3.3 70B</span>
-          <span>EMBEDDINGS: pgvector</span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+            <Sparkles className="h-3 w-3" /> 5 DOMAINS ACTIVE
+          </span>
+          <span>•</span>
+          <span>CONSULTING • SOFTWARE • ANALYTICS • FINANCE • PRODUCT</span>
         </div>
-        <div className="text-foreground">
+        <div className="text-foreground font-medium">
           Ready for live candidate interaction
         </div>
       </div>

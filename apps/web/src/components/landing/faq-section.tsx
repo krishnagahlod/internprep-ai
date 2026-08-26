@@ -2,62 +2,56 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HelpCircle, Sparkles, ShieldCheck, Zap, CreditCard, GraduationCap } from "lucide-react";
+import { MessageSquare, CreditCard, Sparkles, FileText, GraduationCap, Users } from "lucide-react";
 
 const FAQ_ITEMS = [
   {
     id: "faq-1",
-    category: "ai",
-    categoryLabel: "AI Architecture",
-    icon: Zap,
-    question: "How does the Cerebras engine differ from standard ChatGPT?",
-    answer: "Standard conversational LLMs have 3 to 8 seconds of latency, which breaks the pressure of a live interview. InternPrep runs on Cerebras ultra-fast inference hardware (~1000 tokens/sec, <150ms latency), allowing for natural speech rhythm and instant edge-case probing without awkward pauses.",
-    tag: "<150ms Cerebras Llama-3.3"
+    category: "interviews",
+    categoryLabel: "Interview Simulation",
+    icon: MessageSquare,
+    question: "How do the conversational mock interview simulations work?",
+    answer: "InternPrep AI simulates realistic, multi-turn interview rounds across 5 specialized domains. The AI evaluates your problem structuring, pushes back on flawed assumptions, and probes your edge-case calculations in real time without awkward delays. After each session, you receive a full transcript and 7-dimension performance rubric."
   },
   {
     id: "faq-2",
     category: "credits",
-    categoryLabel: "Credits & Passes",
+    categoryLabel: "Credits & Validity",
     icon: CreditCard,
     question: "Do my 1-Time Top-Up Passes ever expire?",
-    answer: "No. Top-Up Passes (such as the ₹49 Resume Pass, ₹79 Mock Pass, or ₹199 Sprint Pack) never expire. Credits remain permanently in your account balance until you use them for an interview or resume scan.",
-    tag: "Permanent Non-Expiring"
+    answer: "No. Top-up passes (such as the ₹49 Single Resume Pass, ₹79 Single Mock Pass, or ₹199 Sprint Pack) never expire. Credits remain permanently in your account balance until you use them for an interview session or resume audit."
   },
   {
     id: "faq-3",
-    category: "guest",
-    categoryLabel: "Free Sandbox",
-    icon: Sparkles,
-    question: "Can I try the platform without an account or credit card?",
-    answer: "Yes! You can interact with the live Sandbox directly on this page or click 'Launch Free Interactive Sandbox' to start a complete guest session without providing any card details.",
-    tag: "No Card Required"
+    category: "resume",
+    categoryLabel: "Resume Intelligence",
+    icon: FileText,
+    question: "How does the resume intelligence engine evaluate my bullets?",
+    answer: "The engine extracts every achievement from your uploaded PDF and benchmarks it against verified Day 1 placement resumes. It identifies missing scale, flags passive verbs, and generates line-by-line Google XYZ formula rewrites (Accomplished [X], measured by [Y], by doing [Z])."
   },
   {
     id: "faq-4",
-    category: "resume",
-    categoryLabel: "Resume RAG",
-    icon: HelpCircle,
-    question: "How does the Adaptive RAG resume engine evaluate my bullets?",
-    answer: "The engine extracts every achievement from your PDF and computes high-dimensional vector embeddings to compare against verified Day 1 placement resumes. It identifies missing metrics and outputs line-by-line Google XYZ formula rewrites.",
-    tag: "Google XYZ Benchmarking"
+    category: "domains",
+    categoryLabel: "Domain Tracks",
+    icon: Sparkles,
+    question: "What 5 domain tracks are available on the platform?",
+    answer: "We support tailored interview simulations and resume scoring for Management Consulting (Case Interviews), Software & Systems Engineering, Data Science & Analytics, Quantitative Finance & Valuation, and Product Management."
   },
   {
     id: "faq-5",
     category: "iitb",
-    categoryLabel: "IIT Bombay Access",
+    categoryLabel: "IIT Bombay Verification",
     icon: GraduationCap,
-    question: "Is access free for IIT Bombay students?",
-    answer: "Yes! Students with an active @iitb.ac.in email address receive 100% free unlocked access to all mock interviews, resume diagnostics, and ATS tools upon single sign-on.",
-    tag: "100% Free @iitb.ac.in"
+    question: "Is InternPrep AI free for IIT Bombay students?",
+    answer: "Yes! Students with an active @iitb.ac.in email address receive 100% free unlocked access to all interview tracks, resume diagnostics, ATS checkers, and point bank tools upon single sign-on."
   },
   {
     id: "faq-6",
-    category: "privacy",
-    categoryLabel: "Data Privacy",
-    icon: ShieldCheck,
-    question: "Is my uploaded resume kept private and secure?",
-    answer: "Yes. All PDF resumes are parsed in isolated, transient sandbox containers with 256-bit encryption. We never sell or share candidate data with third-party recruiters without explicit opt-in.",
-    tag: "TLS 256-Bit Encrypted"
+    category: "access",
+    categoryLabel: "General Access",
+    icon: Users,
+    question: "Can off-campus and other college candidates use the platform?",
+    answer: "Yes. Candidates from all universities can sign up and use our free interactive sandbox or purchase non-expiring micro-passes starting at ₹49 to prepare for their upcoming corporate placement drives and internship rounds."
   }
 ];
 
@@ -77,7 +71,7 @@ export function FaqSection() {
           <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
             [FAQ]
           </span>
-          <span className="text-xs font-mono-tech text-muted-foreground">KNOWLEDGE BASE & ARCHITECTURE</span>
+          <span className="text-xs font-mono-tech text-muted-foreground">FREQUENTLY ASKED QUESTIONS</span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
@@ -86,23 +80,24 @@ export function FaqSection() {
               Everything you need to know about the platform.
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-xl font-sans">
-              Clear answers regarding latency, credits validity, data privacy, and domain tracks.
+              Clear answers regarding interview simulation, credit validity, domain coverage, and access.
             </p>
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="flex flex-wrap gap-1.5 p-1 rounded-lg bg-muted/60 border border-border">
+          {/* Clean Single-Row Category Filter Pills */}
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-muted/60 border border-border overflow-x-auto max-w-full custom-scrollbar">
             {[
               { id: "all", label: "All Questions" },
+              { id: "interviews", label: "Interviews" },
               { id: "credits", label: "Credits & Passes" },
-              { id: "ai", label: "AI Latency" },
-              { id: "iitb", label: "IITB Access" },
-              { id: "privacy", label: "Privacy" }
+              { id: "resume", label: "Resume RAG" },
+              { id: "domains", label: "5 Domains" },
+              { id: "iitb", label: "IITB Access" }
             ].map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
+                className={`px-3 py-1.5 rounded-md text-xs font-mono-tech whitespace-nowrap transition-all ${
                   selectedCategory === cat.id
                     ? "bg-card text-foreground font-bold shadow-xs border border-border"
                     : "text-muted-foreground hover:text-foreground"
@@ -114,7 +109,7 @@ export function FaqSection() {
           </div>
         </div>
 
-        {/* 2-Column Bento FAQ Grid */}
+        {/* Modern 2-Column Bento FAQ Grid */}
         <div className="grid md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
             {filteredFaqs.map((faq) => {
@@ -130,14 +125,9 @@ export function FaqSection() {
                   className="rounded-xl border border-border bg-card p-6 space-y-4 flex flex-col justify-between shadow-xs hover:border-emerald-500/30 transition-all"
                 >
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs font-mono-tech">
-                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold">
-                        <Icon className="h-4 w-4" />
-                        <span>{faq.categoryLabel}</span>
-                      </div>
-                      <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border text-[10px]">
-                        {faq.tag}
-                      </span>
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-xs font-mono-tech">
+                      <Icon className="h-4 w-4" />
+                      <span>{faq.categoryLabel}</span>
                     </div>
 
                     <h3 className="text-base font-bold text-foreground leading-snug">
@@ -149,9 +139,9 @@ export function FaqSection() {
                     </p>
                   </div>
 
-                  <div className="pt-3 border-t border-border/60 text-[11px] font-mono-tech text-muted-foreground flex items-center justify-between">
-                    <span>STATUS: VERIFIED DIRECTIVE</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">ACTIVE</span>
+                  <div className="pt-3 border-t border-border/50 text-[11px] font-mono-tech text-muted-foreground flex items-center justify-between">
+                    <span>InternPrep Knowledge Base</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Verified</span>
                   </div>
                 </motion.div>
               );

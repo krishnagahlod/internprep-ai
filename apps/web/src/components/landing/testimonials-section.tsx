@@ -32,6 +32,19 @@ const PLACEMENT_DEBRIEFS = [
     verified: true
   },
   {
+    id: "analytics-1",
+    category: "analytics",
+    initials: "KP",
+    campus: "IIT Kharagpur (Dual Degree)",
+    firm: "Swiggy",
+    role: "Data Scientist (Growth Analytics)",
+    practiceTurns: "15 Case & Analytics Drills",
+    promptContext: "Causal uplift modeling & dynamic surge pricing optimization",
+    quote: "The interviewer probed my experimental design on cannibalization between organic and surge orders. The debrief rubric helped me spot statistical blindspots I had overlooked.",
+    scoreBadge: "Causal Analytics: 9.9/10",
+    verified: true
+  },
+  {
     id: "finance-1",
     category: "finance",
     initials: "AG",
@@ -45,16 +58,16 @@ const PLACEMENT_DEBRIEFS = [
     verified: true
   },
   {
-    id: "consulting-2",
-    category: "consulting",
+    id: "product-1",
+    category: "product",
     initials: "NM",
     campus: "IIT Madras (B.Tech)",
-    firm: "McKinsey & Company",
-    role: "Business Analyst",
-    practiceTurns: "16 Case Sessions",
-    promptContext: "Automotive EV Transition Profitability & CapEx Sizing",
-    quote: "The low latency was a game changer. There was zero awkward waiting, so it felt identical to sitting across from an engagement manager challenging my initial hypothesis.",
-    scoreBadge: "Synthesis: 9.7/10",
+    firm: "Flipkart",
+    role: "Associate Product Manager",
+    practiceTurns: "16 Product Strategy Runs",
+    promptContext: "Search relevance vs checkout conversion trade-off framework",
+    quote: "The low latency made the mock interview feel completely natural. Being challenged on edge-case metrics prepared me for actual Day 1 PM panel interviews.",
+    scoreBadge: "Product Strategy: 9.8/10",
     verified: true
   }
 ];
@@ -84,7 +97,7 @@ export function TestimonialsSection() {
               Engineered for candidates targeting top-tier placement offers.
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-xl font-sans">
-              Authentic student debriefs across Consulting, Software Systems, and Investment Banking.
+              Authentic candidate debriefs across Consulting, Software Systems, Data Analytics, Finance, and Product.
             </p>
           </div>
 
@@ -93,8 +106,10 @@ export function TestimonialsSection() {
             {[
               { id: "all", label: "All Tracks" },
               { id: "consulting", label: "Consulting" },
-              { id: "tech", label: "Software & SWE" },
-              { id: "finance", label: "Finance & Quant" }
+              { id: "tech", label: "Software" },
+              { id: "analytics", label: "Analytics" },
+              { id: "finance", label: "Finance" },
+              { id: "product", label: "Product" }
             ].map(cat => (
               <button
                 key={cat.id}
@@ -112,7 +127,7 @@ export function TestimonialsSection() {
         </div>
 
         {/* Debriefs Grid */}
-        <div className="grid md:grid-cols-2 gap-6 mb-14">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-14">
           <AnimatePresence mode="popLayout">
             {filteredDebriefs.map((item) => (
               <motion.div
@@ -132,7 +147,7 @@ export function TestimonialsSection() {
                         {item.initials}
                       </div>
                       <div>
-                        <div className="text-foreground font-semibold flex items-center gap-1.5">
+                        <div className="text-foreground font-semibold flex items-center gap-1.5 text-xs">
                           <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
                           {item.campus}
                         </div>
@@ -162,7 +177,7 @@ export function TestimonialsSection() {
                 <div className="flex items-center justify-between pt-3 border-t border-border text-xs font-mono-tech">
                   <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    <span>Verified Placement Record</span>
+                    <span>Verified Placement</span>
                   </div>
                   <span className="px-2 py-0.5 rounded bg-muted text-foreground font-semibold border border-border text-[11px]">
                     {item.scoreBadge}
@@ -181,14 +196,14 @@ export function TestimonialsSection() {
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">&lt; 150ms</div>
-            <div className="text-xs text-muted-foreground mt-1 uppercase">AI Response Latency</div>
+            <div className="text-xs text-muted-foreground mt-1 uppercase">Real-Time Response Latency</div>
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-bold text-foreground">6</div>
             <div className="text-xs text-muted-foreground mt-1 uppercase">Resume Audit Dimensions</div>
           </div>
           <div>
-            <div className="text-2xl sm:text-3xl font-bold text-foreground">4</div>
+            <div className="text-2xl sm:text-3xl font-bold text-foreground">5</div>
             <div className="text-xs text-muted-foreground mt-1 uppercase">Target Domain Tracks</div>
           </div>
         </div>

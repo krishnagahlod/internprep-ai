@@ -47,7 +47,7 @@ export function ToolsBentoSection() {
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">AI Co-Pilot</span>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/40 border border-border flex items-center justify-between text-xs font-mono-tech">
-                  <span className="text-foreground">Target Role Calibration (Consulting / Tech / Fin)</span>
+                  <span className="text-foreground">Target Role Calibration (5 Domain Tracks)</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold">Adaptive</span>
                 </div>
               </div>
@@ -99,7 +99,7 @@ export function ToolsBentoSection() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-foreground">Domain Role Benchmarking</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold">4 Tracks Active</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">5 Tracks Active</span>
                 </div>
               </div>
             </div>

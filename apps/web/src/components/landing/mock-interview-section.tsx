@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Mic, ArrowRight, Activity, Layers, MessageSquare } from "lucide-react";
+import { Mic, ArrowRight, Activity, Layers, MessageSquare, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -30,14 +30,36 @@ const TRACKS = [
     }
   },
   {
+    id: "analytics",
+    label: "Data Science & Analytics",
+    persona: "Analytics & Product Intelligence Track",
+    focus: "A/B Testing, Causal Inference, Pipeline SLAs, SQL/Python Logic",
+    turnExample: {
+      interviewer: "Your attribution model shows a 20% lift in 90-day retention, but paid acquisition CAC rose by 15%. How do you mathematically verify incremental contribution margin?",
+      candidate: "I'll build a difference-in-differences quasi-experiment controlling for regional seasonality and direct-traffic cannibalization before computing incremental Net Present Value.",
+      rubricBadge: "Analytics Precision: 9.8/10",
+    }
+  },
+  {
     id: "finance",
-    label: "Finance & Analytics",
-    persona: "Investment Banking & Quant Track",
-    focus: "Financial Statements, LBO Cash Flows, Working Capital",
+    label: "Finance & Quant",
+    persona: "Investment Banking & Quantitative Finance Track",
+    focus: "Financial Statements, LBO Cash Flows, Working Capital, Option Greeks",
     turnExample: {
       interviewer: "If Capex is $10M higher than Depreciation, how does this flow through the three financial statements and impact Unlevered Free Cash Flow?",
       candidate: "Income Statement is unchanged initially. Cash Flow: CFO flat, CFI down $10M. Balance Sheet: Cash down $10M, PP&E up $10M. UFCF decreases by $10M.",
       rubricBadge: "Financial Precision: 10/10",
+    }
+  },
+  {
+    id: "product",
+    label: "Product Management",
+    persona: "Product Strategy & Execution Track",
+    focus: "User Journey, Trade-Off Frameworks, Metric Trees, Go-to-Market",
+    turnExample: {
+      interviewer: "If DAU increases by 12% following the new recommendation engine rollout but average session duration drops by 18%, is this feature successful?",
+      candidate: "I will evaluate task-completion efficiency versus content engagement by segmenting transactional queries (where faster exit is good) from exploratory browsing feeds.",
+      rubricBadge: "Product Acumen: 9.7/10",
     }
   }
 ];
@@ -55,7 +77,7 @@ export function MockInterviewSection() {
           <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
             [CORE MODULE 01]
           </span>
-          <span className="text-xs font-mono-tech text-muted-foreground">INTERVIEW SIMULATOR</span>
+          <span className="text-xs font-mono-tech text-muted-foreground">INTERVIEW SIMULATOR (5 DOMAINS)</span>
         </div>
 
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-12 max-w-3xl">
@@ -68,12 +90,15 @@ export function MockInterviewSection() {
           {/* Left Column: Feature Breakdown */}
           <div className="lg:col-span-5 space-y-6">
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed font-sans">
-              Powered by Cerebras Llama-3.3 running at ~1000 tokens/sec. The AI guides you through authentic technical and case rounds, probing logical leaps and testing your defensibility.
+              Ultra-low latency conversational engine with instant response times. The AI guides you through authentic technical and case rounds, probing logical leaps and testing your defensibility.
             </p>
 
             {/* Track Switcher */}
             <div className="space-y-2">
-              <div className="text-xs font-mono-tech text-muted-foreground uppercase">Target Placement Track</div>
+              <div className="text-xs font-mono-tech text-muted-foreground uppercase flex items-center justify-between">
+                <span>Select Placement Track</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{TRACKS.length} Tracks Available</span>
+              </div>
               <div className="space-y-2">
                 {TRACKS.map((t, idx) => (
                   <button
