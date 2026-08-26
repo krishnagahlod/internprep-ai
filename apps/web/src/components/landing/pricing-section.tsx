@@ -113,10 +113,10 @@ export function PricingSection() {
 
         {/* Toggle Switch */}
         <div className="flex items-center gap-2 mb-10">
-          <div className="p-1 rounded-lg bg-muted/60 border border-border inline-flex">
+          <div className="p-1 rounded-lg bg-muted/60 border border-border inline-flex" role="group" aria-label="Pricing Type Selector">
             <button
               onClick={() => setPricingMode("passes")}
-              className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
+              className={`px-4 py-2 min-h-[40px] rounded-md text-xs font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
                 pricingMode === "passes"
                   ? "bg-card text-foreground font-semibold shadow-xs border border-border"
                   : "text-muted-foreground hover:text-foreground"
@@ -126,7 +126,7 @@ export function PricingSection() {
             </button>
             <button
               onClick={() => setPricingMode("subscription")}
-              className={`px-4 py-1.5 rounded-md text-xs font-mono-tech transition-all ${
+              className={`px-4 py-2 min-h-[40px] rounded-md text-xs font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
                 pricingMode === "subscription"
                   ? "bg-card text-foreground font-semibold shadow-xs border border-border"
                   : "text-muted-foreground hover:text-foreground"
@@ -144,7 +144,7 @@ export function PricingSection() {
               key={idx}
               className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
                 p.isPopular
-                  ? "bg-card border-emerald-500 shadow-sm"
+                  ? "bg-card border-emerald-500 shadow-sm ring-1 ring-emerald-500/20"
                   : "bg-card border-border shadow-xs"
               }`}
             >
@@ -187,7 +187,7 @@ export function PricingSection() {
               <Link href="/billing" className="w-full">
                 <Button
                   size="sm"
-                  className={`w-full h-10 rounded-md text-xs font-semibold font-mono-tech transition-all ${
+                  className={`w-full h-11 rounded-md text-xs font-semibold font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all ${
                     p.isPopular
                       ? "bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-sm"
                       : "bg-foreground text-background hover:bg-foreground/90"

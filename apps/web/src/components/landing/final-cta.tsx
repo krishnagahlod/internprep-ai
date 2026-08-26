@@ -47,7 +47,7 @@ export function FinalCta() {
               <Button
                 onClick={handleStartPractice}
                 size="lg"
-                className="w-full sm:w-auto h-11 px-6 rounded-md bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-semibold text-sm shadow-sm transition-all group"
+                className="w-full sm:w-auto h-11 px-6 rounded-md bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-semibold text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all group"
               >
                 Launch Free Sandbox
                 <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
@@ -57,7 +57,7 @@ export function FinalCta() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="w-full sm:w-auto h-11 px-6 rounded-md border-border bg-card hover:bg-muted text-foreground text-sm font-medium transition-all"
+                  className="w-full sm:w-auto h-11 px-6 rounded-md border-border bg-card hover:bg-muted text-foreground text-sm font-medium focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                 >
                   View Placement Plans
                 </Button>

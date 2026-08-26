@@ -17,7 +17,10 @@ export function Footer() {
           
           {/* Brand Col */}
           <div className="col-span-2 space-y-3.5">
-            <Link href="/" className="flex items-center gap-2 text-foreground font-mono-tech font-bold text-sm">
+            <Link 
+              href="/" 
+              className="flex items-center gap-2 text-foreground font-mono-tech font-bold text-sm focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded w-fit"
+            >
               <div className="h-6 w-6 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <Terminal className="h-3.5 w-3.5" />
               </div>
@@ -36,11 +39,11 @@ export function Footer() {
           <div className="space-y-3 font-sans">
             <div className="font-mono-tech text-foreground text-xs font-semibold uppercase">Platform</div>
             <ul className="space-y-2 text-muted-foreground">
-              <li><Link href="#simulator" className="hover:text-foreground transition-colors">Case Simulator</Link></li>
-              <li><Link href="#resume-intelligence" className="hover:text-foreground transition-colors">Resume Intelligence</Link></li>
-              <li><Link href="/resume" className="hover:text-foreground transition-colors">Resume Audit</Link></li>
-              <li><Link href="/ats-checker" className="hover:text-foreground transition-colors">ATS Checker</Link></li>
-              <li><Link href="#pricing" className="hover:text-foreground transition-colors">Pricing & Top-Ups</Link></li>
+              <li><Link href="#simulator" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Case Simulator</Link></li>
+              <li><Link href="#resume-intelligence" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Resume Intelligence</Link></li>
+              <li><Link href="/resume" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Resume Audit</Link></li>
+              <li><Link href="/ats-checker" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">ATS Checker</Link></li>
+              <li><Link href="#pricing" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Pricing & Top-Ups</Link></li>
             </ul>
           </div>
 
@@ -48,10 +51,10 @@ export function Footer() {
           <div className="space-y-3 font-sans">
             <div className="font-mono-tech text-foreground text-xs font-semibold uppercase">Workspace</div>
             <ul className="space-y-2 text-muted-foreground">
-              <li><Link href="/dashboard" className="hover:text-foreground transition-colors">Candidate Dashboard</Link></li>
-              <li><Link href="/interview" className="hover:text-foreground transition-colors">Mock Session Studio</Link></li>
-              <li><Link href="/history" className="hover:text-foreground transition-colors">Interview History</Link></li>
-              <li><Link href="/resume-builder" className="hover:text-foreground transition-colors">Resume Builder</Link></li>
+              <li><Link href="/dashboard" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Candidate Dashboard</Link></li>
+              <li><Link href="/interview" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Mock Session Studio</Link></li>
+              <li><Link href="/history" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Interview History</Link></li>
+              <li><Link href="/resume-builder" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">Resume Builder</Link></li>
             </ul>
           </div>
 
@@ -60,17 +63,26 @@ export function Footer() {
             <div className="font-mono-tech text-foreground text-xs font-semibold uppercase">Trust & Legal</div>
             <ul className="space-y-2 text-muted-foreground">
               <li>
-                <button onClick={() => setModalType("privacy")} className="hover:text-foreground transition-colors text-left">
+                <button 
+                  onClick={() => setModalType("privacy")} 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors text-left"
+                >
                   Privacy Policy
                 </button>
               </li>
               <li>
-                <button onClick={() => setModalType("terms")} className="hover:text-foreground transition-colors text-left">
+                <button 
+                  onClick={() => setModalType("terms")} 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors text-left"
+                >
                   Terms of Service
                 </button>
               </li>
               <li>
-                <button onClick={() => setModalType("methodology")} className="hover:text-foreground transition-colors text-left">
+                <button 
+                  onClick={() => setModalType("methodology")} 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors text-left"
+                >
                   Evaluation Methodology
                 </button>
               </li>

@@ -71,7 +71,10 @@ export function ResumeIntelligenceSection() {
 
             <div className="pt-2">
               <Link href="/resume">
-                <Button size="sm" className="h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold">
+                <Button 
+                  size="sm" 
+                  className="h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
+                >
                   Upload PDF for Audit
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
@@ -88,7 +91,7 @@ export function ResumeIntelligenceSection() {
 
             <div className="p-6 space-y-4 font-sans">
               {/* Bullet 1 */}
-              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-2">
+              <div className="p-4 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono-tech">
                   <span className="text-muted-foreground font-semibold">BULLET 01 • QUANTITATIVE FINANCE</span>
                   <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -104,7 +107,7 @@ export function ResumeIntelligenceSection() {
               </div>
 
               {/* Bullet 2 */}
-              <div className="p-4 rounded-lg bg-muted/30 border border-border space-y-2">
+              <div className="p-4 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono-tech">
                   <span className="text-muted-foreground font-semibold">BULLET 02 • SYSTEM SCALING</span>
                   <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -120,7 +123,7 @@ export function ResumeIntelligenceSection() {
               </div>
 
               {/* Cross-Question Warning */}
-              <div className="p-3 rounded-md bg-muted/60 border border-border text-xs font-mono-tech text-foreground space-y-1">
+              <div className="p-3 rounded-md bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs font-mono-tech text-foreground space-y-1">
                 <div className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
                   <ShieldAlert className="h-3.5 w-3.5" /> PREDICTED INTERVIEWER CROSS-QUESTION
                 </div>

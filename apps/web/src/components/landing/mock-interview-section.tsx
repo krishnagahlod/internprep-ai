@@ -79,7 +79,7 @@ export function MockInterviewSection() {
                   <button
                     key={t.id}
                     onClick={() => setActiveTrack(idx)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all text-xs font-mono-tech flex items-center justify-between ${
+                    className={`w-full text-left p-3.5 rounded-lg border transition-all text-xs font-mono-tech flex items-center justify-between focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
                       activeTrack === idx
                         ? "bg-card border-emerald-500/50 text-foreground shadow-xs"
                         : "bg-muted/40 border-border text-muted-foreground hover:text-foreground hover:bg-muted/70"
@@ -115,7 +115,10 @@ export function MockInterviewSection() {
 
             <div className="pt-2">
               <Link href="/interview">
-                <Button size="sm" className="h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold">
+                <Button 
+                  size="sm" 
+                  className="h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
+                >
                   Launch {track.label} Session
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
@@ -141,7 +144,7 @@ export function MockInterviewSection() {
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
                   <span>PARTNER PUSHBACK & INTERRUPT</span>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/40 border border-red-500/20 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
+                <div className="p-4 rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
                   "{track.turnExample.interviewer}"
                 </div>
               </div>
@@ -152,7 +155,7 @@ export function MockInterviewSection() {
                   <Mic className="h-3.5 w-3.5" />
                   <span>CANDIDATE LOGICAL DEFENSE</span>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/40 border border-emerald-500/30 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
+                <div className="p-4 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
                   "{track.turnExample.candidate}"
                 </div>
               </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, RefreshCw, CheckCircle2, AlertTriangle, ArrowRight, Volume2, MessageSquareCode } from "lucide-react";
+import { Mic, RefreshCw, CheckCircle2, AlertTriangle, ArrowRight, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const SAMPLE_BULLETS = [
@@ -78,15 +78,15 @@ export function InteractiveHeroWidget() {
     setTimeout(() => {
       setBulletIndex((prev) => (prev + 1) % SAMPLE_BULLETS.length);
       setIsRewriting(false);
-    }, 200);
+    }, 150);
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto rounded-xl border border-border bg-card overflow-hidden shadow-lg transition-colors">
-      {/* Console Header */}
-      <div className="flex flex-wrap items-center justify-between px-4 py-2.5 bg-muted/50 border-b border-border text-xs font-mono-tech text-muted-foreground">
+      {/* Console Top Header */}
+      <div className="flex flex-wrap items-center justify-between px-4 py-2.5 bg-muted/60 border-b border-border text-xs font-mono-tech text-muted-foreground">
         <div className="flex items-center gap-3">
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" aria-hidden="true">
             <span className="w-2.5 h-2.5 rounded-full bg-border"></span>
             <span className="w-2.5 h-2.5 rounded-full bg-border"></span>
             <span className="w-2.5 h-2.5 rounded-full bg-border"></span>
@@ -98,11 +98,13 @@ export function InteractiveHeroWidget() {
           </div>
         </div>
 
-        {/* Mode Switcher Tabs */}
-        <div className="flex items-center gap-1 p-0.5 rounded-md bg-background border border-border mt-2 sm:mt-0">
+        {/* Tab List */}
+        <div className="flex items-center gap-1 p-0.5 rounded-md bg-background border border-border mt-2 sm:mt-0" role="tablist" aria-label="Interactive Sandbox Tools">
           <button
+            role="tab"
+            aria-selected={activeTab === "case"}
             onClick={() => setActiveTab("case")}
-            className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+            className={`px-3 py-1.5 rounded text-xs font-medium focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
               activeTab === "case"
                 ? "bg-card text-foreground font-semibold shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -111,8 +113,10 @@ export function InteractiveHeroWidget() {
             Case Interview Simulator
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === "resume"}
             onClick={() => setActiveTab("resume")}
-            className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+            className={`px-3 py-1.5 rounded text-xs font-medium focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
               activeTab === "resume"
                 ? "bg-card text-foreground font-semibold shadow-xs border border-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -129,9 +133,9 @@ export function InteractiveHeroWidget() {
           {activeTab === "case" ? (
             <motion.div
               key="case-tab"
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
+              exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
               className="space-y-6"
             >
@@ -156,7 +160,7 @@ export function InteractiveHeroWidget() {
                       setCaseIndex((prev) => (prev + 1) % CASE_SCENARIOS.length);
                       setIsPushbackActive(false);
                     }}
-                    className="flex items-center gap-1 text-xs font-mono-tech px-2.5 py-1 rounded bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
+                    className="flex items-center gap-1.5 text-xs font-mono-tech px-2.5 py-1.5 rounded bg-muted hover:bg-muted/80 text-foreground border border-border focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                   >
                     <RefreshCw className="h-3 w-3 text-muted-foreground" />
                     Switch Case Track
@@ -188,7 +192,7 @@ export function InteractiveHeroWidget() {
                     </span>
                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold">High Logic Density</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans">
                     "{currentCase.candidateResponse}"
                   </p>
 
@@ -197,7 +201,7 @@ export function InteractiveHeroWidget() {
                       onClick={() => setIsPushbackActive(!isPushbackActive)}
                       size="sm"
                       variant="outline"
-                      className="h-7 text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                      className="h-8 text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98]"
                     >
                       {isPushbackActive ? "Reset to Initial Prompt" : "Simulate Partner Pushback →"}
                     </Button>
@@ -239,9 +243,9 @@ export function InteractiveHeroWidget() {
           ) : (
             <motion.div
               key="resume-tab"
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
+              exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
               className="space-y-6"
             >
@@ -252,7 +256,7 @@ export function InteractiveHeroWidget() {
                 </div>
                 <button
                   onClick={handleNextBullet}
-                  className="flex items-center gap-1 text-xs font-mono-tech px-2.5 py-1 rounded bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-mono-tech px-2.5 py-1.5 rounded bg-muted hover:bg-muted/80 text-foreground border border-border focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                 >
                   <RefreshCw className={`h-3 w-3 text-muted-foreground ${isRewriting ? "animate-spin" : ""}`} />
                   Test Another Bullet
@@ -262,7 +266,7 @@ export function InteractiveHeroWidget() {
               {/* Before & After Split */}
               <div className="grid md:grid-cols-2 gap-5">
                 {/* Draft Box */}
-                <div className="p-4 rounded-lg bg-muted/40 border border-red-500/20 space-y-3">
+                <div className="p-4 rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono-tech">
                     <span className="text-red-600 dark:text-red-400 flex items-center gap-1.5 font-semibold">
                       <AlertTriangle className="h-3.5 w-3.5" />
@@ -279,7 +283,7 @@ export function InteractiveHeroWidget() {
                 </div>
 
                 {/* Optimized Box */}
-                <div className="p-4 rounded-lg bg-muted/40 border border-emerald-500/30 space-y-3">
+                <div className="p-4 rounded-lg bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono-tech">
                     <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-semibold">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -301,7 +305,7 @@ export function InteractiveHeroWidget() {
       </div>
 
       {/* Console Bottom Bar */}
-      <div className="flex flex-wrap items-center justify-between px-5 py-2.5 bg-muted/50 border-t border-border text-xs font-mono-tech text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between px-5 py-2.5 bg-muted/60 border-t border-border text-xs font-mono-tech text-muted-foreground">
         <div className="flex items-center gap-4">
           <span>BACKEND: FastAPI + Cerebras Llama-3.3 70B</span>
           <span>EMBEDDINGS: pgvector</span>

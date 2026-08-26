@@ -60,12 +60,13 @@ export function FaqSection() {
               >
                 <button
                   onClick={() => setOpenIndex(isOpen ? null : idx)}
-                  className="w-full flex items-center justify-between p-5 text-left focus:outline-none"
+                  className="w-full flex items-center justify-between p-5 min-h-[52px] text-left focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                  aria-expanded={isOpen}
                 >
                   <span className="font-semibold text-sm sm:text-base text-foreground">
                     {faq.question}
                   </span>
-                  <div className="shrink-0 ml-4 text-muted-foreground">
+                  <div className="shrink-0 ml-4 text-muted-foreground" aria-hidden="true">
                     {isOpen ? <Minus className="w-4 h-4 text-foreground" /> : <Plus className="w-4 h-4" />}
                   </div>
                 </button>

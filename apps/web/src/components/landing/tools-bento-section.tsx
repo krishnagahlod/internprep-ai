@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FileCheck, BarChart2, ArrowRight, CheckCircle2, History, Layers } from "lucide-react";
+import { FileCheck, BarChart2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export function ToolsBentoSection() {
@@ -54,11 +54,17 @@ export function ToolsBentoSection() {
             </div>
 
             <div className="pt-4 border-t border-border flex items-center gap-4">
-              <Link href="/ats-checker" className="inline-flex items-center text-xs font-mono-tech text-emerald-600 dark:text-emerald-400 hover:underline">
+              <Link 
+                href="/ats-checker" 
+                className="inline-flex items-center text-xs font-mono-tech text-emerald-600 dark:text-emerald-400 hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded"
+              >
                 Launch ATS Checker <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
               <span className="text-border">•</span>
-              <Link href="/resume-builder" className="inline-flex items-center text-xs font-mono-tech text-muted-foreground hover:text-foreground">
+              <Link 
+                href="/resume-builder" 
+                className="inline-flex items-center text-xs font-mono-tech text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded"
+              >
                 Open Resume Studio
               </Link>
             </div>
@@ -99,7 +105,10 @@ export function ToolsBentoSection() {
             </div>
 
             <div className="pt-4 border-t border-border">
-              <Link href="/dashboard" className="inline-flex items-center text-xs font-mono-tech text-blue-600 dark:text-blue-400 hover:underline">
+              <Link 
+                href="/dashboard" 
+                className="inline-flex items-center text-xs font-mono-tech text-blue-600 dark:text-blue-400 hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded"
+              >
                 Explore Candidate Dashboard <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Link>
             </div>
