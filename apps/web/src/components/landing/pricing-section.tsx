@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, ShieldCheck, Check } from "lucide-react";
+import { ArrowRight, ShieldCheck, Check, Zap, Sparkles, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -62,17 +61,17 @@ const SUBSCRIPTION_PLANS = [
     credits: "Unlimited Resumes + 10 Mocks / mo",
     highlights: [
       "Unlimited Resume Intelligence Audits",
-      "10 Mock Interview Sessions / month",
+      "10 Full Mock Interview Sessions / month",
       "ATS checker & Resume Studio access",
       "Historical progression analytics"
     ],
-    cta: "Start Monthly",
+    cta: "Start Monthly Plan",
     isPopular: false
   },
   {
     name: "Placement Season Pass",
     price: "₹699",
-    billing: "Billed for 3 months",
+    billing: "Billed for 3 months (₹233/mo)",
     badge: "Semester Favorite",
     credits: "Unlimited Resumes + 35 Mocks Total",
     highlights: [
@@ -88,9 +87,6 @@ const SUBSCRIPTION_PLANS = [
 ];
 
 export function PricingSection() {
-  const [pricingMode, setPricingMode] = useState<"passes" | "subscription">("passes");
-  const plans = pricingMode === "passes" ? MICRO_PASSES : SUBSCRIPTION_PLANS;
-
   return (
     <section id="pricing" className="py-20 border-b border-border bg-background transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -100,115 +96,153 @@ export function PricingSection() {
           <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
             [PRICING]
           </span>
-          <span className="text-xs font-mono-tech text-muted-foreground">TRANSPARENT PASSES</span>
+          <span className="text-xs font-mono-tech text-muted-foreground">ALL-IN-ONE TRANSPARENT PRICING</span>
         </div>
 
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-4 max-w-3xl">
-          Purchase exact credits when you need them, or activate a Season Pass.
+          Purchase exact credits as you need them, or activate a Season Pass.
         </h2>
 
-        <p className="text-sm sm:text-base text-muted-foreground mb-10 max-w-2xl font-sans">
-          Top-up passes never expire. Your credits remain in your account permanently until used.
+        <p className="text-sm sm:text-base text-muted-foreground mb-12 max-w-3xl font-sans">
+          Zero hidden fees. Top-up passes never expire and remain permanently in your account. Subscriptions provide bulk monthly quotas for intensive placement prep.
         </p>
 
-        {/* Toggle Switch */}
-        <div className="flex items-center gap-2 mb-10">
-          <div className="p-1 rounded-lg bg-muted/60 border border-border inline-flex" role="group" aria-label="Pricing Type Selector">
-            <button
-              onClick={() => setPricingMode("passes")}
-              className={`px-4 py-2 min-h-[40px] rounded-md text-xs font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
-                pricingMode === "passes"
-                  ? "bg-card text-foreground font-semibold shadow-xs border border-border"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              1-Time Top-Up Passes
-            </button>
-            <button
-              onClick={() => setPricingMode("subscription")}
-              className={`px-4 py-2 min-h-[40px] rounded-md text-xs font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-all ${
-                pricingMode === "subscription"
-                  ? "bg-card text-foreground font-semibold shadow-xs border border-border"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Semester Subscriptions
-            </button>
+        {/* SECTION 1: 1-Time Top-Up Passes (Pay-as-you-go) */}
+        <div className="space-y-4 mb-14">
+          <div className="flex items-center gap-2 text-xs font-mono-tech text-foreground font-bold">
+            <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="uppercase">1-Time Top-Up Credit Passes (Non-Expiring)</span>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {MICRO_PASSES.map((p, idx) => (
+              <div
+                key={idx}
+                className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
+                  p.isPopular
+                    ? "bg-card border-emerald-500 shadow-sm ring-1 ring-emerald-500/20"
+                    : "bg-card border-border shadow-xs"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs font-mono-tech mb-4">
+                    <span className="text-muted-foreground font-semibold uppercase">{p.name}</span>
+                    <span className={`px-2 py-0.5 rounded text-[11px] ${
+                      p.isPopular
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold"
+                        : "bg-muted text-muted-foreground border border-border"
+                    }`}>
+                      {p.badge}
+                    </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-3xl sm:text-4xl font-bold text-foreground font-mono-tech">{p.price}</div>
+                    <div className="text-xs text-muted-foreground font-mono-tech mt-1">{p.billing}</div>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-muted/50 border border-border text-xs font-mono-tech text-emerald-600 dark:text-emerald-400 font-medium mb-6">
+                    {p.credits}
+                  </div>
+
+                  <div className="space-y-2.5 mb-8 text-xs text-muted-foreground font-sans">
+                    {p.highlights.map((h, hIdx) => (
+                      <div key={hIdx} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{h}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Link href="/billing" className="w-full">
+                  <Button
+                    size="sm"
+                    className={`w-full h-11 rounded-md text-xs font-semibold font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all ${
+                      p.isPopular
+                        ? "bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-sm"
+                        : "bg-foreground text-background hover:bg-foreground/90"
+                    }`}
+                  >
+                    {p.cta}
+                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Pricing Cards Grid */}
-        <div className={`grid gap-6 ${pricingMode === "passes" ? "md:grid-cols-3" : "md:grid-cols-2 max-w-4xl"}`}>
-          {plans.map((p, idx) => (
-            <div
-              key={idx}
-              className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
-                p.isPopular
-                  ? "bg-card border-emerald-500 shadow-sm ring-1 ring-emerald-500/20"
-                  : "bg-card border-border shadow-xs"
-              }`}
-            >
-              <div>
-                {/* Header */}
-                <div className="flex items-center justify-between text-xs font-mono-tech mb-4">
-                  <span className="text-muted-foreground font-semibold uppercase">{p.name}</span>
-                  <span className={`px-2 py-0.5 rounded text-[11px] ${
-                    p.isPopular
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold"
-                      : "bg-muted text-muted-foreground border border-border"
-                  }`}>
-                    {p.badge}
-                  </span>
+        {/* SECTION 2: Semester Subscriptions */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-mono-tech text-foreground font-bold">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="uppercase">Placement Season Subscriptions (Bulk Value)</span>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {SUBSCRIPTION_PLANS.map((p, idx) => (
+              <div
+                key={idx}
+                className={`rounded-xl border p-6 sm:p-8 flex flex-col justify-between transition-all ${
+                  p.isPopular
+                    ? "bg-card border-primary/50 shadow-sm ring-1 ring-primary/20"
+                    : "bg-card border-border shadow-xs"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between text-xs font-mono-tech mb-4">
+                    <span className="text-muted-foreground font-semibold uppercase">{p.name}</span>
+                    <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                      p.isPopular
+                        ? "bg-primary/10 text-primary border border-primary/20"
+                        : "bg-muted text-muted-foreground border border-border"
+                    }`}>
+                      {p.badge}
+                    </span>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="text-3xl sm:text-4xl font-bold text-foreground font-mono-tech">{p.price}</div>
+                    <div className="text-xs text-muted-foreground font-mono-tech mt-1">{p.billing}</div>
+                  </div>
+
+                  <div className="p-2.5 rounded bg-muted/50 border border-border text-xs font-mono-tech text-primary font-medium mb-6">
+                    {p.credits}
+                  </div>
+
+                  <div className="space-y-2.5 mb-8 text-xs text-muted-foreground font-sans">
+                    {p.highlights.map((h, hIdx) => (
+                      <div key={hIdx} className="flex items-start gap-2">
+                        <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                        <span>{h}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Price */}
-                <div className="mb-4">
-                  <div className="text-3xl sm:text-4xl font-bold text-foreground font-mono-tech">{p.price}</div>
-                  <div className="text-xs text-muted-foreground font-mono-tech mt-1">{p.billing}</div>
-                </div>
-
-                {/* Credit Summary */}
-                <div className="p-2.5 rounded bg-muted/50 border border-border text-xs font-mono-tech text-emerald-600 dark:text-emerald-400 font-medium mb-6">
-                  {p.credits}
-                </div>
-
-                {/* Feature Checklist */}
-                <div className="space-y-2.5 mb-8 text-xs text-muted-foreground font-sans">
-                  {p.highlights.map((h, hIdx) => (
-                    <div key={hIdx} className="flex items-start gap-2">
-                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <span>{h}</span>
-                    </div>
-                  ))}
-                </div>
+                <Link href="/billing" className="w-full">
+                  <Button
+                    size="sm"
+                    className="w-full h-11 rounded-md text-xs font-semibold font-mono-tech bg-foreground text-background hover:bg-foreground/90 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
+                  >
+                    {p.cta}
+                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </Link>
               </div>
-
-              {/* Action Button */}
-              <Link href="/billing" className="w-full">
-                <Button
-                  size="sm"
-                  className={`w-full h-11 rounded-md text-xs font-semibold font-mono-tech focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all ${
-                    p.isPopular
-                      ? "bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-sm"
-                      : "bg-foreground text-background hover:bg-foreground/90"
-                  }`}
-                >
-                  {p.cta}
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Security & Lifetime Guarantee */}
-        <div className="mt-10 p-4 rounded-lg bg-card border border-border flex flex-wrap items-center justify-between gap-4 text-xs font-mono-tech text-muted-foreground shadow-xs">
+        {/* Security & Guarantee Banner */}
+        <div className="mt-12 p-4 rounded-lg bg-card border border-border flex flex-wrap items-center justify-between gap-4 text-xs font-mono-tech text-muted-foreground shadow-xs">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span>Razorpay Secure Encrypted 256-Bit Checkout</span>
           </div>
-          <div className="text-muted-foreground">
-            Top-up credits never expire and remain permanently in your account.
+          <div className="text-foreground">
+            IIT Bombay (@iitb.ac.in) students receive 100% free access upon login.
           </div>
         </div>
 

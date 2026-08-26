@@ -10,7 +10,7 @@ const TRACKS = [
   {
     id: "consulting",
     label: "Management Consulting",
-    persona: "4-Phase MBB Partner Engine",
+    persona: "Tier-1 Strategy & Case Engine",
     focus: "Clarification, MECE Structuring, Napkin Math, Synthesis",
     turnExample: {
       interviewer: "You assumed a 20% operating margin, but logistics in Tier-2 Indian cities carry a 40% higher return-to-origin cost. How does that reshape your unit economics?",
@@ -21,7 +21,7 @@ const TRACKS = [
   {
     id: "tech",
     label: "Systems & SWE",
-    persona: "FAANG Engineering Track",
+    persona: "Engineering & Architecture Track",
     focus: "Distributed Concurrency, Caching SLAs, Failure Modes",
     turnExample: {
       interviewer: "Your caching layer avoids database contention, but what prevents cache stampede when the 100k-key flash sale cache expires simultaneously at midnight?",
@@ -55,7 +55,7 @@ export function MockInterviewSection() {
           <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
             [CORE MODULE 01]
           </span>
-          <span className="text-xs font-mono-tech text-muted-foreground">CASE INTERVIEW SIMULATOR</span>
+          <span className="text-xs font-mono-tech text-muted-foreground">INTERVIEW SIMULATOR</span>
         </div>
 
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-12 max-w-3xl">
@@ -68,7 +68,7 @@ export function MockInterviewSection() {
           {/* Left Column: Feature Breakdown */}
           <div className="lg:col-span-5 space-y-6">
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed font-sans">
-              Powered by Cerebras Llama-3.3 running at ~1000 tokens/sec. The AI guides you through the authentic 4-phase interview lifecycle and pushes back on flawed frameworks.
+              Powered by Cerebras Llama-3.3 running at ~1000 tokens/sec. The AI guides you through authentic technical and case rounds, probing logical leaps and testing your defensibility.
             </p>
 
             {/* Track Switcher */}
@@ -105,7 +105,7 @@ export function MockInterviewSection() {
               </div>
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground font-sans">
                 <MessageSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                <span>Interrogates your logic during calculation, data interpretation, and final synthesis.</span>
+                <span>Interrogates your logic during calculation, system design, and final synthesis.</span>
               </div>
               <div className="flex items-start gap-2.5 text-xs text-muted-foreground font-sans">
                 <Layers className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -114,13 +114,13 @@ export function MockInterviewSection() {
             </div>
 
             <div className="pt-2">
-              <Link href="/interview">
+              <Link href="/interview" className="block w-full">
                 <Button 
-                  size="sm" 
-                  className="h-9 px-4 rounded-md bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
+                  size="lg" 
+                  className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 text-xs font-bold font-mono-tech shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                 >
-                  Launch {track.label} Session
-                  <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  Launch Live {track.label} Session
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             </div>
@@ -140,11 +140,11 @@ export function MockInterviewSection() {
 
               {/* Pushback Turn */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-mono-tech text-red-600 dark:text-red-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
-                  <span>PARTNER PUSHBACK & INTERRUPT</span>
+                <div className="flex items-center gap-2 text-xs font-mono-tech text-amber-600 dark:text-amber-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                  <span>INTERVIEWER CROSS-EXAMINATION & PROBING</span>
                 </div>
-                <div className="p-4 rounded-lg bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
+                <div className="p-4 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-xs sm:text-sm text-foreground font-sans leading-relaxed">
                   "{track.turnExample.interviewer}"
                 </div>
               </div>
@@ -163,7 +163,7 @@ export function MockInterviewSection() {
               {/* Verdict */}
               <div className="p-3 rounded-md bg-muted/60 border border-border flex items-center justify-between text-xs font-mono-tech">
                 <span className="text-muted-foreground">EVALUATION</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Passed Pushback • Strict Logic Verified</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Passed Probe • Strict Logic Verified</span>
               </div>
             </div>
           </div>

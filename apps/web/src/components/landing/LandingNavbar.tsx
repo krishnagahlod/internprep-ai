@@ -40,18 +40,12 @@ export function LandingNavbar() {
               InternPrep<span className="text-emerald-600 dark:text-emerald-400">.ai</span>
             </span>
           </Link>
-
-          {/* System Status Chip */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded border border-border bg-muted/50 text-[11px] font-mono-tech text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Cerebras Llama-3.3 Live</span>
-          </div>
         </div>
 
         {/* Desktop Nav Links */}
         <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-muted-foreground" aria-label="Main Navigation">
           <Link href="#simulator" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">
-            Case Simulator
+            Interview Simulator
           </Link>
           <Link href="#resume-intelligence" className="hover:text-foreground focus-visible:text-foreground focus-visible:outline-none transition-colors">
             Resume Intelligence
@@ -122,7 +116,7 @@ export function LandingNavbar() {
             onClick={() => setMobileMenuOpen(false)}
             className="block py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
-            Case Simulator
+            Interview Simulator
           </Link>
           <Link
             href="#resume-intelligence"

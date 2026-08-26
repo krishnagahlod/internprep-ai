@@ -34,7 +34,7 @@ const SAMPLE_BULLETS = [
 
 const CASE_SCENARIOS = [
   {
-    role: "McKinsey Partner Persona",
+    role: "Management Consulting Track",
     caseTitle: "FMCG Margin Turnaround",
     turn: "Phase 2: MECE Structuring",
     prompt: "Our client is experiencing a 15% margin erosion in their premium packaged foods division despite rising top-line sales. Walk me through your structure to diagnose whether this is driven by raw material inflation, channel mix, or logistical inefficiencies.",
@@ -44,21 +44,35 @@ const CASE_SCENARIOS = [
       mece: "9.6 / 10",
       acumen: "9.2 / 10",
       synthesis: "9.4 / 10",
-      verdict: "Strong Hire (Partner Track)"
+      verdict: "Strong Hire (Top 1% Benchmark)"
     }
   },
   {
-    role: "BCG Principal Persona",
-    caseTitle: "Electric Vehicle Market Entry",
-    turn: "Phase 3: Analysis & Sizing",
-    prompt: "Estimate the addressable commercial EV charging market in Tier-1 Indian metro cities by 2028. What key adoption bottlenecks will limit charging infrastructure utilization?",
-    candidateResponse: "Starting from top-down sizing: 4 major metros, 12M private registered four-wheelers, projecting 8% EV penetration by 2028 = 960k active EVs. Assuming 1 fast charger per 25 EVs gives 38,400 required commercial ports, representing an asset CapEx pool of ₹1,150 Crores.",
-    pushbackPrompt: "Your 1:25 charger ratio assumes 80% home charging overnight. If grid constraints in residential high-rises drop home charging to 30%, how does that expand your commercial port CapEx requirement?",
+    role: "Software & Systems Architecture Track",
+    caseTitle: "Flash Sale Distributed Cache",
+    turn: "Phase 3: Edge-Case Probing",
+    prompt: "Your distributed caching layer handles high read throughput, but how do you prevent a cache stampede when 100,000 flash sale product keys expire simultaneously at midnight?",
+    candidateResponse: "I will implement probabilistic early expiration with distributed mutex locks and jittered TTLs. This ensures only a single background worker regenerates the cache key while incoming traffic reads the hot replica.",
+    pushbackPrompt: "What happens if the worker acquiring the mutex crashes midway before writing the key? How do you prevent thread starvation under 50,000 QPS?",
     scores: {
-      mece: "9.7 / 10",
-      acumen: "9.5 / 10",
-      synthesis: "9.6 / 10",
-      verdict: "Strong Hire (Day 1 Ready)"
+      mece: "9.8 / 10",
+      acumen: "9.7 / 10",
+      synthesis: "9.9 / 10",
+      verdict: "Senior Level Verification"
+    }
+  },
+  {
+    role: "Quantitative Finance & Valuation Track",
+    caseTitle: "LBO Free Cash Flow Mechanics",
+    turn: "Phase 3: Financial Precision",
+    prompt: "If CapEx is $10M higher than Depreciation, walk me through how this flows through the three financial statements and its impact on Unlevered Free Cash Flow.",
+    candidateResponse: "Income Statement is unaffected initially. On the Cash Flow Statement: Cash from Operations is unchanged, Cash from Investing decreases by $10M. On the Balance Sheet: Cash is down $10M, PP&E is up $10M. Unlevered FCF decreases by $10M.",
+    pushbackPrompt: "If the asset was 60% funded via 8% debt with 3-year amortization, how does interest expense flow into Net Income next year assuming a 25% tax rate?",
+    scores: {
+      mece: "9.9 / 10",
+      acumen: "9.8 / 10",
+      synthesis: "10.0 / 10",
+      verdict: "Top Quartile Analyst"
     }
   }
 ];
@@ -110,7 +124,7 @@ export function InteractiveHeroWidget() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Case Interview Simulator
+            Interview Simulator
           </button>
           <button
             role="tab"
@@ -143,7 +157,7 @@ export function InteractiveHeroWidget() {
               <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-mono-tech text-xs font-semibold">
-                    01
+                    0{caseIndex + 1}
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground font-mono-tech">{currentCase.role}</div>
@@ -163,7 +177,7 @@ export function InteractiveHeroWidget() {
                     className="flex items-center gap-1.5 text-xs font-mono-tech px-2.5 py-1.5 rounded bg-muted hover:bg-muted/80 text-foreground border border-border focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] transition-all"
                   >
                     <RefreshCw className="h-3 w-3 text-muted-foreground" />
-                    Switch Case Track
+                    Switch Role Track ({caseIndex + 1}/{CASE_SCENARIOS.length})
                   </button>
                 </div>
               </div>
@@ -173,7 +187,7 @@ export function InteractiveHeroWidget() {
                 <div className="flex items-center justify-between text-xs font-mono-tech text-emerald-600 dark:text-emerald-400">
                   <span className="flex items-center gap-1.5 font-semibold">
                     <Volume2 className="h-3.5 w-3.5" />
-                    INTERVIEWER PROMPT (PHASE-AWARE ENGINE)
+                    INTERVIEWER PROMPT (ROLE-SPECIFIC ENGINE)
                   </span>
                   <span className="text-muted-foreground">LATENCY: &lt; 150MS</span>
                 </div>
@@ -188,9 +202,9 @@ export function InteractiveHeroWidget() {
                   <div className="flex items-center justify-between text-xs font-mono-tech text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <Mic className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                      CANDIDATE STRUCTURING & RESPONSE
+                      CANDIDATE LOGICAL DEFENSE
                     </span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">High Logic Density</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">High Technical Depth</span>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans">
                     "{currentCase.candidateResponse}"
@@ -201,9 +215,9 @@ export function InteractiveHeroWidget() {
                       onClick={() => setIsPushbackActive(!isPushbackActive)}
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98]"
+                      className="h-8 text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none active:scale-[0.98] font-mono-tech"
                     >
-                      {isPushbackActive ? "Reset to Initial Prompt" : "Simulate Partner Pushback →"}
+                      {isPushbackActive ? "Reset to Base Prompt" : "Trigger Edge-Case Cross-Examination →"}
                     </Button>
                   </div>
                 </div>
@@ -213,20 +227,20 @@ export function InteractiveHeroWidget() {
                   <div>
                     <div className="text-xs font-mono-tech text-muted-foreground mb-3 flex items-center justify-between">
                       <span>EVALUATION RUBRIC</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">MBB BENCHMARK</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">DAY 1 STANDARD</span>
                     </div>
 
                     <div className="space-y-2 text-xs font-mono-tech">
                       <div className="flex justify-between items-center py-1 border-b border-border/50">
-                        <span className="text-muted-foreground">MECE Structuring</span>
+                        <span className="text-muted-foreground">Problem Structuring</span>
                         <span className="text-foreground font-semibold">{currentCase.scores.mece}</span>
                       </div>
                       <div className="flex justify-between items-center py-1 border-b border-border/50">
-                        <span className="text-muted-foreground">Business Acumen</span>
+                        <span className="text-muted-foreground">Technical Rigor</span>
                         <span className="text-foreground font-semibold">{currentCase.scores.acumen}</span>
                       </div>
                       <div className="flex justify-between items-center py-1 border-b border-border/50">
-                        <span className="text-muted-foreground">Synthesis & Math</span>
+                        <span className="text-muted-foreground">Synthesis & Delivery</span>
                         <span className="text-foreground font-semibold">{currentCase.scores.synthesis}</span>
                       </div>
                     </div>
