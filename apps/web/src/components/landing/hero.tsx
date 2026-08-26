@@ -85,7 +85,7 @@ export function Hero() {
         </div>
 
         {/* Trust Signals */}
-        <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-mono-tech text-muted-foreground mb-16">
+        <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-mono-tech text-muted-foreground mb-14">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span>NO CREDIT CARD REQUIRED</span>
@@ -102,15 +102,13 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Embedded Interactive Sandbox */}
+        {/* Embedded Interactive Sandbox (Clean, no weird blur gradient) */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
           className="relative"
         >
-          {/* Subtle Ambient Glow Behind Widget */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/10 via-transparent to-teal-500/10 rounded-2xl blur-xl pointer-events-none" />
           <InteractiveHeroWidget />
         </motion.div>
 

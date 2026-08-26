@@ -1,28 +1,28 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { GraduationCap, ShieldCheck, CheckCircle2, MessageSquare } from "lucide-react";
+import { GraduationCap, ShieldCheck, Quote, Sparkles } from "lucide-react";
 
 const IITB_TESTIMONIALS = [
   {
     initials: "RV",
     name: "Rahul V.",
-    dept: "IIT Bombay (B.Tech Mechanical '25)",
-    role: "Consulting & Case Prep",
+    campus: "IIT Bombay",
+    track: "Consulting & Case Prep",
     quote: "The live edge-case probing was surprisingly realistic. Having the AI interrupt when my contribution margin napkin math didn't add up forced me to be much more rigorous in my actual consulting round."
   },
   {
     initials: "SS",
     name: "Siddharth S.",
-    dept: "IIT Bombay (Dual Degree CSE '25)",
-    role: "Software Systems Track",
+    campus: "IIT Bombay",
+    track: "Software Systems Track",
     quote: "The resume scanner flagged that my distributed systems bullet lacked quantifiable throughput metrics. Rewriting it according to the Google XYZ diff format gave it a much stronger technical punch."
   },
   {
     initials: "AG",
     name: "Ananya G.",
-    dept: "IIT Bombay (B.Tech Electrical '25)",
-    role: "Analytics & Quant Track",
+    campus: "IIT Bombay",
+    track: "Analytics & Quant Track",
     quote: "The 7-dimension post-interview rubric was super helpful for spotting logic gaps in my causal experimentation framework before our campus Day 1 shortlist interviews."
   }
 ];
@@ -51,34 +51,32 @@ export function TestimonialsSection() {
           </div>
         </div>
 
-        {/* 3 Clean Compact Cards */}
+        {/* 3 Grounded Compact Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           {IITB_TESTIMONIALS.map((item, idx) => (
             <div
               key={idx}
-              className="rounded-xl border border-border bg-card p-6 flex flex-col justify-between shadow-xs hover:border-emerald-500/30 transition-all space-y-4"
+              className="rounded-xl border border-border bg-card p-6 flex flex-col justify-between shadow-xs hover:border-emerald-500/30 transition-all space-y-4 relative group"
             >
               <div className="space-y-3.5">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-border text-xs font-mono-tech">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                       {item.initials}
                     </div>
                     <div>
-                      <div className="text-foreground font-bold text-xs">{item.name}</div>
-                      <div className="text-[11px] text-muted-foreground">{item.dept}</div>
+                      <div className="text-foreground font-bold text-sm">{item.name}</div>
+                      <div className="text-[11px] text-muted-foreground">{item.campus}</div>
                     </div>
                   </div>
-                </div>
-
-                {/* Track Badge */}
-                <div className="inline-block px-2 py-0.5 rounded bg-muted text-emerald-600 dark:text-emerald-400 text-[11px] font-mono-tech font-semibold border border-border">
-                  {item.role}
+                  <span className="px-2 py-0.5 rounded-full bg-muted text-emerald-600 dark:text-emerald-400 text-[11px] font-mono-tech font-semibold border border-border">
+                    {item.track}
+                  </span>
                 </div>
 
                 {/* Quote */}
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans italic">
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans italic pt-1">
                   "{item.quote}"
                 </p>
               </div>
