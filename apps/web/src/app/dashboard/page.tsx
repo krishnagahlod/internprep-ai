@@ -113,15 +113,22 @@ export default function DashboardPage() {
     
     setUploadingResume(true)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/interview/start_domain`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           domain: selectedDomain,
           company: targetCompanyName,
           resume_id: selectedResumeId,
-          user_id: user?.id
+          user_id: user?.id || (isGuest ? "guest" : undefined)
         })
       })
 

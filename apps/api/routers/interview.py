@@ -43,6 +43,7 @@ class ChatRequest(BaseModel):
     domain: Optional[str] = None
     company: Optional[str] = None
     resume_context: Optional[str] = None
+    user_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -177,18 +178,15 @@ async def start_domain_endpoint(
                 request_id=request.headers.get("x-request-id")
             )
     try:
-        initial_phase = "introduction"
-        
-        resume_context = "No resume provided."
+        resume_context = "No resume attached. Use standard candidate profile."
         file_url = ""
         if body.resume_id and supabase:
-            res = supabase.table("resumes").select("parsed_content, file_url").eq("id", body.resume_id).execute()
+            res = supabase.table("resumes").select("parsed_text, file_url").eq("id", body.resume_id).execute()
             if res.data:
-                if res.data[0].get("parsed_content"):
-                    resume_context = res.data[0]["parsed_content"]
-                if res.data[0].get("file_url"):
-                    file_url = res.data[0]["file_url"]
-        
+                resume_context = res.data[0].get("parsed_text", "")
+                file_url = res.data[0].get("file_url", "")
+                
+        initial_phase = "introduction"
         bot_reply, next_phase = generate_domain_interview_response(
             history=[],
             current_phase=initial_phase,
@@ -204,8 +202,8 @@ async def start_domain_endpoint(
                 "status": "in_progress",
                 "case_state": {"current_phase": next_phase, "domain": body.domain, "company": body.company, "resume_context": resume_context, "case_source": file_url}
             }
-            if body.user_id:
-                insert_data["user_id"] = body.user_id
+            if effective_user_id:
+                insert_data["user_id"] = effective_user_id
                 
             res = supabase.table("interview_sessions").insert(insert_data).execute()
             if res.data:
@@ -217,9 +215,9 @@ async def start_domain_endpoint(
                     "phase": initial_phase
                 }).execute()
         
-        if posthog_client and body.user_id:
+        if posthog_client and effective_user_id:
             posthog_client.capture(
-                distinct_id=body.user_id, 
+                distinct_id=effective_user_id, 
                 event='interview_started', 
                 properties={
                     'interview_type': 'domain',
@@ -251,6 +249,7 @@ async def chat_endpoint(
     try:
         history = [{"role": m.role, "content": m.content} for m in body.messages]
         user_turns = sum(1 for m in history if m.get("role") == "user")
+        effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
         
         # Determine user tier
         is_paid = False
@@ -260,22 +259,27 @@ async def chat_endpoint(
             else:
                 ent = EntitlementService.get_active_entitlement(user_id=auth_user.id, user_email=auth_user.email)
                 pk = ent.get("plan_key", "free")
-                if pk.startswith("pro") or pk == "lifetime" or pk == "admin":
+                if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
                     is_paid = True
                 else:
                     # Check topup credits
                     mock_credits = UsageService.get_topup_balance(auth_user.id, "mock_interview")
                     if mock_credits > 0:
                         is_paid = True
+        elif effective_user_id:
+            ent = EntitlementService.get_active_entitlement(user_id=effective_user_id)
+            pk = ent.get("plan_key", "free")
+            if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
+                is_paid = True
+            else:
+                mock_credits = UsageService.get_topup_balance(effective_user_id, "mock_interview")
+                if mock_credits > 0:
+                    is_paid = True
 
-        # 1. Free tier teaser cutoff at 4 questions
+        # 1. Free tier teaser cutoff at 4 questions - NO in-character interviewer paywall chat text!
         if not is_paid and user_turns >= 4:
-            teaser_reply = (
-                "🎯 **Great progress on this initial phase!** You have completed the 4-question trial preview of this interview session.\n\n"
-                "To continue exploring the remaining technical follow-ups, synthesize your recommendation, and unlock your **Comprehensive AI Scorecard & Rubric**, please upgrade to **InternPrep Pro** or get a **Single Mock Pass (₹79)**."
-            )
             return ChatResponse(
-                response=teaser_reply,
+                response="",
                 new_phase="trial_limit_reached",
                 is_paywall_locked=True,
                 turn_count=user_turns,
@@ -285,8 +289,8 @@ async def chat_endpoint(
         # 2. Paid user cap at 18-20 turns with graceful wrap-up
         if user_turns >= 19:
             wrapup_reply = (
-                "👏 **Excellent analysis!** We have thoroughly covered the case framework, quantitative estimation, and risk synthesis over our 40-minute session.\n\n"
-                "We have reached the conclusion of this interview. Please click **'End & Generate Scorecard'** below to receive your detailed dimensional evaluation and recruiter feedback!"
+                "👏 **Excellent analysis!** We have thoroughly covered the case framework, quantitative estimation, and risk synthesis over our session.\n\n"
+                "We have reached the conclusion of this interview. Please click **'End & Generate Scorecard'** below to receive your comprehensive rubric evaluation and recruiter feedback!"
             )
             return ChatResponse(
                 response=wrapup_reply,

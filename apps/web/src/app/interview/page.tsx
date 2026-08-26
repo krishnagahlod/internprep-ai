@@ -9,7 +9,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { 
   Mic, Send, PenTool, ArrowLeft, Loader2, 
   Volume2, VolumeX, Lightbulb, FileText, Bot, 
-  User, Play, Clock, CheckCircle2, ExternalLink, X, Sparkles 
+  User, Play, Clock, CheckCircle2, ExternalLink, X, Sparkles,
+  Lock, Zap
 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import dynamic from "next/dynamic"
@@ -74,6 +75,7 @@ function InterviewEngine() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [isTimerRunning, setIsTimerRunning] = useState(false)
   const [interviewMode, setInterviewMode] = useState<"case" | "domain">("case")
+  const [isPaywallLocked, setIsPaywallLocked] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [paywallMeta, setPaywallMeta] = useState<{
     title?: string
@@ -178,14 +180,21 @@ function InterviewEngine() {
     setShowSetupModal(false)
     setIsTyping(true)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       
       const response = await fetch(`${API_URL}/interview/start_case`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           case_type: selectedCaseType,
-          user_id: user?.id
+          user_id: user?.id || (isGuest ? "guest" : undefined)
         })
       })
 
@@ -243,7 +252,7 @@ function InterviewEngine() {
             }
           }
           if (finalTranscript) {
-            setInputValue((prev) => prev + (prev ? " " : "") + finalTranscript)
+            setInputValue((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript))
           }
         }
         recognition.onerror = () => setIsListening(false)
@@ -287,10 +296,17 @@ function InterviewEngine() {
     if (messages.length === 0) return
     setIsTyping(true)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/interview/hint`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           session_id: currentSessionId || "temp_session_id",
           messages: messages,
@@ -313,7 +329,7 @@ function InterviewEngine() {
   }
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() || isPaywallLocked) return
 
     if (window.speechSynthesis) window.speechSynthesis.cancel()
 
@@ -323,10 +339,17 @@ function InterviewEngine() {
     setIsTyping(true)
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/interview/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           session_id: currentSessionId || "temp_session_id",
           messages: newMessages,
@@ -337,7 +360,8 @@ function InterviewEngine() {
           interview_type: interviewMode,
           domain: "",
           company: "",
-          resume_context: interviewMode === "domain" ? caseContext : undefined
+          resume_context: interviewMode === "domain" ? caseContext : undefined,
+          user_id: user?.id || (isGuest ? "guest" : undefined)
         }),
       })
 
@@ -345,23 +369,27 @@ function InterviewEngine() {
 
       const data = await response.json()
       
-      setMessages([...newMessages, { role: "assistant", content: data.response }])
-      
-      if (ttsEnabled) {
-        speakResponse(data.response)
-      }
-      
-      if (data.new_phase) {
-        setCurrentPhase(data.new_phase)
-      }
-
       if (data.is_paywall_locked) {
+        setIsPaywallLocked(true)
+        if (data.response && data.response.trim()) {
+          setMessages([...newMessages, { role: "assistant", content: data.response }])
+        }
         setPaywallMeta({
-          title: "Trial Preview Completed • Unlock Full Mock Interview",
-          description: "You've completed the 4-question trial preview! Unlock the full 45-minute technical session, dynamic follow-ups, and dimensional AI scorecard with rubrics.",
+          title: "Trial Limit Reached (4 Free Questions)",
+          description: "You've completed your free 4-question trial preview! Unlock the full 45-minute simulation, dynamic edge-case follow-ups, and comprehensive partner rubric scorecard.",
           featureKey: "mock_interview"
         })
         setPaywallOpen(true)
+      } else {
+        if (data.response && data.response.trim()) {
+          setMessages([...newMessages, { role: "assistant", content: data.response }])
+          if (ttsEnabled) {
+            speakResponse(data.response)
+          }
+        }
+        if (data.new_phase) {
+          setCurrentPhase(data.new_phase)
+        }
       }
 
     } catch (error) {
@@ -681,6 +709,41 @@ function InterviewEngine() {
           {/* Chat Omnibar */}
           <div className="shrink-0 p-4 border-t border-border bg-card/60">
             <div className="max-w-2xl mx-auto space-y-2">
+              
+              {/* In-Chat Paywall Notice */}
+              {isPaywallLocked && (
+                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs font-mono-tech space-y-2.5 mb-2 shadow-xs animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <Lock className="h-4 w-4" /> TRIAL PREVIEW COMPLETED (4 QUESTIONS)
+                    </span>
+                    <span className="text-[10px] text-muted-foreground bg-background/80 border border-border px-2 py-0.5 rounded">
+                      Free Preview
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground font-sans text-xs leading-relaxed">
+                    You have completed your 4 free trial questions. Unlock the full 45-minute simulation with live partner pushbacks, dynamic technical follow-ups, and receive your comprehensive candidate scorecard.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button 
+                      size="sm" 
+                      onClick={() => setPaywallOpen(true)} 
+                      className="h-8 text-xs font-bold bg-primary text-primary-foreground shadow-xs focus-visible:ring-2 focus-visible:ring-emerald-500"
+                    >
+                      <Zap className="h-3.5 w-3.5 mr-1.5" /> Unlock Full Simulation & Scorecard →
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleEndSession} 
+                      className="h-8 text-xs border-border"
+                    >
+                      End & Generate Preview Scorecard
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-center px-1">
                 <span className="text-[10px] font-mono-tech uppercase tracking-wider text-muted-foreground">Candidate Turn</span>
                 <Button 
@@ -688,20 +751,21 @@ function InterviewEngine() {
                   size="sm" 
                   className="h-6 px-2 text-[10px] font-mono-tech text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
                   onClick={handleGetHint}
-                  disabled={isTyping || messages.length === 0}
+                  disabled={isTyping || messages.length === 0 || isPaywallLocked}
                 >
                   <Lightbulb className="h-3 w-3 mr-1" />
                   Request Hint
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-background border border-border focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
+              <div className={`flex items-center gap-2 p-1.5 rounded-lg bg-background border border-border focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 ${isPaywallLocked ? 'opacity-60 pointer-events-none' : ''}`}>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   className={`h-8 w-8 rounded shrink-0 ${isListening ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
                   onClick={toggleListening}
                   title={isListening ? "Stop Dictation" : "Start Voice Input"}
+                  disabled={isPaywallLocked}
                 >
                   <Mic className="h-4 w-4" />
                 </Button>
@@ -720,7 +784,7 @@ function InterviewEngine() {
                 </Button>
 
                 <textarea 
-                  placeholder={isListening ? "Listening to your dictation..." : "Speak or type your logical structuring..."}
+                  placeholder={isPaywallLocked ? "Trial completed. Unlock full session to continue..." : isListening ? "Listening to your dictation..." : "Speak or type your logical structuring..."}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -730,13 +794,13 @@ function InterviewEngine() {
                     }
                   }}
                   className="flex-1 border-0 bg-transparent focus-visible:outline-none px-2 py-1.5 text-xs sm:text-sm placeholder:text-muted-foreground text-foreground font-sans resize-none min-h-[36px] max-h-[120px]"
-                  disabled={isTyping}
+                  disabled={isTyping || isPaywallLocked}
                   rows={1}
                 />
 
                 <Button 
                   onClick={handleSendMessage} 
-                  disabled={isTyping || !inputValue.trim()} 
+                  disabled={isTyping || !inputValue.trim() || isPaywallLocked} 
                   size="icon"
                   className="h-8 w-8 rounded bg-primary hover:bg-primary/90 text-primary-foreground shrink-0 shadow-xs"
                 >
