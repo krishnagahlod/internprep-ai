@@ -5,9 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Mic, Send, PenTool, ArrowLeft, Loader2, Volume2, VolumeX, Lightbulb, FileText, Bot, User, Play, Clock, CheckCircle2, ExternalLink } from "lucide-react"
+import { 
+  Mic, Send, PenTool, ArrowLeft, Loader2, 
+  Volume2, VolumeX, Lightbulb, FileText, Bot, 
+  User, Play, Clock, CheckCircle2, ExternalLink, X, Sparkles 
+} from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import dynamic from "next/dynamic"
 import { PaywallModal } from "@/components/paywall-modal"
@@ -15,7 +18,7 @@ import { PaywallModal } from "@/components/paywall-modal"
 // Dynamically import Excalidraw to prevent SSR hydration errors
 const ExcalidrawWrapper = dynamic(
   () => import("@/components/ExcalidrawWrapper"),
-  { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-[#000000]"><Loader2 className="h-4 w-4 animate-spin text-white/50" /></div> }
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-background"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div> }
 )
 
 type Message = {
@@ -45,7 +48,7 @@ function InterviewEngine() {
   const searchParams = useSearchParams()
   const sessionIdParam = searchParams.get("id")
   const supabase = createClient()
-  const { targetCompany, currentSessionId, currentPhase, setCurrentSessionId, setCurrentPhase, isGuest, guestInterviewCount, incrementGuestInterview, user } = useAuthStore()
+  const { currentSessionId, currentPhase, setCurrentSessionId, setCurrentPhase, isGuest, guestInterviewCount, incrementGuestInterview, user } = useAuthStore()
   
   const [messages, setMessages] = useState<Message[]>([])
   const [caseContext, setCaseContext] = useState<string>("")
@@ -61,9 +64,10 @@ function InterviewEngine() {
   const [isDragging, setIsDragging] = useState(false)
   const [showResumePanel, setShowResumePanel] = useState(false)
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null)
+  
+  // Mobile Split-Pane View Switcher State (Phase 2 UX enhancement)
+  const [mobileView, setMobileView] = useState<"chat" | "canvas" | "source">("chat")
 
-  // Wait for auth to initialize before rendering
-  const [isAuthReady, setIsAuthReady] = useState(false)
   const [showSetupModal, setShowSetupModal] = useState(true)
   const [isInitializingSession, setIsInitializingSession] = useState(false)
   const [selectedCaseType, setSelectedCaseType] = useState("Random")
@@ -114,11 +118,9 @@ function InterviewEngine() {
             setIsTimerRunning(true)
           } else {
              setSessionLoadError("Failed to fetch session. Please ensure you are connected to the network.")
-             console.error("Failed to fetch session from API")
           }
         } catch (e) {
-          setSessionLoadError("Connection error while loading session. Please ensure the backend is running.")
-          console.error("Failed to resume session", e)
+          setSessionLoadError("Connection error while loading session.")
         } finally {
           setIsTyping(false)
           setIsInitializingSession(false)
@@ -251,7 +253,7 @@ function InterviewEngine() {
     }
   }, [])
 
-  // STRICT AUTO-SCROLL LOGIC
+  // Auto-scroll
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -293,7 +295,7 @@ function InterviewEngine() {
           session_id: currentSessionId || "temp_session_id",
           messages: messages,
           current_phase: currentPhase,
-          scratchpad: "", // Not sending scratchpad text
+          scratchpad: "",
           case_context: caseContext,
           case_source: caseSource
         }),
@@ -370,13 +372,6 @@ function InterviewEngine() {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
   const handleEndSession = async () => {
     if (!currentSessionId) {
       router.push("/feedback")
@@ -402,37 +397,46 @@ function InterviewEngine() {
 
   if (isInitializingSession) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-neutral-950">
+      <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-          <p className="text-sm font-medium text-slate-500">Restoring interview session...</p>
+          <div className="h-8 w-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          <p className="text-xs font-mono-tech text-muted-foreground">RESTORING INTERVIEW SESSION...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className={`flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-neutral-950 text-slate-800 dark:text-neutral-200 font-sans antialiased selection:bg-primary/20 ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
+    <div className={`flex h-screen flex-col overflow-hidden bg-background text-foreground font-sans antialiased selection:bg-primary/20 ${isDragging ? 'select-none cursor-col-resize' : ''}`}>
       
       {/* Setup Modal */}
       {showSetupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-slate-200/20 dark:border-white/10 animate-in zoom-in-95 duration-300">
-            <div className="flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mx-auto mb-6">
-              <Bot className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold text-center mb-2 font-outfit">Interview Setup</h2>
-            <p className="text-muted-foreground text-center mb-8">Select the type of case you want to practice.</p>
-            
-            <div className="space-y-4 mb-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card rounded-xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-xl border border-border">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-center text-primary">
+                <Bot className="h-5 w-5" />
+              </div>
               <div>
-                <label className="text-sm font-semibold mb-2 block">Case Type</label>
+                <h2 className="text-lg font-bold text-foreground">Interview Calibration Setup</h2>
+                <p className="text-xs text-muted-foreground">Select case type to simulate partner evaluation.</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-xs font-mono-tech uppercase tracking-wider text-muted-foreground mb-2 block">Case Framework Type</label>
                 <div className="grid grid-cols-2 gap-2">
                   {caseTypes.map(type => (
                     <Button
                       key={type}
                       variant={selectedCaseType === type ? "default" : "outline"}
-                      className={`justify-start ${selectedCaseType === type ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900' : ''}`}
+                      size="sm"
+                      className={`justify-start text-xs h-9 rounded-lg font-mono-tech ${
+                        selectedCaseType === type 
+                          ? 'bg-primary text-primary-foreground font-semibold shadow-xs' 
+                          : 'border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
                       onClick={() => setSelectedCaseType(type)}
                     >
                       {type}
@@ -442,25 +446,35 @@ function InterviewEngine() {
               </div>
             </div>
             
-            <Button onClick={handleStartCase} className="w-full h-12 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all">
-              <Play className="h-5 w-5 mr-2" /> Start Mock Interview
+            <Button 
+              onClick={handleStartCase} 
+              className="w-full h-10 text-xs font-semibold font-mono-tech bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs transition-all"
+            >
+              <Play className="h-4 w-4 mr-2" /> Start Mock Interview
             </Button>
           </div>
         </div>
       )}
 
-      <header className="flex h-14 items-center justify-between border-b border-slate-200/70 dark:border-neutral-800/70 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl px-6 shrink-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => {
-             if (window.speechSynthesis) window.speechSynthesis.cancel()
-             router.push("/dashboard")
-          }} className="text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-all duration-300 rounded-lg h-9 px-3">
-            <ArrowLeft className="h-4 w-4 mr-2" /> Save & Exit
+      {/* Main Top Header */}
+      <header className="flex h-14 items-center justify-between border-b border-border bg-card/80 backdrop-blur-md px-4 sm:px-6 shrink-0 z-10">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => {
+              if (window.speechSynthesis) window.speechSynthesis.cancel()
+              router.push("/dashboard")
+            }} 
+            className="text-muted-foreground hover:text-foreground hover:bg-muted rounded-md h-8 px-2.5 text-xs font-medium"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Save & Exit
           </Button>
-          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700" />
+
+          <div className="h-4 w-px bg-border hidden sm:block" />
           
           {/* Phase Progress Indicator */}
-          <div className="hidden lg:flex items-center gap-1.5 ml-2">
+          <div className="hidden lg:flex items-center gap-1">
             {(interviewMode === "domain" ? DOMAIN_PHASES : PHASES).map((phase, idx, arr) => {
               const isActive = currentPhase === phase.id
               const phaseIndex = arr.findIndex(p => p.id === currentPhase)
@@ -468,12 +482,18 @@ function InterviewEngine() {
               
               return (
                 <div key={phase.id} className="flex items-center">
-                  <div className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full transition-all duration-500 flex items-center ${isActive ? 'bg-primary text-primary-foreground shadow-sm scale-105' : isPast ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-neutral-500'}`}>
+                  <div className={`text-[10px] font-mono-tech font-bold uppercase tracking-wider px-2 py-0.5 rounded-md transition-all flex items-center ${
+                    isActive 
+                      ? 'bg-primary text-primary-foreground shadow-xs' 
+                      : isPast 
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                      : 'text-muted-foreground opacity-60'
+                  }`}>
                     {isPast && <CheckCircle2 className="h-3 w-3 mr-1" />}
                     {phase.label}
                   </div>
                   {idx < arr.length - 1 && (
-                    <div className={`w-3 h-px mx-1 ${isPast ? 'bg-emerald-500/30' : 'bg-slate-200 dark:bg-neutral-800'}`} />
+                    <div className={`w-2 h-px mx-1 ${isPast ? 'bg-emerald-500/30' : 'bg-border'}`} />
                   )}
                 </div>
               )
@@ -481,39 +501,63 @@ function InterviewEngine() {
           </div>
         </div>
         
+        {/* Actions & Tool Switches */}
         <div className="flex items-center gap-2">
-          {/* Timer & Pause */}
-          <div className="hidden md:flex items-center text-slate-600 dark:text-neutral-400 font-mono text-sm font-semibold bg-slate-100 dark:bg-neutral-800 rounded-md border border-slate-200 dark:border-neutral-700 overflow-hidden">
-            <div className="px-3 py-1.5 flex items-center border-r border-slate-200 dark:border-neutral-700">
-              <Clock className="h-4 w-4 mr-2 opacity-70" />
+          
+          {/* Mobile Split View Switcher */}
+          <div className="flex md:hidden p-0.5 rounded-md bg-muted border border-border text-[11px] font-mono-tech">
+            <button
+              onClick={() => setMobileView("chat")}
+              className={`px-2 py-1 rounded transition-all ${mobileView === "chat" ? "bg-card text-foreground font-bold shadow-xs" : "text-muted-foreground"}`}
+            >
+              Chat
+            </button>
+            <button
+              onClick={() => setMobileView("canvas")}
+              className={`px-2 py-1 rounded transition-all ${mobileView === "canvas" ? "bg-card text-foreground font-bold shadow-xs" : "text-muted-foreground"}`}
+            >
+              Canvas
+            </button>
+            {caseSource && (
+              <button
+                onClick={() => setMobileView("source")}
+                className={`px-2 py-1 rounded transition-all ${mobileView === "source" ? "bg-card text-foreground font-bold shadow-xs" : "text-muted-foreground"}`}
+              >
+                Doc
+              </button>
+            )}
+          </div>
+
+          {/* Timer */}
+          <div className="hidden sm:flex items-center text-muted-foreground font-mono-tech text-xs font-semibold bg-muted/60 rounded-md border border-border overflow-hidden">
+            <div className="px-2.5 py-1 flex items-center border-r border-border">
+              <Clock className="h-3.5 w-3.5 mr-1.5 opacity-70" />
               {formatTime(elapsedSeconds)}
             </div>
             <button 
               onClick={() => setIsTimerRunning(!isTimerRunning)} 
-              className="px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-neutral-700 transition-colors flex items-center"
+              className="px-2 py-1 hover:bg-muted text-foreground transition-colors"
               title={isTimerRunning ? "Pause Interview" : "Resume Interview"}
             >
               {isTimerRunning ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span className="h-2 w-2 rounded-xs bg-amber-500 inline-block" />
               ) : (
-                <Play className="h-4 w-4" />
+                <Play className="h-3 w-3 text-emerald-500" />
               )}
             </button>
           </div>
 
-          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           <ThemeToggle />
-          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
           
           {interviewMode === "case" && (
-            <>
+            <div className="hidden md:flex items-center gap-1 p-0.5 rounded-md bg-muted/60 border border-border">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setRightPanelState("whiteboard")}
-                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "whiteboard" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+                className={`h-7 px-2.5 text-xs font-mono-tech rounded ${rightPanelState === "whiteboard" ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                <PenTool className="h-4 w-4 mr-2" />
+                <PenTool className="h-3.5 w-3.5 mr-1.5" />
                 Canvas
               </Button>
 
@@ -521,128 +565,103 @@ function InterviewEngine() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setRightPanelState("source")}
-                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${rightPanelState === "source" ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
+                className={`h-7 px-2.5 text-xs font-mono-tech rounded ${rightPanelState === "source" ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                <FileText className="h-4 w-4 mr-2" />
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
                 Document
               </Button>
-
-              <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
-            </>
+            </div>
           )}
 
-          {interviewMode === "domain" && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowResumePanel(!showResumePanel)}
-                className={`font-semibold text-xs tracking-wide transition-all duration-300 h-9 px-4 rounded-lg ${showResumePanel ? 'text-primary bg-primary/10 shadow-sm' : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Resume
-              </Button>
-
-              <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
-            </>
-          )}
-
-          <div className="h-4 w-px bg-slate-200 dark:bg-neutral-700 mx-2" />
-          
-          <Button size="sm" className="bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-neutral-900 text-xs font-semibold h-9 rounded-lg px-5 ml-2 transition-all duration-300 shadow-sm hover:shadow-md" onClick={handleEndSession} disabled={isTyping}>
-            Finish & Feedback
+          <Button 
+            size="sm" 
+            className="bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 text-xs font-semibold h-8 rounded-md px-3 font-mono-tech shadow-xs" 
+            onClick={handleEndSession} 
+            disabled={isTyping}
+          >
+            End & Grade
           </Button>
         </div>
       </header>
 
-      {/* 
-        MAIN BENTO GRID LAYOUT 
-        min-h-0 is absolutely critical here. It prevents flex children from expanding past their parent.
-      */}
-      <div className={`flex flex-1 overflow-hidden min-h-0 relative ${interviewMode === "domain" ? "justify-center bg-slate-50 dark:bg-[#0a0a0a]" : ""}`}>
+      {/* Main Workspace Layout */}
+      <div className="flex flex-1 overflow-hidden min-h-0 relative">
 
-        {/* Domain AI Visualizer Background */}
-        {interviewMode === "domain" && (
-          <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none flex justify-center pt-12 z-0">
-            <div className={`w-40 h-40 rounded-full blur-3xl transition-all duration-1000 ${isSpeaking ? 'bg-primary/30 scale-150 animate-pulse' : 'bg-primary/10 scale-100'}`} />
-          </div>
-        )}
-
-        {/* LEFT PANEL: CO-PILOT CHAT SIDEBAR / MAIN DOMAIN CHAT */}
+        {/* LEFT PANEL: Chat Feed */}
         <div 
           style={interviewMode === "case" ? { "--chat-width": `${chatWidth}%` } as React.CSSProperties : {}}
-          className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-500 w-full md:w-[var(--chat-width,auto)]
-            ${interviewMode === "domain" 
-              ? `w-full flex-1 max-w-5xl mx-auto bg-transparent border-none`
-              : 'bg-white dark:bg-neutral-900 shadow-[4px_0_24px_rgba(0,0,0,0.02)] border-r border-slate-200/70 dark:border-neutral-800/70'
-            }`}
+          className={`flex flex-col min-w-[320px] shrink-0 relative z-10 transition-all duration-300 w-full md:w-[var(--chat-width,auto)] bg-card border-r border-border ${
+            mobileView !== "chat" ? "hidden md:flex" : "flex"
+          }`}
         >
-          {/* Custom Drag Handle (Only for Case mode) */}
+          {/* Custom Drag Handle (Case Mode Desktop) */}
           {interviewMode === "case" && (
             <div 
-              className="absolute -right-3 top-0 bottom-0 w-6 cursor-col-resize z-50 flex items-center justify-center group"
+              className="hidden md:flex absolute -right-2 top-0 bottom-0 w-4 cursor-col-resize z-50 items-center justify-center group"
               onMouseDown={() => setIsDragging(true)}
+              title="Drag to resize panels"
             >
-              <div className="h-16 w-1.5 rounded-full bg-slate-200/50 dark:bg-neutral-700/50 group-hover:bg-primary/40 transition-colors duration-300" />
+              <div className="h-12 w-1 rounded-full bg-border group-hover:bg-primary transition-colors" />
             </div>
           )}
           
-          {/* Strict overflow-y-auto ensures ONLY the chat feed scrolls */}
-          <div className="flex-1 overflow-y-auto px-8 py-8 scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" ref={scrollRef}>
-            <div className="space-y-10 pb-6">
+          {/* Scrollable Chat Feed */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 scroll-smooth custom-scrollbar" ref={scrollRef}>
+            <div className="space-y-6 max-w-2xl mx-auto pb-4">
               {sessionLoadError ? (
-                <div className="flex h-full items-center justify-center pt-32">
-                  <div className="flex flex-col items-center gap-4 text-red-500">
-                    <p className="text-sm font-medium">{sessionLoadError}</p>
-                    <Button variant="outline" onClick={() => router.push("/history")}>Go Back</Button>
+                <div className="flex h-full items-center justify-center pt-20 text-center">
+                  <div className="space-y-3 text-destructive font-mono-tech text-xs">
+                    <p>{sessionLoadError}</p>
+                    <Button variant="outline" size="sm" onClick={() => router.push("/history")}>Back to History</Button>
                   </div>
                 </div>
               ) : messages.length === 0 && !showSetupModal && (
-                <div className="flex h-full items-center justify-center pt-32">
-                  <div className="flex flex-col items-center gap-4 text-slate-400">
-                    <Loader2 className="h-6 w-6 animate-spin opacity-50" />
-                    <p className="text-sm font-medium">Initializing session...</p>
+                <div className="flex h-full items-center justify-center pt-20 text-center">
+                  <div className="flex flex-col items-center gap-3 text-muted-foreground font-mono-tech text-xs">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <p>INITIALIZING CEREBRAS PARTNER ENGINE...</p>
                   </div>
                 </div>
               )}
               
               {messages.map((msg, idx) => (
-                <div key={idx} className={`flex gap-5 group animate-in slide-in-from-bottom-2 fade-in duration-500 ${interviewMode === "domain" ? 'bg-white/60 dark:bg-neutral-900/40 backdrop-blur-md p-6 rounded-3xl border border-white/40 dark:border-neutral-800/40 shadow-sm' : ''}`}>
+                <div key={idx} className="flex gap-3.5 group animate-in fade-in duration-200">
                   
-                  {/* Elegant Avatar */}
-                  <div className="shrink-0 mt-1">
+                  {/* Avatar */}
+                  <div className="shrink-0 mt-0.5">
                     {msg.role === "assistant" ? (
-                      <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-neutral-800 dark:to-neutral-900 border border-slate-200/60 dark:border-neutral-700/60 flex items-center justify-center shadow-sm">
-                        <Bot className="h-4 w-4 text-slate-700 dark:text-neutral-300" />
+                      <div className="h-7 w-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                        <Bot className="h-3.5 w-3.5" />
                       </div>
                     ) : msg.role === "system" ? (
-                      <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30 border border-amber-200/60 dark:border-amber-700/60 flex items-center justify-center shadow-sm">
-                        <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <div className="h-7 w-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                        <Lightbulb className="h-3.5 w-3.5" />
                       </div>
                     ) : (
-                      <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/20 flex items-center justify-center shadow-sm">
-                        <User className="h-4 w-4 text-primary" />
+                      <div className="h-7 w-7 rounded-md bg-muted border border-border flex items-center justify-center text-foreground">
+                        <User className="h-3.5 w-3.5" />
                       </div>
                     )}
                   </div>
 
-                  {/* Flowing Typography Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[13px] font-semibold text-slate-900 dark:text-neutral-100">
-                        {msg.role === "assistant" ? "Interviewer" : msg.role === "system" ? "System Hint" : "You"}
-                      </span>
-                      <span className="text-[11px] font-medium text-slate-400 dark:text-neutral-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {msg.role === "system" ? "Internal" : "Just now"}
+                  {/* Message Content */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tech font-semibold text-foreground">
+                        {msg.role === "assistant" ? "Partner Interviewer" : msg.role === "system" ? "System Hint" : "Candidate"}
                       </span>
                     </div>
 
                     {msg.role === "assistant" || msg.role === "system" ? (
-                      <div className={`prose max-w-none prose-p:leading-relaxed prose-li:my-1.5 text-[15px] ${msg.role === "system" ? "text-amber-800 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-900/10 p-4 rounded-2xl border border-amber-100/50 dark:border-amber-900/30" : "text-slate-700 dark:text-neutral-200 font-normal tracking-tight"}`}>
+                      <div className={`text-xs sm:text-sm leading-relaxed ${
+                        msg.role === "system" 
+                          ? "text-amber-700 dark:text-amber-300 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20 font-mono-tech" 
+                          : "text-foreground font-sans"
+                      }`}>
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
                     ) : (
-                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-700 dark:text-neutral-200 font-normal tracking-tight">
+                      <p className="whitespace-pre-wrap text-xs sm:text-sm leading-relaxed text-foreground/90 font-sans">
                         {msg.content}
                       </p>
                     )}
@@ -651,187 +670,122 @@ function InterviewEngine() {
               ))}
               
               {isTyping && (
-                <div className="flex gap-5 animate-in slide-in-from-bottom-2 fade-in duration-300">
-                  <div className="shrink-0 mt-1">
-                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-neutral-800 dark:to-neutral-900 border border-slate-200/60 dark:border-neutral-700/60 flex items-center justify-center shadow-sm">
-                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                    </div>
-                  </div>
-                  <div className="flex items-center text-sm text-slate-400 font-medium tracking-wide">
-                    Synthesizing response<span className="animate-pulse">...</span>
-                  </div>
+                <div className="flex gap-3.5 items-center font-mono-tech text-xs text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span>Synthesizing partner response...</span>
                 </div>
               )}
             </div>
           </div>
           
-          {/* PREMIUM FLOATING OMNIBAR */}
-          <div className={`shrink-0 relative z-20 ${interviewMode === "domain" ? 'bg-transparent p-6 pb-8' : 'p-6 bg-gradient-to-t from-white via-white dark:from-neutral-900 dark:via-neutral-900 to-white/80 dark:to-neutral-900/80 border-t border-slate-200/50 dark:border-neutral-800/50'}`}>
-            <div className="flex justify-between items-center mb-3 px-2">
-              <span className="text-[11px] font-bold tracking-widest text-slate-400 dark:text-neutral-400 uppercase">Input</span>
-              {interviewMode === "case" && (
+          {/* Chat Omnibar */}
+          <div className="shrink-0 p-4 border-t border-border bg-card/60">
+            <div className="max-w-2xl mx-auto space-y-2">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-mono-tech uppercase tracking-wider text-muted-foreground">Candidate Turn</span>
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-7 px-3 text-[11px] font-bold tracking-widest text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 transition-all duration-300 uppercase rounded-full"
+                  className="h-6 px-2 text-[10px] font-mono-tech text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
                   onClick={handleGetHint}
                   disabled={isTyping || messages.length === 0}
                 >
-                  <Lightbulb className="h-3 w-3 mr-1.5" />
+                  <Lightbulb className="h-3 w-3 mr-1" />
                   Request Hint
                 </Button>
-              )}
-            </div>
+              </div>
 
-            <div className={`flex gap-2 transition-all duration-300 w-full shadow-lg ${interviewMode === "domain" ? 'bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl border border-white/50 dark:border-neutral-800 rounded-3xl p-2' : 'p-1.5 bg-white dark:bg-neutral-950 border border-slate-200/80 dark:border-neutral-800 rounded-2xl focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10'}`}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`shrink-0 rounded-xl h-11 w-11 transition-all duration-300 ${isListening ? 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-                onClick={toggleListening}
-                title={isListening ? "Stop Dictation" : "Start Voice Dictation"}
-              >
-                <div className="relative flex items-center justify-center">
-                  <Mic className="h-5 w-5" />
-                  {isListening && <span className="absolute -inset-1 rounded-full border-2 border-red-500/30 animate-ping opacity-100" />}
-                </div>
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => {
-                  if (ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel()
-                  setTtsEnabled(!ttsEnabled)
-                }}
-                className={`shrink-0 rounded-xl h-11 w-11 transition-all duration-300 ${ttsEnabled ? 'bg-primary/10 text-primary shadow-[0_0_10px_rgba(59,130,246,0.2)]' : 'text-slate-400 dark:text-neutral-400 hover:text-slate-700 dark:hover:text-neutral-200 hover:bg-slate-100 dark:hover:bg-neutral-800'}`}
-                title={ttsEnabled ? "Disable Voice Output" : "Enable Voice Output"}
-              >
-                {ttsEnabled ? <Volume2 className={`h-5 w-5 ${isSpeaking ? 'animate-pulse' : ''}`} /> : <VolumeX className="h-5 w-5 opacity-70" />}
-              </Button>
-              <textarea 
-                placeholder={isListening ? "Listening..." : "Message your interviewer..."}
-                value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value)
-                  // Auto-expand logic
-                  e.target.style.height = 'auto'
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                    e.currentTarget.style.height = 'auto'; // reset height on send
-                  }
-                }}
-                className="flex-1 border-0 bg-transparent focus-visible:outline-none px-3 py-3 text-[15px] shadow-none placeholder:text-slate-400 dark:placeholder:text-neutral-400 text-slate-800 dark:text-neutral-100 font-medium resize-none min-h-[44px] max-h-[200px]"
-                disabled={isTyping}
-                rows={1}
-              />
-              <Button 
-                onClick={handleSendMessage} 
-                disabled={isTyping || !inputValue.trim()} 
-                size="icon"
-                className="shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-300 h-11 w-11 disabled:opacity-30 shadow-md hover:shadow-lg hover:-translate-y-0.5"
-              >
-                <Send className="h-4 w-4 ml-0.5" />
-              </Button>
+              <div className="flex items-center gap-2 p-1.5 rounded-lg bg-background border border-border focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`h-8 w-8 rounded shrink-0 ${isListening ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={toggleListening}
+                  title={isListening ? "Stop Dictation" : "Start Voice Input"}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => {
+                    if (ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel()
+                    setTtsEnabled(!ttsEnabled)
+                  }}
+                  className={`h-8 w-8 rounded shrink-0 ${ttsEnabled ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                  title={ttsEnabled ? "Disable Voice Output" : "Enable Voice Output"}
+                >
+                  {ttsEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 opacity-50" />}
+                </Button>
+
+                <textarea 
+                  placeholder={isListening ? "Listening to your dictation..." : "Speak or type your logical structuring..."}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  className="flex-1 border-0 bg-transparent focus-visible:outline-none px-2 py-1.5 text-xs sm:text-sm placeholder:text-muted-foreground text-foreground font-sans resize-none min-h-[36px] max-h-[120px]"
+                  disabled={isTyping}
+                  rows={1}
+                />
+
+                <Button 
+                  onClick={handleSendMessage} 
+                  disabled={isTyping || !inputValue.trim()} 
+                  size="icon"
+                  className="h-8 w-8 rounded bg-primary hover:bg-primary/90 text-primary-foreground shrink-0 shadow-xs"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* DOMAIN RESUME PANEL */}
-        {interviewMode === "domain" && showResumePanel && (
-          <div className="hidden md:flex w-[500px] shrink-0 bg-white dark:bg-neutral-900 shadow-2xl border-l border-slate-200 dark:border-neutral-800 z-30 animate-in slide-in-from-right duration-300 flex-col relative">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-neutral-800">
-              <h3 className="font-semibold text-sm">Your Resume</h3>
-              <Button variant="ghost" size="icon" onClick={() => setShowResumePanel(false)} className="h-8 w-8 rounded-full">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </Button>
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-              {caseSource ? (
-                <iframe 
-                  src={caseSource.startsWith('http') ? caseSource : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`} 
-                  className="w-full h-full border-0 bg-white dark:bg-neutral-900"
-                  title="Candidate Resume"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                  <FileText className="h-10 w-10 opacity-20 mb-4" />
-                  <span className="font-semibold text-sm">Resume not available</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* RIGHT PANEL: HERO CANVAS (Only for Case Mode) */}
+        {/* RIGHT PANEL: Excalidraw Whiteboard & PDF Source */}
         {interviewMode === "case" && (
-          <div className="hidden md:flex flex-1 flex-col bg-slate-50/50 dark:bg-neutral-950/50 relative z-0 overflow-hidden">
-            {rightPanelState === "whiteboard" ? (
-              <div className="absolute inset-0 animate-in fade-in duration-500">
+          <div className={`flex-1 flex-col bg-muted/20 relative z-0 overflow-hidden ${
+            mobileView === "chat" ? "hidden md:flex" : "flex"
+          }`}>
+            {rightPanelState === "whiteboard" || mobileView === "canvas" ? (
+              <div className="absolute inset-0">
                 <ExcalidrawWrapper />
               </div>
             ) : (
-            <div className="h-full w-full relative animate-in fade-in duration-500">
-              {caseSource ? (
-                <div className="w-full h-full relative">
-                  <div className="absolute top-4 right-8 z-50">
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      className="shadow-md bg-white/90 dark:bg-black/90 hover:bg-white dark:hover:bg-black border border-slate-200 dark:border-neutral-800"
-                      onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}`, "_blank")}
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 mr-2" /> Open PDF in New Tab
-                    </Button>
-                  </div>
+              <div className="h-full w-full relative">
+                {caseSource ? (
                   <iframe 
                     src={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/casebooks/${encodeURIComponent(caseSource)}#page=${pageNumber}`} 
-                    className="w-full h-full border-0 relative z-10 bg-white dark:bg-neutral-900"
+                    className="w-full h-full border-0 bg-background"
                     title="Source PDF"
                   />
-                </div>
-              ) : caseContext ? (
-                <div className="h-full overflow-y-auto p-12 lg:p-16">
-                  <div className="prose prose-slate dark:prose-invert max-w-3xl mx-auto prose-headings:font-bold prose-headings:tracking-tight prose-p:text-slate-600 dark:prose-p:text-slate-400 prose-p:leading-relaxed text-[15px]">
+                ) : caseContext ? (
+                  <div className="h-full overflow-y-auto p-6 max-w-2xl mx-auto font-sans text-xs sm:text-sm text-muted-foreground leading-relaxed">
                     <ReactMarkdown>{caseContext}</ReactMarkdown>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                  <Loader2 className="h-8 w-8 animate-spin opacity-20 mb-4" />
-                  <span className="font-semibold text-sm tracking-widest uppercase">Awaiting Context</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-xs font-mono-tech text-muted-foreground">
+                    No source document attached for this case.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
-      </div>
 
-      <PaywallModal
-        isOpen={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        title={paywallMeta.title}
-        description={paywallMeta.description}
-        featureKey={paywallMeta.featureKey}
-        limit={paywallMeta.limit}
-        used={paywallMeta.used}
-        resetAt={paywallMeta.resetAt}
-      />
+      </div>
     </div>
   )
 }
 
-export default function InterviewEnginePage() {
+export default function InterviewPage() {
   return (
-    <Suspense fallback={
-      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-neutral-950">
-        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
-      </div>
-    }>
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-background font-mono-tech text-xs text-muted-foreground">INITIALIZING INTERVIEW ENGINE...</div>}>
       <InterviewEngine />
     </Suspense>
   )

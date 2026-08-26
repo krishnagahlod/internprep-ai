@@ -6,7 +6,6 @@ import { useAuthStore } from "@/stores/auth-store"
 import { createClient } from "@/lib/supabase/client"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, ArrowRight, Clock, FileText, Bot, Loader2, Calendar } from "lucide-react"
 
@@ -27,7 +26,6 @@ export default function HistoryPage() {
 
     const fetchHistory = async () => {
       try {
-        // Fetch resumes
         const { data: resumes } = await supabase
           .from("resume_analyses")
           .select("*")
@@ -37,7 +35,6 @@ export default function HistoryPage() {
 
         if (resumes) setResumeHistory(resumes)
 
-        // Fetch interviews
         const { data: interviews } = await supabase
           .from("interview_sessions")
           .select("*, session_feedback(*)")
@@ -59,138 +56,154 @@ export default function HistoryPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
+      <div className="min-h-screen flex items-center justify-center bg-background font-mono-tech text-xs text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p>FETCHING SESSION ARCHIVES...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0a] text-slate-900 dark:text-slate-100 font-sans selection:bg-primary/20">
-      <div className="absolute top-4 right-4 z-50">
-        <ThemeToggle />
-      </div>
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden transition-colors">
+      
+      {/* Top Header */}
+      <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.push("/dashboard")} 
+            className="text-muted-foreground hover:text-foreground h-8 px-2.5 text-xs font-mono-tech"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Command Center
+          </Button>
 
-      <main className="max-w-6xl mx-auto px-6 py-12 relative z-10">
-        <Button variant="ghost" className="mb-6 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" onClick={() => router.push("/dashboard")}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-        </Button>
+          <ThemeToggle />
+        </div>
+      </header>
 
-        <div className="mb-10">
-          <h1 className="text-4xl font-extrabold tracking-tight font-outfit">Your History</h1>
-          <p className="text-muted-foreground mt-2">Review your past resume analyses and mock interviews to track your progress.</p>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 relative z-10 space-y-8">
+        
+        <div className="pb-4 border-b border-border">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
+              [ARCHIVES]
+            </span>
+            <span className="text-xs font-mono-tech text-muted-foreground">TELEMETRY & LOGS</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            Interview & Resume History
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-sans">
+            Review past transcripts, radar scores, and performance growth over time.
+          </p>
         </div>
 
-        <Tabs defaultValue="resumes" className="w-full flex flex-col gap-8">
-          <TabsList className="w-full sm:w-fit inline-flex p-1.5 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-2xl shadow-sm gap-2 mx-auto">
-            <TabsTrigger value="resumes" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium text-sm flex items-center">
-              <FileText className="h-4 w-4 mr-2.5" /> Resume Scans
-            </TabsTrigger>
-            <TabsTrigger value="interviews" className="rounded-xl px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all font-medium text-sm flex items-center">
-              <Bot className="h-4 w-4 mr-2.5" /> Mock Interviews
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="resumes" className="w-full space-y-6">
+          <div className="flex justify-start">
+            <TabsList className="p-1 rounded-lg bg-muted/60 border border-border inline-flex font-mono-tech text-xs">
+              <TabsTrigger value="resumes" className="rounded-md px-4 py-1.5 text-xs">
+                <FileText className="h-3.5 w-3.5 mr-1.5" /> Resume Scans ({resumeHistory.length})
+              </TabsTrigger>
+              <TabsTrigger value="interviews" className="rounded-md px-4 py-1.5 text-xs">
+                <Bot className="h-3.5 w-3.5 mr-1.5" /> Mock Interviews ({interviewHistory.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <div className="min-h-[400px] bg-white/30 dark:bg-neutral-900/20 backdrop-blur-xl border border-slate-200/80 dark:border-neutral-800/80 rounded-3xl p-6 md:p-8">
-            <TabsContent value="resumes" className="mt-0 h-full">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-xs min-h-[350px]">
+            {/* Resumes Tab */}
+            <TabsContent value="resumes" className="mt-0 space-y-4">
               {resumeHistory.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                  <Clock className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold">No resumes analyzed yet</h3>
-                  <p className="text-muted-foreground mt-2">Upload a resume to get started.</p>
-                  <Button className="mt-6 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8" onClick={() => router.push("/resume")}>Analyze Resume</Button>
+                <div className="text-center py-16 space-y-3">
+                  <Clock className="h-8 w-8 text-muted-foreground mx-auto" />
+                  <div className="text-sm font-bold text-foreground">No resume analyses found</div>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">Upload a resume to run your first diagnostic.</p>
+                  <Button size="sm" onClick={() => router.push("/resume")} className="h-8 text-xs font-mono-tech">
+                    Analyze Resume
+                  </Button>
                 </div>
               ) : (
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   {resumeHistory.map((scan) => (
-                    <Card key={scan.id} className="bg-white/60 dark:bg-neutral-900/60 backdrop-blur-md border-slate-200/60 dark:border-neutral-800 hover:shadow-lg transition-all rounded-2xl overflow-hidden group">
-                      <CardHeader className="pb-3 bg-black/5 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-base flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-primary" />
-                              {new Date(scan.created_at).toLocaleDateString()}
-                            </CardTitle>
-                            <CardDescription className="mt-1 uppercase tracking-widest text-[10px] font-bold text-primary/70">
-                              TARGET: {scan.target_role}
-                            </CardDescription>
-                          </div>
-                          {scan.analysis_data?.radar_scores && (
-                            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-bold border border-primary/20">
-                              Score: {scan.analysis_data.radar_scores.formatting || 0}/100
-                            </div>
-                          )}
+                    <div key={scan.id} className="p-4 rounded-lg border border-border bg-background hover:border-primary/40 transition-all space-y-3 flex flex-col justify-between shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-mono-tech mb-2">
+                          <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                            <Calendar className="h-3.5 w-3.5 text-primary" />
+                            {new Date(scan.created_at).toLocaleDateString()}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-[10px] uppercase font-bold">
+                            {scan.target_role}
+                          </span>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <p className="text-sm text-muted-foreground line-clamp-3 mb-6">
-                          {scan.analysis_data?.overall_feedback || "No feedback generated."}
+                        <p className="text-xs text-muted-foreground font-sans line-clamp-2">
+                          {scan.analysis_data?.overall_feedback || "Analysis completed."}
                         </p>
-                        <Button variant="outline" className="w-full text-sm font-semibold rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={() => {
-                          router.push(`/history/resume/${scan.id}`)
-                        }}>
-                          View Full Report <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => router.push(`/history/resume/${scan.id}`)}
+                        className="w-full h-8 text-xs font-mono-tech border-border"
+                      >
+                        View Scorecard <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               )}
             </TabsContent>
 
-            <TabsContent value="interviews" className="mt-0 h-full">
+            {/* Interviews Tab */}
+            <TabsContent value="interviews" className="mt-0 space-y-4">
               {interviewHistory.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-20">
-                  <Clock className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-bold">No interviews completed</h3>
-                  <p className="text-muted-foreground mt-2">Start a mock case interview to practice.</p>
-                  <Button className="mt-6 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8" onClick={() => router.push("/interview")}>Start Interview</Button>
+                <div className="text-center py-16 space-y-3">
+                  <Clock className="h-8 w-8 text-muted-foreground mx-auto" />
+                  <div className="text-sm font-bold text-foreground">No mock interviews completed</div>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">Start a mock interview session to build your history.</p>
+                  <Button size="sm" onClick={() => router.push("/interview")} className="h-8 text-xs font-mono-tech">
+                    Start Mock Session
+                  </Button>
                 </div>
               ) : (
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   {interviewHistory.map((interview) => (
-                    <Card key={interview.id} className="bg-white/60 dark:bg-neutral-900/40 backdrop-blur-sm border-slate-200/60 dark:border-neutral-800 hover:shadow-lg transition-all rounded-2xl overflow-hidden group">
-                      <CardHeader className="pb-3 bg-black/5 dark:bg-white/5 border-b border-black/5 dark:border-white/5">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <CardTitle className="text-base flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-primary" />
-                              {new Date(interview.created_at).toLocaleDateString()}
-                            </CardTitle>
-                            <CardDescription className="mt-1 flex items-center gap-2">
-                              <span className="uppercase tracking-widest text-[10px] font-bold text-primary/70">
-                                {interview.interview_type === 'domain' ? 'FULL INTERVIEW' : 'MOCK CASE'}
-                              </span>
-                              <span className="text-slate-300 dark:text-neutral-700">•</span>
-                              <span className="text-xs uppercase font-medium">{interview.case_state?.current_phase || "Introduction"}</span>
-                            </CardDescription>
-                          </div>
-                          {interview.status === 'completed' && (
-                            <div className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-3 py-1 rounded-full text-[10px] font-bold border border-green-200 dark:border-green-800/50 uppercase tracking-widest">
-                              Completed
-                            </div>
-                          )}
+                    <div key={interview.id} className="p-4 rounded-lg border border-border bg-background hover:border-primary/40 transition-all space-y-3 flex flex-col justify-between shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between text-xs font-mono-tech mb-2">
+                          <span className="flex items-center gap-1.5 text-foreground font-semibold">
+                            <Calendar className="h-3.5 w-3.5 text-primary" />
+                            {new Date(interview.created_at).toLocaleDateString()}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-bold border border-emerald-500/20">
+                            {interview.interview_type === 'domain' ? 'Domain Interview' : 'Case Interview'}
+                          </span>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-4">
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-6">
-                          {interview.interview_type === 'domain' 
-                            ? 'Comprehensive behavioral and technical interview based on your resume.' 
-                            : 'Case interview simulating strategy consulting and problem solving.'}
+                        <p className="text-xs text-muted-foreground font-sans line-clamp-2">
+                          Phase: {interview.case_state?.current_phase || "Complete"} • Role: {interview.domain || "Consulting"}
                         </p>
-                        <Button variant={interview.status === 'completed' ? 'outline' : 'default'} className="w-full text-sm font-semibold rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={() => {
-                          router.push(`/interview?id=${interview.id}`)
-                        }}>
-                          {interview.status === 'completed' ? 'View Transcript' : 'Resume Interview'} <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      </CardContent>
-                    </Card>
+                      </div>
+
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => router.push(`/interview?id=${interview.id}`)}
+                        className="w-full h-8 text-xs font-mono-tech border-border"
+                      >
+                        {interview.status === 'completed' ? 'View Transcript' : 'Resume Session'} <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               )}
             </TabsContent>
           </div>
         </Tabs>
+
       </main>
     </div>
   )

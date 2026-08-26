@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
-import { LayoutDashboard, FileText, Briefcase, ExternalLink, Sparkles, LogOut, TrendingUp, Compass, Settings, Clock, Users, Loader2, UploadCloud, Menu, X, Gauge, Building2, CreditCard, Crown } from "lucide-react"
+import { 
+  LayoutDashboard, FileText, Briefcase, ExternalLink, 
+  Sparkles, LogOut, TrendingUp, Compass, Clock, 
+  Users, Loader2, UploadCloud, Menu, X, Gauge, 
+  Building2, CreditCard, Crown, ArrowRight, ShieldCheck, CheckCircle2 
+} from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
@@ -52,7 +57,6 @@ export default function DashboardPage() {
     const file = e.target.files?.[0]
     if (!file) return
     
-    // Check if it's a PDF (either by type or extension)
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setUploadError("Please upload a PDF file.")
       return
@@ -107,8 +111,7 @@ export default function DashboardPage() {
       return
     }
     
-    // We will start the session by creating it via API, then redirect
-    setUploadingResume(true) // Reuse loading state for spinner
+    setUploadingResume(true)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/interview/start_domain`, {
@@ -165,7 +168,7 @@ export default function DashboardPage() {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 rounded-full border-t-2 border-primary animate-spin" />
-          <p className="text-sm text-muted-foreground font-mono">Initializing Workspace...</p>
+          <p className="text-xs text-muted-foreground font-mono-tech">INITIALIZING WORKSPACE...</p>
         </div>
       </div>
     )
@@ -173,36 +176,44 @@ export default function DashboardPage() {
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
   }
 
   const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } }
   }
 
   return (
-    <div className="flex min-h-screen bg-background relative overflow-hidden">
+    <div className="flex min-h-screen bg-background text-foreground relative overflow-hidden transition-colors">
       
       {/* Domain Setup Modal */}
       {showDomainModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-neutral-900 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border border-slate-200/20 dark:border-white/10 relative">
-            <button onClick={() => setShowDomainModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card rounded-xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-xl border border-border relative">
+            <button 
+              onClick={() => setShowDomainModal(false)} 
+              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
             </button>
             
-            <div className="flex items-center justify-center w-16 h-16 bg-blue-500/10 rounded-full mx-auto mb-6">
-              <Users className="h-8 w-8 text-blue-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-center mb-2 font-outfit">Full Interview Simulator</h2>
-            <p className="text-muted-foreground text-center mb-8 text-sm">Configure your tailored interview environment.</p>
-            
-            <div className="space-y-4 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-center text-primary">
+                <Users className="h-5 w-5" />
+              </div>
               <div>
-                <label className="text-sm font-semibold mb-2 block">Domain</label>
+                <h2 className="text-lg font-bold text-foreground">Configure Domain Interview</h2>
+                <p className="text-xs text-muted-foreground">Tailored role & company simulation environment.</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-6 text-xs">
+              <div>
+                <label className="font-semibold mb-1.5 block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">Domain Track</label>
                 <select 
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                  className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 text-xs text-foreground cursor-pointer"
                   value={selectedDomain}
                   onChange={(e) => setSelectedDomain(e.target.value)}
                 >
@@ -211,20 +222,21 @@ export default function DashboardPage() {
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="text-sm font-semibold mb-2 block">Target Company (Optional)</label>
+                <label className="font-semibold mb-1.5 block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">Target Company (Optional)</label>
                 <Input 
-                  placeholder="e.g. Goldman Sachs" 
+                  placeholder="e.g. McKinsey, Google, Goldman Sachs" 
                   value={targetCompanyName}
                   onChange={(e) => setTargetCompanyName(e.target.value)}
-                  className="rounded-xl h-11"
+                  className="rounded-lg h-9 text-xs border-border bg-background"
                 />
               </div>
               
               <div>
-                <label className="text-sm font-semibold mb-2 block">Select Resume</label>
+                <label className="font-semibold mb-1.5 block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">Select Resume</label>
                 <select 
-                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm mb-3"
+                  className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 text-xs text-foreground mb-2.5 cursor-pointer"
                   value={selectedResumeId}
                   onChange={(e) => setSelectedResumeId(e.target.value)}
                   disabled={uploadingResume}
@@ -236,108 +248,106 @@ export default function DashboardPage() {
                 </select>
                 
                 <div 
-                  className="border-2 border-dashed border-slate-300 dark:border-neutral-700 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-colors"
+                  className="border-2 border-dashed border-border rounded-lg p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/40 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploadingResume ? (
-                    <div className="flex items-center gap-2 text-primary">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-sm font-medium">Parsing and extracting layout...</span>
+                    <div className="flex items-center gap-2 text-primary font-mono-tech text-xs">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Parsing layout geometry...</span>
                     </div>
                   ) : (
                     <>
-                      <UploadCloud className="h-6 w-6 text-slate-400 mb-2" />
-                      <span className="text-sm font-medium text-slate-600 dark:text-neutral-300">Upload new resume (PDF)</span>
-                      <span className="text-xs text-slate-400 mt-1">We will parse and extract it perfectly.</span>
+                      <UploadCloud className="h-5 w-5 text-muted-foreground mb-1.5" />
+                      <span className="text-xs font-semibold text-foreground">Upload new PDF resume</span>
+                      <span className="text-[11px] text-muted-foreground mt-0.5">Extracts bullet points & experience automatically.</span>
                     </>
                   )}
                   <input type="file" className="hidden" accept="application/pdf,.pdf" ref={fileInputRef} onChange={handleFileUpload} />
                 </div>
-                {uploadError && <p className="text-xs text-red-500 mt-2 font-medium">{uploadError}</p>}
+                {uploadError && <p className="text-xs text-destructive mt-1.5 font-medium">{uploadError}</p>}
               </div>
             </div>
             
             <Button 
               onClick={handleStartDomainInterview} 
-              className="w-full h-12 text-base font-bold shadow-lg hover:-translate-y-0.5 transition-all"
+              className="w-full h-10 text-xs font-semibold font-mono-tech bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs transition-all"
               disabled={uploadingResume || !selectedResumeId}
             >
-              {uploadingResume ? "Initializing..." : "Start Full Interview"}
+              {uploadingResume ? "Initializing Session..." : "Launch Domain Session →"}
             </Button>
           </div>
         </div>
       )}
 
       {/* Sidebar Navigation */}
-      <aside className="w-64 border-r border-border bg-white/40 dark:bg-neutral-950/40 backdrop-blur-3xl hidden lg:flex flex-col p-6 z-20">
-        <div className="flex items-center gap-3 mb-12">
-          <div className="h-8 w-8 rounded-lg bg-gradient-premium p-[1px] flex items-center justify-center shadow-sm">
-            <div className="h-full w-full bg-white dark:bg-neutral-950 rounded-[7px] flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-primary" />
-            </div>
+      <aside className="w-64 border-r border-border bg-card/60 backdrop-blur-xl hidden lg:flex flex-col p-5 z-20 transition-colors">
+        <div className="flex items-center gap-2.5 mb-8">
+          <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
+            <Sparkles className="h-4 w-4" />
           </div>
-          <span className="text-xl font-bold font-outfit tracking-tight">InternPrep</span>
+          <span className="text-sm font-bold tracking-tight font-mono-tech text-foreground">
+            InternPrep<span className="text-primary">.ai</span>
+          </span>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          <Button variant="secondary" className="w-full justify-start shadow-sm bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-slate-800 text-foreground border border-black/5 dark:border-white/5">
-            <LayoutDashboard className="mr-3 h-4 w-4 text-primary" />
+        <nav className="flex-1 space-y-1.5 text-xs font-medium" aria-label="Command Center Navigation">
+          <Button variant="secondary" className="w-full justify-start text-xs font-semibold bg-muted text-foreground border border-border shadow-xs">
+            <LayoutDashboard className="mr-2.5 h-4 w-4 text-primary" />
             Command Center
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/resume")}>
-            <FileText className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/resume")}>
+            <FileText className="mr-2.5 h-4 w-4" />
             Resume Review
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/ats-checker")}>
-            <Gauge className="mr-3 h-4 w-4 text-primary" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/ats-checker")}>
+            <Gauge className="mr-2.5 h-4 w-4 text-primary" />
             ATS Scorecard
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/resume-builder")}>
-            <UploadCloud className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/resume-builder")}>
+            <UploadCloud className="mr-2.5 h-4 w-4" />
             Resume Builder
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/interview")}>
-            <Briefcase className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/interview")}>
+            <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/dashboard/analytics")}>
-            <TrendingUp className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/dashboard/analytics")}>
+            <TrendingUp className="mr-2.5 h-4 w-4" />
             Analytics
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/history")}>
-            <Clock className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/history")}>
+            <Clock className="mr-2.5 h-4 w-4" />
             History
           </Button>
-
-          
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50" onClick={() => router.push("/billing")}>
-            <CreditCard className="mr-3 h-4 w-4 text-primary" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/billing")}>
+            <CreditCard className="mr-2.5 h-4 w-4 text-primary" />
             Subscriptions & Quotas
           </Button>
 
           {isAdmin && (
             <div className="pt-2 space-y-1">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
+              <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
                 <Crown className="h-3 w-3" /> Admin Studio
               </div>
               <Button
                 variant="ghost"
-                className="w-full justify-start text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                className="w-full justify-start text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
                 onClick={() => router.push("/admin")}
               >
-                <Crown className="mr-3 h-4 w-4 text-purple-500" />
+                <Crown className="mr-2.5 h-4 w-4 text-purple-500" />
                 Admin Console
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
+                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
                 onClick={() => {
                   localStorage.setItem("iitb_placement_verified", "true")
                   localStorage.setItem("iitb_placement_admin", "true")
                   router.push("/placement-analysis")
                 }}
               >
-                <Building2 className="mr-3 h-4 w-4 text-amber-500" />
+                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
                 Placement Intelligence
                 <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
                   VIP
@@ -346,26 +356,27 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="pt-4 pb-2">
-            <div className="h-px bg-border/50 w-full" />
+          <div className="pt-3 pb-1">
+            <div className="h-px bg-border w-full" />
           </div>
           
-          <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="w-full">
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:bg-gray-100 dark:hover:bg-slate-800/50">
-              <Compass className="mr-3 h-4 w-4" />
+          <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="w-full block">
+            <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted">
+              <Compass className="mr-2.5 h-4 w-4" />
               IITB Resources
               <ExternalLink className="ml-auto h-3 w-3 opacity-50" />
             </Button>
           </a>
         </nav>
 
-        <div className="mt-auto">
-          <div className="flex items-center gap-3 text-sm font-medium text-foreground p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={handleLogout}>
-            <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-neutral-800 flex items-center justify-center text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-neutral-700">
+        {/* User Footer */}
+        <div className="mt-auto pt-3 border-t border-border">
+          <div className="flex items-center gap-2.5 text-xs text-foreground p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors" onClick={handleLogout}>
+            <div className="h-7 w-7 rounded-md bg-muted border border-border flex items-center justify-center font-mono-tech font-bold text-foreground text-xs">
               {isGuest ? "G" : user?.email?.charAt(0).toUpperCase()}
             </div>
-            <span className="truncate flex-1">{isGuest ? "Guest User" : user?.email}</span>
-            <LogOut className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate flex-1 font-medium">{isGuest ? "Guest User" : user?.email}</span>
+            <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
           </div>
         </div>
       </aside>
@@ -376,68 +387,48 @@ export default function DashboardPage() {
       )}
       
       {/* Mobile Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-white dark:bg-neutral-950 shadow-2xl flex flex-col p-6 transition-transform duration-300 ease-in-out lg:hidden ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-gradient-premium p-[1px] flex items-center justify-center shadow-sm">
-              <div className="h-full w-full bg-white dark:bg-neutral-950 rounded-[7px] flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card shadow-xl flex flex-col p-5 transition-transform duration-200 ease-in-out lg:hidden ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+              <Sparkles className="h-4 w-4" />
             </div>
-            <span className="text-xl font-bold font-outfit tracking-tight">InternPrep</span>
+            <span className="text-sm font-bold font-mono-tech text-foreground">InternPrep.ai</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-            <X className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMobileMenuOpen(false)}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          <Button variant="secondary" className="w-full justify-start shadow-sm bg-white dark:bg-neutral-900 text-foreground border border-black/5 dark:border-white/5" onClick={() => setIsMobileMenuOpen(false)}>
-            <LayoutDashboard className="mr-3 h-4 w-4 text-primary" />
+        <nav className="flex-1 space-y-1 text-xs">
+          <Button variant="secondary" className="w-full justify-start text-xs font-semibold bg-muted text-foreground" onClick={() => setIsMobileMenuOpen(false)}>
+            <LayoutDashboard className="mr-2.5 h-4 w-4 text-primary" />
             Command Center
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume"); setIsMobileMenuOpen(false); }}>
-            <FileText className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/resume"); setIsMobileMenuOpen(false); }}>
+            <FileText className="mr-2.5 h-4 w-4" />
             Resume Review
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/ats-checker"); setIsMobileMenuOpen(false); }}>
-            <Gauge className="mr-3 h-4 w-4 text-primary" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/ats-checker"); setIsMobileMenuOpen(false); }}>
+            <Gauge className="mr-2.5 h-4 w-4 text-primary" />
             ATS Scorecard
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/resume-builder"); setIsMobileMenuOpen(false); }}>
-            <UploadCloud className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/resume-builder"); setIsMobileMenuOpen(false); }}>
+            <UploadCloud className="mr-2.5 h-4 w-4" />
             Resume Builder
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
-            <Briefcase className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
+            <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/billing"); setIsMobileMenuOpen(false); }}>
-            <CreditCard className="mr-3 h-4 w-4 text-primary" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/billing"); setIsMobileMenuOpen(false); }}>
+            <CreditCard className="mr-2.5 h-4 w-4 text-primary" />
             Subscriptions & Quotas
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => { router.push("/history"); setIsMobileMenuOpen(false); }}>
-            <Clock className="mr-3 h-4 w-4" />
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/history"); setIsMobileMenuOpen(false); }}>
+            <Clock className="mr-2.5 h-4 w-4" />
             History
           </Button>
-
-          {isAdmin && (
-            <div className="pt-2 space-y-1 border-t border-border/50">
-              <Button variant="ghost" className="w-full justify-start text-purple-600 dark:text-purple-300 font-semibold" onClick={() => { router.push("/admin"); setIsMobileMenuOpen(false); }}>
-                <Crown className="mr-3 h-4 w-4 text-purple-500" />
-                Admin Console
-              </Button>
-              <Button variant="ghost" className="w-full justify-start text-amber-600 dark:text-amber-300 font-semibold" onClick={() => {
-                localStorage.setItem("iitb_placement_verified", "true")
-                localStorage.setItem("iitb_placement_admin", "true")
-                router.push("/placement-analysis");
-                setIsMobileMenuOpen(false);
-              }}>
-                <Building2 className="mr-3 h-4 w-4 text-amber-500" />
-                Placement Intelligence
-              </Button>
-            </div>
-          )}
         </nav>
       </aside>
 
@@ -445,171 +436,223 @@ export default function DashboardPage() {
       <main className="flex-1 flex flex-col relative h-screen overflow-y-auto">
         
         {/* Mobile Header */}
-        <header className="lg:hidden border-b border-border bg-white/50 dark:bg-neutral-950/50 backdrop-blur-xl sticky top-0 z-30 flex h-16 items-center justify-between px-4">
+        <header className="lg:hidden border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-30 flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="-ml-2" onClick={() => setIsMobileMenuOpen(true)}>
-              <Menu className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 -ml-1" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="h-4 w-4" />
             </Button>
-            <Sparkles className="h-5 w-5 text-primary ml-1" />
-            <span className="text-xl font-bold tracking-tight">InternPrep</span>
+            <span className="text-sm font-bold font-mono-tech text-foreground">InternPrep.ai</span>
           </div>
           <div className="flex items-center gap-2">
             <QuotaBadge />
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5 text-muted-foreground" />
-            </Button>
           </div>
         </header>
 
-        <div className="p-4 md:p-8 lg:p-12 max-w-7xl mx-auto w-full z-10">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full z-10 space-y-8">
+          
+          {/* Greeting & Header */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-border">
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2 font-outfit text-foreground drop-shadow-sm">Good {new Date().getHours() < 12 ? 'morning' : 'evening'}, {isGuest ? 'Guest' : 'Candidate'}</h1>
-              <p className="text-muted-foreground text-lg">Your AI copilot is ready. What are we practicing today?</p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
+                  [COMMAND CENTER]
+                </span>
+                <span className="text-xs font-mono-tech text-muted-foreground">ACTIVE CALIBRATION</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                Good {new Date().getHours() < 12 ? 'morning' : 'evening'}, {isGuest ? 'Guest' : 'Candidate'}
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                Select an interview engine or resume diagnostic module to continue your prep.
+              </p>
             </div>
-            <div className="flex items-center gap-4">
+            
+            <div className="flex items-center gap-3">
               <QuotaBadge />
-              <a href="https://reach.gymkhana.iitb.ac.in/internships" target="_blank" rel="noopener noreferrer" className="hidden md:flex">
-                <Button variant="outline" size="sm" className="rounded-full bg-white/50 dark:bg-neutral-900/50 backdrop-blur-sm border-dashed">
-                  <Compass className="mr-2 h-4 w-4" /> IITB Resources <ExternalLink className="ml-1 h-3 w-3" />
-                </Button>
-              </a>
               <div className="hidden lg:block">
                 <ThemeToggle />
               </div>
             </div>
-          </motion.div>
+          </div>
           
           {/* Bento Box Layout */}
           <motion.div 
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+            className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"
           >
             
             {/* Full Interview Simulator Card (Spans 2 cols) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => setShowDomainModal(true)}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-blue-100/50 dark:bg-blue-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-blue-200/50 dark:group-hover:bg-blue-800/30 transition-colors duration-500 z-0" />
-              
-              <div className="flex items-start justify-between relative z-10 mb-6">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform duration-300">
-                  <Users className="h-7 w-7 text-white" />
+            <motion.div 
+              variants={itemVariants} 
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-emerald-500/40 shadow-xs transition-all"
+              onClick={() => setShowDomainModal(true)}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech font-semibold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                    DOMAIN FOCUS
+                  </span>
                 </div>
-                <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">DOMAIN FOCUS</span>
-              </div>
-              
-              <div className="relative z-10">
-                <h2 className="text-2xl md:text-3xl font-extrabold mb-3 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors font-outfit">Full Interview Simulator</h2>
-                <p className="text-muted-foreground text-sm md:text-base leading-relaxed mb-6 max-w-sm">
-                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across various domains.
+                
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                  Full Interview Simulator
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-6 font-sans">
+                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across Software, Consulting, Finance, and Quant.
                 </p>
-                <div className="inline-flex items-center text-white bg-blue-600 px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-fit">
-                  Configure Session <ExternalLink className="ml-2 h-4 w-4" />
-                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border flex items-center justify-between">
+                <span className="text-xs font-mono-tech text-foreground font-semibold flex items-center gap-1 group-hover:underline">
+                  Configure Session <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </span>
+                <span className="text-[11px] font-mono-tech text-muted-foreground">7 Tracks Active</span>
               </div>
             </motion.div>
 
             {/* Mock Case Simulator Card (Spans 2 cols) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-panel dark:bg-neutral-900/80 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden shadow-lg border-white dark:border-neutral-800" onClick={() => router.push("/interview")}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-100/50 dark:bg-cyan-900/20 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 group-hover:bg-cyan-200/50 dark:group-hover:bg-cyan-800/30 transition-colors duration-500 z-0" />
-              
-              <div className="flex items-start justify-between relative z-10 mb-6">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-premium flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform duration-300">
-                  <Briefcase className="h-7 w-7 text-white" />
+            <motion.div 
+              variants={itemVariants} 
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-blue-500/40 shadow-xs transition-all"
+              onClick={() => router.push("/interview")}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <Briefcase className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech font-semibold tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded border border-blue-500/20">
+                    CORE CASE ENGINE
+                  </span>
                 </div>
-                <span className="text-xs font-semibold tracking-wider text-white bg-black/80 backdrop-blur-md px-3 py-1 rounded-full shadow-sm">CORE ENGINE</span>
-              </div>
-              
-              <div className="relative z-10">
-                <h2 className="text-3xl font-extrabold mb-3 group-hover:text-cyan-700 transition-colors font-outfit">Mock Case Simulator</h2>
-                <p className="text-muted-foreground text-base leading-relaxed mb-6 max-w-sm">
-                  Engage in a hyper-realistic, voice-enabled mock interview. Work through problems on a live digital scratchpad evaluated in real-time.
+                
+                <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  Mock Case Simulator
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-6 font-sans">
+                  Engage in a hyper-realistic case interview with MBB Partner pushbacks. Work through calculations and frameworks on the live Excalidraw scratchpad.
                 </p>
-                <div className="inline-flex items-center text-white bg-primary px-5 py-2.5 rounded-full font-medium text-sm hover:shadow-md hover:-translate-y-0.5 transition-all w-fit">
-                  Initialize Session <ExternalLink className="ml-2 h-4 w-4" />
-                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border flex items-center justify-between">
+                <span className="text-xs font-mono-tech text-foreground font-semibold flex items-center gap-1 group-hover:underline">
+                  Initialize Session <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                </span>
+                <span className="text-[11px] font-mono-tech text-muted-foreground">&lt; 150ms Latency</span>
               </div>
             </motion.div>
 
-            {/* Resume Diagnostic Card (Spans 2 columns) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume")}>
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-100/50 dark:from-violet-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
-              <div className="flex items-start justify-between relative z-10">
-                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-violet-100 dark:border-violet-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                  <FileText className="h-6 w-6 text-violet-600 dark:text-violet-400" />
+            {/* Resume Diagnostics Card */}
+            <motion.div 
+              variants={itemVariants} 
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-primary/40 shadow-xs transition-all"
+              onClick={() => router.push("/resume")}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-9 w-9 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                    DIAGNOSTICS
+                  </span>
                 </div>
-                <span className="text-xs font-semibold tracking-wider text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-3 py-1 rounded-full border border-violet-100 dark:border-violet-800/50">DIAGNOSTICS</span>
-              </div>
-              <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2 group-hover:text-violet-700 transition-colors font-outfit">Resume Intelligence</h2>
-                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
-                  Deep STAR compliance critiques, competence radar, Day 1 benchmark comparison, and interactive AI workshop.
+                <h2 className="text-base font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                  Resume Intelligence
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed font-sans">
+                  Deep STAR compliance critiques, competence radar, Day 1 placement benchmark diffs, and interactive AI workshop.
                 </p>
+              </div>
+              <div className="pt-4 mt-4 border-t border-border text-xs font-mono-tech text-primary font-medium flex items-center gap-1">
+                Analyze PDF <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </motion.div>
 
-            {/* ATS Scorecard Studio Card (Spans 2 columns) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/ats-checker")}>
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-100/50 dark:from-blue-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
-              <div className="flex items-start justify-between relative z-10">
-                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-blue-100 dark:border-blue-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                  <Gauge className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            {/* ATS Scorecard Studio Card */}
+            <motion.div 
+              variants={itemVariants} 
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-primary/40 shadow-xs transition-all"
+              onClick={() => router.push("/ats-checker")}
+            >
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-9 w-9 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+                    <Gauge className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                    ATS SUITE
+                  </span>
                 </div>
-                <span className="text-xs font-semibold tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-800/50">ATS SUITE</span>
-              </div>
-              <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2 group-hover:text-blue-700 transition-colors font-outfit">ATS & Placement Score</h2>
-                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
+                <h2 className="text-base font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                  ATS & Placement Score
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed font-sans">
                   5-Pillar score (0–100), 1-page LaTeX line-wrap auditor, IITB policy compliance check, and custom JD matcher.
                 </p>
               </div>
-            </motion.div>
-
-
-            {/* Resume Builder Card (Spans 2 columns) */}
-            <motion.div variants={itemVariants} className="md:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-8 flex flex-col justify-between group cursor-pointer relative overflow-hidden" onClick={() => router.push("/resume-builder")}>
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-100/50 dark:from-emerald-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0" />
-              <div className="flex items-start justify-between relative z-10">
-                <div className="h-14 w-14 rounded-2xl bg-white dark:bg-neutral-800 flex items-center justify-center border border-emerald-100 dark:border-emerald-900 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                  <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <span className="text-xs font-semibold tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full border border-emerald-100 dark:border-emerald-800/50">BUILDER</span>
-              </div>
-              <div className="relative z-10">
-                <h2 className="text-2xl font-bold mb-2 group-hover:text-emerald-700 transition-colors font-outfit">Resume Builder</h2>
-                <p className="text-muted-foreground text-sm line-clamp-2 max-w-sm">
-                  Turn raw experiences into high-impact, placement-focused bullets using the Achievement Vault.
-                </p>
+              <div className="pt-4 mt-4 border-t border-border text-xs font-mono-tech text-primary font-medium flex items-center gap-1">
+                Run ATS Evaluation <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </motion.div>
 
-            {/* Analytics Card */}
+            {/* Resume Builder Card */}
             <motion.div 
               variants={itemVariants} 
-              className="md:col-span-2 lg:col-span-2 glass-card dark:bg-neutral-900/40 rounded-3xl p-6 flex flex-col justify-between group cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/60 transition-colors"
-              onClick={() => router.push("/dashboard/analytics")}
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-primary/40 shadow-xs transition-all"
+              onClick={() => router.push("/resume-builder")}
             >
-              <div className="flex items-start justify-between">
-                <div className="h-12 w-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800/50 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors shadow-sm">
-                  <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
               <div>
-                <h2 className="text-xl font-bold mb-1 font-outfit">Analytics</h2>
-                <p className="text-muted-foreground text-xs">Performance insights</p>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-9 w-9 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+                    <UploadCloud className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                    STUDIO
+                  </span>
+                </div>
+                <h2 className="text-base font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                  Resume Builder & Vault
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed font-sans">
+                  Turn raw experiences into high-impact, placement-focused bullets using the Achievement Vault & Domain Pivot.
+                </p>
+              </div>
+              <div className="pt-4 mt-4 border-t border-border text-xs font-mono-tech text-primary font-medium flex items-center gap-1">
+                Open Builder <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </motion.div>
 
-            {/* Settings/Progress Placeholder */}
-            <motion.div variants={itemVariants} className="md:col-span-2 lg:col-span-2 glass-card rounded-3xl p-6 flex flex-col justify-between border border-gray-300 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/40 hover:bg-white/80 dark:hover:bg-slate-800/60 cursor-pointer group transition-colors" onClick={() => router.push("/history")}>
-              <div className="h-12 w-12 rounded-2xl bg-white/80 dark:bg-neutral-800/80 flex items-center justify-center border border-gray-200 dark:border-neutral-700 shadow-sm group-hover:scale-110 transition-transform">
-                <Clock className="h-6 w-6 text-gray-700 dark:text-gray-300" />
-              </div>
+            {/* History & Analytics Combined Card */}
+            <motion.div 
+              variants={itemVariants} 
+              className="md:col-span-2 rounded-xl p-6 flex flex-col justify-between group cursor-pointer bg-card border border-border hover:border-primary/40 shadow-xs transition-all"
+              onClick={() => router.push("/history")}
+            >
               <div>
-                <h2 className="text-xl font-bold mb-1 font-outfit">History</h2>
-                <p className="text-muted-foreground text-xs">Track your progress</p>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="h-9 w-9 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                    TELEMETRY
+                  </span>
+                </div>
+                <h2 className="text-base font-bold text-foreground mb-1 group-hover:text-primary transition-colors">
+                  History & Session Logs
+                </h2>
+                <p className="text-xs text-muted-foreground leading-relaxed font-sans">
+                  Track your growth across every mock session. Review past interview transcripts and historical radar charts.
+                </p>
+              </div>
+              <div className="pt-4 mt-4 border-t border-border text-xs font-mono-tech text-primary font-medium flex items-center gap-1">
+                View Past Transcripts <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </motion.div>
 
