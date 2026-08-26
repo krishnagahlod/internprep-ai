@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, CreditCard, Sparkles, FileText, GraduationCap, Users } from "lucide-react";
+import { Plus, Minus, HelpCircle, MessageSquare, CreditCard, Sparkles, FileText, GraduationCap, Users } from "lucide-react";
 
 const FAQ_ITEMS = [
   {
@@ -57,14 +57,19 @@ const FAQ_ITEMS = [
 
 export function FaqSection() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [openIndex, setOpenIndex] = useState<number | null>(0); // First item open by default
 
   const filteredFaqs = selectedCategory === "all"
     ? FAQ_ITEMS
     : FAQ_ITEMS.filter(f => f.category === selectedCategory);
 
+  const toggleFaq = (idx: number) => {
+    setOpenIndex(openIndex === idx ? null : idx);
+  };
+
   return (
     <section id="faq" className="py-20 border-b border-border bg-background transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Tag */}
         <div className="flex items-center gap-2 mb-3">
@@ -76,27 +81,30 @@ export function FaqSection() {
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground max-w-2xl">
-              Everything you need to know about the platform.
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              Frequently Asked Questions
             </h2>
-            <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-xl font-sans">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2 font-sans">
               Clear answers regarding interview simulation, credit validity, domain coverage, and access.
             </p>
           </div>
 
-          {/* Clean Single-Row Category Filter Pills */}
+          {/* Category Filter Pills */}
           <div className="flex items-center gap-1.5 p-1 rounded-lg bg-muted/60 border border-border overflow-x-auto max-w-full custom-scrollbar">
             {[
               { id: "all", label: "All Questions" },
               { id: "interviews", label: "Interviews" },
-              { id: "credits", label: "Credits & Passes" },
+              { id: "credits", label: "Credits" },
               { id: "resume", label: "Resume RAG" },
               { id: "domains", label: "5 Domains" },
               { id: "iitb", label: "IITB Access" }
             ].map(cat => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  setOpenIndex(null);
+                }}
                 className={`px-3 py-1.5 rounded-md text-xs font-mono-tech whitespace-nowrap transition-all ${
                   selectedCategory === cat.id
                     ? "bg-card text-foreground font-bold shadow-xs border border-border"
@@ -109,44 +117,65 @@ export function FaqSection() {
           </div>
         </div>
 
-        {/* Modern 2-Column Bento FAQ Grid */}
-        <div className="grid md:grid-cols-2 gap-6">
-          <AnimatePresence mode="popLayout">
-            {filteredFaqs.map((faq) => {
-              const Icon = faq.icon;
-              return (
-                <motion.div
-                  key={faq.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.2 }}
-                  className="rounded-xl border border-border bg-card p-6 space-y-4 flex flex-col justify-between shadow-xs hover:border-emerald-500/30 transition-all"
+        {/* Clean Modern Accordion List */}
+        <div className="space-y-3">
+          {filteredFaqs.map((faq, idx) => {
+            const isOpen = openIndex === idx;
+            const Icon = faq.icon;
+
+            return (
+              <div
+                key={faq.id}
+                className={`rounded-xl border transition-all overflow-hidden ${
+                  isOpen 
+                    ? "bg-card border-emerald-500/40 shadow-sm" 
+                    : "bg-card/70 border-border hover:border-border/80"
+                }`}
+              >
+                <button
+                  onClick={() => toggleFaq(idx)}
+                  className="w-full flex items-center justify-between p-5 text-left focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none transition-colors"
+                  aria-expanded={isOpen}
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-xs font-mono-tech">
+                  <div className="flex items-center gap-3 pr-4">
+                    <div className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                      isOpen ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-muted text-muted-foreground"
+                    }`}>
                       <Icon className="h-4 w-4" />
-                      <span>{faq.categoryLabel}</span>
                     </div>
-
-                    <h3 className="text-base font-bold text-foreground leading-snug">
+                    <span className={`text-sm sm:text-base font-semibold transition-colors ${
+                      isOpen ? "text-foreground font-bold" : "text-foreground/90"
+                    }`}>
                       {faq.question}
-                    </h3>
-
-                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans">
-                      {faq.answer}
-                    </p>
+                    </span>
                   </div>
 
-                  <div className="pt-3 border-t border-border/50 text-[11px] font-mono-tech text-muted-foreground flex items-center justify-between">
-                    <span>InternPrep Knowledge Base</span>
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">Verified</span>
+                  <div className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 transition-all ${
+                    isOpen ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                  }`}>
+                    {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                   </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                </button>
+
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                    >
+                      <div className="px-5 pb-5 pt-0 border-t border-border/40">
+                        <p className="pt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed font-sans">
+                          {faq.answer}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
         </div>
 
       </div>
