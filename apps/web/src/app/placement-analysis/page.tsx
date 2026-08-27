@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
+  CommandNav,
+  CommandHero,
+  KpiMetricCard,
+  KpiMetricGrid,
+  SegmentedTabs,
+  FilterPills,
+} from "@/components/shared"
+import {
   Building2,
   Search,
   SlidersHorizontal,
@@ -965,21 +973,15 @@ export default function PlacementAnalysisPage() {
   // ---------------------------------------------------------------------------
   if (!isIITBVerified) {
     return (
-      <div className="min-h-screen bg-background relative flex flex-col justify-between p-4 md:p-8 selection:bg-primary/20">
+      <div className="min-h-screen bg-background relative flex flex-col justify-between selection:bg-primary/20">
         <div className="absolute top-10 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute bottom-10 right-1/4 w-[500px] h-[500px] bg-purple-500/10 rounded-full blur-[140px] pointer-events-none" />
 
-        <header className="flex justify-between items-center max-w-7xl mx-auto w-full mb-6 z-10">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/dashboard")}
-            className="text-xs font-semibold text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1.5" /> Back to Dashboard
-          </Button>
-          <ThemeToggle />
-        </header>
+        <CommandNav
+          backHref="/dashboard"
+          backLabel="Dashboard"
+          breadcrumb="PLACEMENT ACCESS GATE"
+        />
 
         <main className="max-w-xl mx-auto w-full my-auto z-10">
           <div className="rounded-3xl border border-primary/30 bg-card/90 backdrop-blur-xl p-8 md:p-10 shadow-2xl relative overflow-hidden text-center">
@@ -1053,167 +1055,98 @@ export default function PlacementAnalysisPage() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-primary/20">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/dashboard")}
-              className="text-xs font-semibold text-muted-foreground hover:text-foreground h-9 px-2.5"
-            >
-              <ArrowLeft className="h-4 w-4 mr-1.5" /> Dashboard
-            </Button>
-            <div className="h-4 w-px bg-border/60" />
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <span className="font-extrabold text-sm tracking-tight font-outfit">Placement Analysis</span>
-                <span className="hidden sm:inline-block text-[11px] text-muted-foreground ml-2">
-                  Company Intelligence & Compensation Benchmarks
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
+      <CommandNav
+        backHref="/dashboard"
+        backLabel="Dashboard"
+        breadcrumb="PLACEMENT INTELLIGENCE & JAFS"
+        actions={
+          <div className="flex items-center gap-2.5">
             {isAdmin && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAdminModal(true)}
-                className="h-8 text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1.5"
+                className="h-8 text-xs font-mono-tech font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 flex items-center gap-1.5 rounded-xl"
               >
                 <Key className="h-3.5 w-3.5" /> Admin Console
               </Button>
             )}
-
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1.5 px-2.5 py-1">
+            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-mono-tech font-semibold flex items-center gap-1.5 px-2.5 py-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               IITB Verified
             </Badge>
-            <ThemeToggle />
           </div>
-        </div>
-      </header>
+        }
+      />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
-        {/* HERO & PLATFORM STATS RIBBON */}
-        <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-primary/10 via-background to-purple-500/10 border border-primary/20 shadow-lg overflow-hidden">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-          
-          <div className="relative z-10 space-y-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30 text-xs font-semibold px-3 py-1">
-                    Historical JAF & Selection Archives (2024–2026)
-                  </Badge>
-                  {isAdmin && (
-                    <Badge variant="outline" className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs font-bold px-2 py-0.5">
-                      Admin Active
-                    </Badge>
-                  )}
-                </div>
-                <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground font-outfit leading-tight">
-                  Placement Intelligence & Company Analysis
-                </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">
-                  Explore real Job Announcement Forms (JAFs), authentic student interview questions, dual-currency compensation breakdowns, and AI-powered preparation roadmaps across <strong className="text-foreground">627+ top recruiters</strong>.
-                </p>
-              </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+        {/* HERO & PLATFORM TELEMETRY */}
+        <CommandHero
+          badge="[CAMPUS RECRUITING & JAF ARCHIVES (2024–2026)]"
+          statusBadge={isAdmin ? "ADMIN ACTIVE" : undefined}
+          statusVariant="amber"
+          title="Placement Intelligence & Company JAF Directory"
+          subtitle="Explore authentic Job Announcement Forms (JAFs), student interview questions, dual-currency compensation benchmarks, and AI preparation roadmaps across 627+ top recruiters."
+          actions={
+            <SegmentedTabs
+              tabs={[
+                { id: "directory", label: "Company Directory", icon: Building2 },
+                { id: "crm", label: "Placement CRM", icon: BookmarkCheck, count: crmItems.length },
+                { id: "analytics", label: "Macro Trends", icon: BarChart3 },
+              ]}
+              activeTab={activeMainTab}
+              onChange={(k) => setActiveMainTab(k as "directory" | "crm" | "analytics")}
+            />
+          }
+        />
 
-              {/* 3-Way Main Navigation Switcher */}
-              <div className="inline-flex rounded-2xl p-1.5 bg-card border border-border/60 shadow-md shrink-0">
-                <button
-                  onClick={() => setActiveMainTab("directory")}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                    activeMainTab === "directory"
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Building2 className="h-4 w-4" /> Company Directory
-                </button>
-                <button
-                  onClick={() => setActiveMainTab("crm")}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                    activeMainTab === "crm"
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <BookmarkCheck className="h-4 w-4" /> Placement CRM ({crmItems.length})
-                </button>
-                <button
-                  onClick={() => setActiveMainTab("analytics")}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                    activeMainTab === "analytics"
-                      ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <BarChart3 className="h-4 w-4" /> Macro Trends
-                </button>
-              </div>
-            </div>
-
-            {/* Metric Counters Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                  {selectedSector !== "All Sectors" ? `${selectedSector} Companies` : "Total Companies"}
-                </span>
-                <span className="text-xl font-extrabold text-foreground font-outfit">
-                  {stats ? stats.total_companies : "627+"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                  {selectedSector !== "All Sectors" ? `${selectedSector} Roles` : "Total JAF Roles"}
-                </span>
-                <span className="text-xl font-extrabold text-primary font-outfit">
-                  {stats ? stats.total_roles.toLocaleString() : "2,246"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                  {selectedSector !== "All Sectors" ? "Sector Highest CTC" : "Highest CTC Offer"}
-                </span>
-                <span className="text-xl font-extrabold text-amber-500 font-outfit">
-                  {stats?.highest_ctc_inr ? formatINRAmount(stats.highest_ctc_inr) : "₹2.51 Cr"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">
-                  {selectedSector !== "All Sectors" ? "Sector Median CTC" : "Median Campus CTC"}
-                </span>
-                <span className="text-xl font-extrabold text-foreground font-outfit">
-                  {stats?.median_ctc_inr ? formatINRAmount(stats.median_ctc_inr) : "₹18.0 LPA"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">International Roles</span>
-                <span className="text-xl font-extrabold text-purple-500 font-outfit">
-                  {stats ? `${stats.international_offers_count} Offers` : "182 Offers"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-card/80 border border-border/60 backdrop-blur-md shadow-sm">
-                <span className="text-[11px] font-medium text-muted-foreground block mb-0.5">Student Q&A Logs</span>
-                <span className="text-xl font-extrabold text-emerald-500 font-outfit">
-                  50+ Verified
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* METRIC COUNTERS GRID */}
+        <KpiMetricGrid columns={6}>
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? `${selectedSector} Companies` : "Total Companies"}
+            value={stats ? stats.total_companies : "627+"}
+            subtext="627+ verified"
+            icon={Building2}
+          />
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? `${selectedSector} Roles` : "Total JAF Roles"}
+            value={stats ? stats.total_roles.toLocaleString() : "2,246"}
+            subtext="Across all sectors"
+            icon={Briefcase}
+            badge="Roles"
+            badgeVariant="blue"
+          />
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? "Sector Highest CTC" : "Highest CTC Offer"}
+            value={stats?.highest_ctc_inr ? formatINRAmount(stats.highest_ctc_inr) : "₹2.51 Cr"}
+            subtext="Dual currency converted"
+            icon={DollarSign}
+            badge="Top CTC"
+            badgeVariant="amber"
+          />
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? "Sector Median CTC" : "Median Campus CTC"}
+            value={stats?.median_ctc_inr ? formatINRAmount(stats.median_ctc_inr) : "₹18.0 LPA"}
+            subtext="IITB Campus benchmark"
+            icon={Award}
+          />
+          <KpiMetricCard
+            label="International Roles"
+            value={stats ? `${stats.international_offers_count} Offers` : "182 Offers"}
+            subtext="US, EU, JP, SG, UAE"
+            icon={Globe}
+            badge="Global"
+            badgeVariant="purple"
+          />
+          <KpiMetricCard
+            label="Student Q&A Logs"
+            value="50+ Verified"
+            subtext="Real interview logs"
+            icon={CheckCircle2}
+            badge="Verified"
+            badgeVariant="emerald"
+          />
+        </KpiMetricGrid>
 
         {/* ----------------------------------------------------------------- */}
         {/* VIEW 1: COMPANY DIRECTORY & JAFS                                  */}
@@ -1227,15 +1160,15 @@ export default function PlacementAnalysisPage() {
                   <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Search by company, role (e.g. APM), skill, or location..."
+                    placeholder="Search by company, role (e.g. APM), skill..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 rounded-2xl bg-card border-border/60 shadow-sm text-sm"
+                    className="pl-10 h-10 rounded-xl bg-card border-border text-foreground font-mono-tech text-xs shadow-xs"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3.5 top-3 text-muted-foreground hover:text-foreground"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -1244,11 +1177,11 @@ export default function PlacementAnalysisPage() {
 
                 <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
                   {/* Descending Chronology Year & Phase Selector */}
-                  <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs flex-wrap gap-0.5">
+                  <div className="inline-flex rounded-xl p-1 bg-muted/40 border border-border text-xs font-mono-tech flex-wrap gap-0.5">
                     <button
                       onClick={() => setSelectedSession("all")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedSession === "all" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                        selectedSession === "all" ? "bg-card text-foreground shadow-xs font-bold border border-border" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       All Sessions
@@ -1256,27 +1189,27 @@ export default function PlacementAnalysisPage() {
                     <button
                       onClick={() => setSelectedSession("25-26_p1")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
-                        selectedSession === "25-26_p1" ? "bg-purple-600 text-white shadow-xs font-bold" : "text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                        selectedSession === "25-26_p1" ? "bg-primary text-primary-foreground shadow-xs font-bold" : "text-primary hover:bg-primary/10"
                       }`}
                       title="2025–26 Phase 1 (December Day 1–7 Placements)"
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p1" ? "bg-white" : "bg-purple-500"} animate-pulse`} />
-                      2025–26 Phase 1
+                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p1" ? "bg-white" : "bg-primary"} animate-pulse`} />
+                      2025–26 P1
                     </button>
                     <button
                       onClick={() => setSelectedSession("25-26_p2")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
-                        selectedSession === "25-26_p2" ? "bg-blue-600 text-white shadow-xs font-bold" : "text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+                        selectedSession === "25-26_p2" ? "bg-primary text-primary-foreground shadow-xs font-bold" : "text-primary hover:bg-primary/10"
                       }`}
                       title="2025–26 Phase 2 (Spring Placement Cycle)"
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p2" ? "bg-white" : "bg-blue-500"}`} />
-                      2025–26 Phase 2
+                      <span className={`h-1.5 w-1.5 rounded-full ${selectedSession === "25-26_p2" ? "bg-white" : "bg-primary"}`} />
+                      2025–26 P2
                     </button>
                     <button
                       onClick={() => setSelectedSession("24-25")}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedSession === "24-25" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                        selectedSession === "24-25" ? "bg-card text-foreground shadow-xs font-bold border border-border" : "text-muted-foreground hover:text-foreground"
                       }`}
                       title="2024–25 Complete Master Cycle"
                     >
@@ -1284,11 +1217,11 @@ export default function PlacementAnalysisPage() {
                     </button>
                   </div>
 
-                  <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40 text-xs">
+                  <div className="inline-flex rounded-xl p-1 bg-muted/40 border border-border text-xs font-mono-tech">
                     <button
                       onClick={() => setSelectedTier("all")}
                       className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedTier === "all" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                        selectedTier === "all" ? "bg-card text-foreground shadow-xs font-bold border border-border" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       All Tiers
@@ -1296,7 +1229,7 @@ export default function PlacementAnalysisPage() {
                     <button
                       onClick={() => setSelectedTier("C1")}
                       className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedTier === "C1" ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground hover:text-foreground"
+                        selectedTier === "C1" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold border border-amber-500/30" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       C1 Dream
@@ -1304,7 +1237,7 @@ export default function PlacementAnalysisPage() {
                     <button
                       onClick={() => setSelectedTier("C2")}
                       className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
-                        selectedTier === "C2" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
+                        selectedTier === "C2" ? "bg-card text-foreground shadow-xs font-bold border border-border" : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       C2 Core
@@ -1315,7 +1248,7 @@ export default function PlacementAnalysisPage() {
                     variant={isInternationalOnly ? "default" : "outline"}
                     size="sm"
                     onClick={() => setIsInternationalOnly(!isInternationalOnly)}
-                    className={`h-9 text-xs rounded-xl font-medium ${isInternationalOnly ? "bg-purple-600 text-white" : ""}`}
+                    className={`h-9 text-xs rounded-xl font-mono-tech ${isInternationalOnly ? "bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground"}`}
                   >
                     <Globe className="h-3.5 w-3.5 mr-1.5" /> International
                   </Button>
@@ -1323,74 +1256,52 @@ export default function PlacementAnalysisPage() {
                   <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="h-9 px-3 text-xs rounded-xl bg-card border border-border/60 text-foreground font-medium outline-none focus:border-primary"
+                    className="h-9 px-3 text-xs rounded-xl bg-card border border-border text-foreground font-mono-tech outline-none focus:border-primary"
                   >
-                    <option value="highest_ctc">Sort: Highest CTC (INR)</option>
+                    <option value="highest_ctc">Sort: Highest CTC</option>
                     <option value="median_ctc">Sort: Median CTC</option>
-                    <option value="roles_count">Sort: Total JAF Roles</option>
-                    <option value="name">Sort: Company Name (A-Z)</option>
+                    <option value="roles_count">Sort: Total Roles</option>
+                    <option value="name">Sort: Name (A-Z)</option>
                   </select>
 
-                  <div className="inline-flex rounded-xl p-1 bg-muted/60 border border-border/40">
+                  <div className="inline-flex rounded-xl p-1 bg-muted/40 border border-border">
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={`p-1.5 rounded-lg transition-all ${viewMode === "grid" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"}`}
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === "grid" ? "bg-card text-foreground shadow-xs border border-border" : "text-muted-foreground hover:text-foreground"}`}
                       title="Grid View"
                     >
-                      <Grid className="h-4 w-4" />
+                      <Grid className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setViewMode("table")}
-                      className={`p-1.5 rounded-lg transition-all ${viewMode === "table" ? "bg-background text-foreground shadow-xs" : "text-muted-foreground"}`}
+                      className={`p-1.5 rounded-lg transition-all ${viewMode === "table" ? "bg-card text-foreground shadow-xs border border-border" : "text-muted-foreground hover:text-foreground"}`}
                       title="Table View"
                     >
-                      <List className="h-4 w-4" />
+                      <List className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Sector Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                {SECTOR_TABS.map((sec) => {
-                  const isSelected = selectedSector === sec
-                  return (
-                    <button
-                      key={sec}
-                      onClick={() => setSelectedSector(sec)}
-                      className={`whitespace-nowrap px-4 py-2 rounded-2xl text-xs font-semibold transition-all border shrink-0 ${
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20 scale-[1.02]"
-                          : "bg-card hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/60"
-                      }`}
-                    >
-                      {sec}
-                    </button>
-                  )
-                })}
+              {/* Sector Filter Pills */}
+              <div className="space-y-1">
+                <FilterPills
+                  options={SECTOR_TABS}
+                  selected={selectedSector}
+                  onSelect={setSelectedSector}
+                />
               </div>
 
               {/* In-Demand Skills Cloud */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 custom-scrollbar">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                <span className="text-[10px] font-bold font-mono-tech text-muted-foreground uppercase tracking-wider shrink-0 flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-primary" /> Key Skills:
                 </span>
-                {POPULAR_SKILLS.map((sk) => {
-                  const isSelected = selectedSkill === sk
-                  return (
-                    <button
-                      key={sk}
-                      onClick={() => setSelectedSkill(sk)}
-                      className={`whitespace-nowrap px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all shrink-0 ${
-                        isSelected
-                          ? "bg-primary/20 text-primary border border-primary/40 font-bold"
-                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/40"
-                      }`}
-                    >
-                      {sk}
-                    </button>
-                  )
-                })}
+                <FilterPills
+                  options={POPULAR_SKILLS}
+                  selected={selectedSkill}
+                  onSelect={setSelectedSkill}
+                />
               </div>
             </div>
 
