@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 from posthog import Posthog
 from supabase import create_client, Client
 
-from services.db import get_supabase
+from services.db import get_supabase, safe_execute, reset_supabase
 from services.entitlement_service import EntitlementService, is_iitb_email, is_admin_email
 from services.usage_service import UsageService
 from services.session_service import SessionService

@@ -130,10 +130,12 @@ async def extract_from_pdf(
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
     try:
-        from dependencies import get_supabase; supabase = get_supabase()
+        from dependencies import safe_execute
         
         # Fetch existing vault context, ignoring final_resume dummy containers
-        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).neq('source_type', 'final_resume').execute()
+        existing_res = safe_execute(
+            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).neq('source_type', 'final_resume')
+        )
         existing_vault = existing_res.data if existing_res else []
         
         pdf_bytes = await file.read()
@@ -174,13 +176,13 @@ async def extract_from_pdf(
             
         inserted_data = []
         if db_records_to_insert:
-            res = supabase.table('achievements').insert(db_records_to_insert).execute()
+            res = safe_execute(lambda s: s.table('achievements').insert(db_records_to_insert))
             if res.data:
                 for r in res.data: r['_is_merged'] = False
                 inserted_data.extend(res.data)
             
         for merge_id, record in updates:
-            res = supabase.table('achievements').update(record).eq('id', merge_id).execute()
+            res = safe_execute(lambda s: s.table('achievements').update(record).eq('id', merge_id))
             if res.data:
                 for r in res.data: r['_is_merged'] = True
                 inserted_data.extend(res.data)
@@ -199,10 +201,12 @@ async def extract_from_pdf(
 @limiter.limit("5/minute")
 async def extract_from_text(request: Request, body: ExtractTextRequest):
     try:
-        from dependencies import get_supabase; supabase = get_supabase()
+        from dependencies import safe_execute
         
         # Fetch existing vault context, ignoring final_resume dummy containers
-        existing_res = supabase.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).neq('source_type', 'final_resume').execute()
+        existing_res = safe_execute(
+            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).neq('source_type', 'final_resume')
+        )
         existing_vault = existing_res.data if existing_res else []
         
         extracted = extract_achievements_from_text(body.text, existing_vault)
@@ -237,13 +241,13 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
             
         inserted_data = []
         if db_records_to_insert:
-            res = supabase.table('achievements').insert(db_records_to_insert).execute()
+            res = safe_execute(lambda s: s.table('achievements').insert(db_records_to_insert))
             if res.data:
                 for r in res.data: r['_is_merged'] = False
                 inserted_data.extend(res.data)
             
         for merge_id, record in updates:
-            res = supabase.table('achievements').update(record).eq('id', merge_id).execute()
+            res = safe_execute(lambda s: s.table('achievements').update(record).eq('id', merge_id))
             if res.data:
                 for r in res.data: r['_is_merged'] = True
                 inserted_data.extend(res.data)
@@ -260,70 +264,81 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
 # CRUD endpoints
 @router.get("/achievements")
 def get_achievements(user_id: str):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
-        res = supabase.table('achievements').select("*").eq('user_id', user_id).neq('source_type', 'final_resume').order('created_at', desc=True).execute()
-        return res.data
+        res = safe_execute(
+            lambda s: s.table('achievements').select("*").eq('user_id', user_id).neq('source_type', 'final_resume').order('created_at', desc=True)
+        )
+        return res.data or []
     except Exception as e:
+        print(f"[Achievements] Error fetching: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/achievements/{achievement_id}")
 def update_achievement(achievement_id: str, body: EditAchievementRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
-        res = supabase.table('achievements').update({
-            "title": body.title,
-            "original_description": body.original_description,
-            "section_type": body.section_type,
-            "parent_experience": body.parent_experience,
-            "timeline": body.timeline
-        }).eq('id', achievement_id).execute()
+        res = safe_execute(
+            lambda s: s.table('achievements').update({
+                "title": body.title,
+                "original_description": body.original_description,
+                "section_type": body.section_type,
+                "parent_experience": body.parent_experience,
+                "timeline": body.timeline
+            }).eq('id', achievement_id)
+        )
         
         if res.data:
             return {"achievement": res.data[0]}
         raise HTTPException(status_code=404, detail="Achievement not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/achievements")
 def add_achievement(req: ManualAchievementRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
-        res = supabase.table('achievements').insert({
-            "user_id": req.user_id,
-            "title": req.title,
-            "parent_experience": req.parent_experience,
-            "timeline": req.timeline,
-            "original_description": req.original_description,
-            "user_notes": req.user_notes,
-            "quantified_metrics": req.quantified_metrics or {},
-            "competency_tags": req.competency_tags or [],
-            "source_type": "manual",
-            "status": "accepted"
-        }).execute()
-        return res.data[0]
+        res = safe_execute(
+            lambda s: s.table('achievements').insert({
+                "user_id": req.user_id,
+                "title": req.title,
+                "parent_experience": req.parent_experience,
+                "timeline": req.timeline,
+                "original_description": req.original_description,
+                "user_notes": req.user_notes,
+                "quantified_metrics": req.quantified_metrics or {},
+                "competency_tags": req.competency_tags or [],
+                "source_type": "manual",
+                "status": "accepted"
+            })
+        )
+        return res.data[0] if res.data else {}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/achievements/{ach_id}")
 def edit_achievement(ach_id: str, req: EditAchievementRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
         update_data = {k: v for k, v in req.dict(exclude_unset=True).items() if v is not None}
         if not update_data:
             return {"status": "no changes"}
-        res = supabase.table('achievements').update(update_data).eq('id', ach_id).execute()
+        res = safe_execute(
+            lambda s: s.table('achievements').update(update_data).eq('id', ach_id)
+        )
         return res.data[0] if res.data else None
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/achievements/{ach_id}")
 def delete_achievement(ach_id: str):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
         # Also delete generated bullets linked to this
-        supabase.table('generated_bullets').delete().eq('achievement_id', ach_id).execute()
-        supabase.table('achievements').delete().eq('id', ach_id).execute()
+        safe_execute(lambda s: s.table('generated_bullets').delete().eq('achievement_id', ach_id))
+        safe_execute(lambda s: s.table('achievements').delete().eq('id', ach_id))
         return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -454,18 +469,21 @@ async def generate_section_bullets_api(
 
 @router.get("/point-bank")
 def get_point_bank(user_id: str):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
         # Only return saved bullets with full achievement metadata including section_type
-        res = supabase.table('generated_bullets').select("*, achievements(id, title, parent_experience, section_type, timeline, original_description)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True).execute()
-        return res.data
+        res = safe_execute(
+            lambda s: s.table('generated_bullets').select("*, achievements(id, title, parent_experience, section_type, timeline, original_description)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True)
+        )
+        return res.data or []
     except Exception as e:
+        print(f"[PointBank] Error fetching: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/save-bullet")
 def save_bullet(req: SaveBulletRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
         insert_data = {
             "achievement_id": req.achievement_id,
@@ -478,27 +496,31 @@ def save_bullet(req: SaveBulletRequest):
         if req.generation_group_id:
             insert_data["generation_group_id"] = req.generation_group_id
             
-        res = supabase.table('generated_bullets').insert(insert_data).execute()
-        return res.data[0]
+        res = safe_execute(
+            lambda s: s.table('generated_bullets').insert(insert_data)
+        )
+        return res.data[0] if res.data else {}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/point-bank/{bullet_id}")
 def delete_saved_bullet(bullet_id: str):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
-        supabase.table('generated_bullets').delete().eq('id', bullet_id).execute()
+        safe_execute(lambda s: s.table('generated_bullets').delete().eq('id', bullet_id))
         return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/point-bank/{bullet_id}")
 def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
-        res = supabase.table('generated_bullets').update({
-            "bullet_text": req.bullet_text
-        }).eq('id', bullet_id).execute()
+        res = safe_execute(
+            lambda s: s.table('generated_bullets').update({
+                "bullet_text": req.bullet_text
+            }).eq('id', bullet_id)
+        )
         return res.data[0] if res.data else None
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -740,7 +762,7 @@ async def convert_domain_endpoint(request: Request, req: ConvertDomainRequest):
 @router.post("/save-bullets-batch")
 @limiter.limit("10/minute")
 async def save_bullets_batch(request: Request, req: SaveBulletsBatchRequest):
-    from dependencies import get_supabase; supabase = get_supabase()
+    from dependencies import safe_execute
     try:
         records_to_insert = []
         for b in req.bullets:
@@ -748,11 +770,11 @@ async def save_bullets_batch(request: Request, req: SaveBulletsBatchRequest):
             
             # If achievement_id is missing, check or create a container
             if not ach_id and b.parent_experience:
-                ach_check = supabase.table('achievements').select("id").eq('user_id', req.user_id).eq('parent_experience', b.parent_experience).execute()
+                ach_check = safe_execute(lambda s: s.table('achievements').select("id").eq('user_id', req.user_id).eq('parent_experience', b.parent_experience))
                 if ach_check.data:
                     ach_id = ach_check.data[0]["id"]
                 else:
-                    new_ach = supabase.table('achievements').insert({
+                    new_ach = safe_execute(lambda s: s.table('achievements').insert({
                         "user_id": req.user_id,
                         "section_type": b.section_type or "Professional Experience",
                         "title": b.parent_experience,
@@ -760,11 +782,11 @@ async def save_bullets_batch(request: Request, req: SaveBulletsBatchRequest):
                         "original_description": b.bullet_text,
                         "source_type": "domain_pivot",
                         "status": "approved"
-                    }).execute()
+                    }))
                     ach_id = new_ach.data[0]["id"] if new_ach.data else None
 
             if not ach_id:
-                fallback_ach = supabase.table('achievements').select("id").eq('user_id', req.user_id).limit(1).execute()
+                fallback_ach = safe_execute(lambda s: s.table('achievements').select("id").eq('user_id', req.user_id).limit(1))
                 ach_id = fallback_ach.data[0]["id"] if fallback_ach.data else None
 
             if ach_id:
@@ -781,7 +803,7 @@ async def save_bullets_batch(request: Request, req: SaveBulletsBatchRequest):
         if not records_to_insert:
             return {"status": "success", "count": 0, "saved_bullets": []}
 
-        res = supabase.table('generated_bullets').insert(records_to_insert).execute()
+        res = safe_execute(lambda s: s.table('generated_bullets').insert(records_to_insert))
         return {
             "status": "success",
             "count": len(res.data) if res.data else 0,

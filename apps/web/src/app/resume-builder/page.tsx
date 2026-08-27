@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, useMemo, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuthStore } from "@/stores/auth-store"
+import { createClient } from "@/lib/supabase/client"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -15,7 +17,7 @@ import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, Responsi
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { AlertTriangle, AlertCircle, UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info, Lightbulb, Compass, ListOrdered, ArrowRight, Gauge, CheckSquare } from "lucide-react"
+import { AlertTriangle, AlertCircle, UploadCloud, CheckCircle2, ChevronRight, Save, Trash2, Edit3, MessageSquare, Plus, Activity, RefreshCw, Send, Target, Sparkles, Loader2, FileText, Copy, Edit2, Layers, Info, Lightbulb, Compass, ListOrdered, ArrowRight, ArrowLeft, Gauge, CheckSquare, ShieldCheck, Database, Bookmark, Check, Wand2 } from "lucide-react"
 import { PaywallModal } from "@/components/paywall-modal"
 
 // Types
@@ -125,9 +127,13 @@ function ResumeBuilderPageContent() {
   const { user } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const supabase = createClient()
   
   // Vault State
   const [achievements, setAchievements] = useState<Achievement[]>([])
+  const [vaultSectionFilter, setVaultSectionFilter] = useState<string>("all")
+  const [isSyncingVault, setIsSyncingVault] = useState(false)
+  const [copiedBulletId, setCopiedBulletId] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [pdfDocumentType, setPdfDocumentType] = useState<"resume" | "other">("resume")
   const [isExtractingPDF, setIsExtractingPDF] = useState(false)
@@ -287,34 +293,82 @@ function ResumeBuilderPageContent() {
     }
   }, [searchParams, pointBank, router]);
 
+  const rolesCovered = useMemo(() => {
+    const roles = new Set<string>()
+    pointBank.forEach(b => {
+      if (b.target_role) roles.add(b.target_role.toLowerCase())
+    })
+    return roles.size
+  }, [pointBank]);
+
+  const quantifiedRate = useMemo(() => {
+    if (pointBank.length === 0) return 0
+    const count = pointBank.filter(b => /\d/.test(b.bullet_text)).length
+    return Math.round((count / pointBank.length) * 100)
+  }, [pointBank]);
+
   if (!mounted || !user) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
-  const fetchAchievements = async () => {
+  const fetchAchievements = async (retries = 3) => {
     if (!user) return
     try {
-      const res = await fetch(`${apiBase}/builder/achievements?user_id=${user.id}`)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
+      const res = await fetch(`${apiBase}/builder/achievements?user_id=${user.id}`, { headers })
       if (res.ok) {
         const data = await res.json()
-        setAchievements(data)
+        setAchievements(Array.isArray(data) ? data : [])
+      } else if (res.status >= 500 && retries > 1) {
+        await new Promise(r => setTimeout(r, 400))
+        return fetchAchievements(retries - 1)
       }
     } catch (e) {
-      console.error(e)
+      if (retries > 1) {
+        await new Promise(r => setTimeout(r, 400))
+        return fetchAchievements(retries - 1)
+      }
+      console.error("Error fetching achievements:", e)
     }
   }
 
-  const fetchPointBank = async () => {
+  const fetchPointBank = async (retries = 3) => {
     if (!user) return
     try {
-      const res = await fetch(`${apiBase}/builder/point-bank?user_id=${user.id}`)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
+      const res = await fetch(`${apiBase}/builder/point-bank?user_id=${user.id}`, { headers })
       if (res.ok) {
         const data = await res.json()
-        setPointBank(data)
+        setPointBank(Array.isArray(data) ? data : [])
+      } else if (res.status >= 500 && retries > 1) {
+        await new Promise(r => setTimeout(r, 400))
+        return fetchPointBank(retries - 1)
       }
     } catch (e) {
-      console.error(e)
+      if (retries > 1) {
+        await new Promise(r => setTimeout(r, 400))
+        return fetchPointBank(retries - 1)
+      }
+      console.error("Error fetching point bank:", e)
     }
+  }
+
+  const handleSyncAll = async () => {
+    setIsSyncingVault(true)
+    await Promise.all([fetchAchievements(), fetchPointBank()])
+    setIsSyncingVault(false)
   }
 
   const handleFileUpload = async () => {
@@ -1024,35 +1078,117 @@ function ResumeBuilderPageContent() {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl px-4">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start mb-10 gap-4">
-        <div className="space-y-2">
-          <div className="inline-flex items-center rounded-lg bg-primary/10 px-3 py-1 text-sm font-medium text-primary mb-2">
-            <Sparkles className="mr-2 h-4 w-4" />
-            Placement Focus
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Sticky Top Navbar */}
+      <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => router.push("/dashboard")} 
+              className="text-muted-foreground hover:text-foreground h-8 px-2.5 text-xs font-mono-tech"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Dashboard
+            </Button>
+            <span className="text-border">/</span>
+            <span className="text-xs font-mono-tech text-muted-foreground">RESUME BUILDER & VAULT</span>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
-            Resume Builder
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl">
-            Specifically focusing on placement and internship resumes. Store your raw achievements once, and let our AI generate perfectly benchmarked bullet variants tailored for top-tier roles.
-          </p>
-        </div>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-8">
-        <TabsList className="flex flex-col sm:flex-row w-full h-auto bg-muted/30 p-1.5 rounded-xl shadow-sm border border-border/50">
-          <TabsTrigger value="vault" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
-            <UploadCloud className="w-4 h-4 mr-2" /> Achievement Vault
-          </TabsTrigger>
-          <TabsTrigger value="lab" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
-            <Activity className="w-4 h-4 mr-2" /> Bullet Laboratory
-          </TabsTrigger>
-          <TabsTrigger value="bank" className="flex-1 py-3 text-sm md:text-base font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all">
-            <Save className="w-4 h-4 mr-2" /> Point Bank & Strategy
-          </TabsTrigger>
-        </TabsList>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSyncAll} 
+              disabled={isSyncingVault}
+              className="text-xs font-mono-tech h-8 border-border"
+            >
+              <RefreshCw className={`h-3 w-3 mr-1.5 ${isSyncingVault ? "animate-spin" : ""}`} /> Sync Vault
+            </Button>
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto py-8 max-w-6xl px-4 sm:px-6 space-y-8 flex-1">
+        {/* Placement Command Header */}
+        <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono-tech uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-bold">
+                [DAY 1 PLACEMENT CALIBRATED]
+              </span>
+              <span className="text-xs font-mono-tech text-muted-foreground">MULTI-ROLE RESUME STUDIO</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              Resume Builder & Achievement Vault
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl font-sans">
+              Store your raw achievements once. Compose, benchmark, and pivot tailored bullet points across 5 placement domains with verified Day 1 quality.
+            </p>
+          </div>
+        </div>
+
+        {/* 4-KPI Metric Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-1">
+            <div className="text-[11px] font-mono-tech uppercase text-muted-foreground flex items-center justify-between">
+              <span>RAW ACHIEVEMENTS</span>
+              <Database className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <div className="text-2xl font-bold font-mono-tech text-foreground">{achievements.length}</div>
+            <div className="text-[10px] text-muted-foreground">Extracted across all sections</div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-1">
+            <div className="text-[11px] font-mono-tech uppercase text-muted-foreground flex items-center justify-between">
+              <span>POINT BANK BULLETS</span>
+              <Bookmark className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-2xl font-bold font-mono-tech text-foreground">{pointBank.length}</div>
+            <div className="text-[10px] text-muted-foreground">Day 1 placement-ready variants</div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-1">
+            <div className="text-[11px] font-mono-tech uppercase text-muted-foreground flex items-center justify-between">
+              <span>ROLE COVERAGE</span>
+              <Layers className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="text-2xl font-bold font-mono-tech text-foreground">{rolesCovered} / 5 Roles</div>
+            <div className="text-[10px] text-muted-foreground">Consulting, SDE, PM, Finance, Analytics</div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border bg-card shadow-xs space-y-1">
+            <div className="text-[11px] font-mono-tech uppercase text-muted-foreground flex items-center justify-between">
+              <span>QUANTIFICATION RATE</span>
+              <ShieldCheck className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div className="text-2xl font-bold font-mono-tech text-foreground">{quantifiedRate}%</div>
+            <div className="text-[10px] text-muted-foreground">Bullets with quantified metrics</div>
+          </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col w-full space-y-8">
+          <TabsList className="flex flex-col sm:flex-row w-full h-auto bg-muted/40 p-1.5 rounded-xl shadow-xs border border-border">
+            <TabsTrigger 
+              value="vault" 
+              className="flex-1 py-2.5 text-xs sm:text-sm font-semibold font-mono-tech rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs data-[state=active]:text-foreground transition-all"
+            >
+              <UploadCloud className="w-4 h-4 mr-2 text-primary" /> 1. Achievement Vault ({achievements.length})
+            </TabsTrigger>
+            <TabsTrigger 
+              value="lab" 
+              className="flex-1 py-2.5 text-xs sm:text-sm font-semibold font-mono-tech rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs data-[state=active]:text-foreground transition-all"
+            >
+              <Activity className="w-4 h-4 mr-2 text-emerald-600 dark:text-emerald-400" /> 2. Bullet Laboratory & Composer
+            </TabsTrigger>
+            <TabsTrigger 
+              value="bank" 
+              className="flex-1 py-2.5 text-xs sm:text-sm font-semibold font-mono-tech rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs data-[state=active]:text-foreground transition-all"
+            >
+              <Save className="w-4 h-4 mr-2 text-blue-600 dark:text-blue-400" /> 3. Point Bank & Strategy ({pointBank.length})
+            </TabsTrigger>
+          </TabsList>
 
         {/* VAULT TAB */}
         <TabsContent value="vault" className="space-y-8 animate-in fade-in-50 duration-500">
@@ -1145,10 +1281,39 @@ function ResumeBuilderPageContent() {
           </div>
 
           <div className="pt-4">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                Your Vault <Badge variant="secondary" className="text-sm px-2 rounded-full">{achievements.length}</Badge>
-              </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <span>Your Vault Achievements</span>
+                  <Badge variant="secondary" className="text-xs font-mono-tech px-2 rounded-full">{achievements.length}</Badge>
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">Structured raw career accomplishments categorized for AI bullet generation</p>
+              </div>
+
+              {achievements.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-muted/40 border border-border text-xs font-mono-tech">
+                  {[
+                    { id: "all", label: "All Sections" },
+                    { id: "Professional Experience", label: "Experience" },
+                    { id: "Projects", label: "Projects" },
+                    { id: "Positions of Responsibility", label: "POR" },
+                    { id: "Scholastic Achievements", label: "Scholastic" },
+                    { id: "Extracurriculars", label: "Extracurriculars" },
+                  ].map(sec => (
+                    <button
+                      key={sec.id}
+                      onClick={() => setVaultSectionFilter(sec.id)}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        vaultSectionFilter === sec.id 
+                          ? "bg-background text-foreground font-semibold shadow-xs border border-border" 
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {sec.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             
             {achievements.length === 0 ? (
@@ -1181,7 +1346,18 @@ function ResumeBuilderPageContent() {
                     if (indexA === -1) return 1;
                     if (indexB === -1) return -1;
                     return indexA - indexB;
-                  });
+                  }).filter(s => vaultSectionFilter === "all" || s === vaultSectionFilter);
+
+                  if (sortedSections.length === 0) {
+                    return (
+                      <div className="text-center p-12 border border-dashed rounded-xl text-muted-foreground bg-muted/5">
+                        <p className="text-sm">No achievements found under <span className="font-semibold text-foreground">{vaultSectionFilter}</span>.</p>
+                        <Button variant="outline" size="sm" onClick={() => setVaultSectionFilter("all")} className="mt-3 text-xs font-mono-tech">
+                          View All Sections
+                        </Button>
+                      </div>
+                    );
+                  }
 
                   return sortedSections.map(section => (
                     <div key={section} className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 fade-in">
@@ -2603,6 +2779,23 @@ function ResumeBuilderPageContent() {
                                                     variant="ghost" 
                                                     size="icon" 
                                                     onClick={() => {
+                                                      navigator.clipboard.writeText(bullet.bullet_text);
+                                                      setCopiedBulletId(bullet.id);
+                                                      setTimeout(() => setCopiedBulletId(null), 2000);
+                                                    }} 
+                                                    className={`h-8 w-8 rounded-full shadow-sm transition-all ${
+                                                      copiedBulletId === bullet.id 
+                                                        ? 'bg-emerald-500/15 text-emerald-600' 
+                                                        : 'hover:bg-primary/10 text-muted-foreground hover:text-foreground'
+                                                    }`} 
+                                                    title={copiedBulletId === bullet.id ? "Copied!" : "Copy Bullet Text"}
+                                                  >
+                                                    {copiedBulletId === bullet.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                                  </Button>
+                                                  <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    onClick={() => {
                                                       setRefineTarget({ 
                                                         source: "bank", 
                                                         id: bullet.id, 
@@ -3472,6 +3665,7 @@ function ResumeBuilderPageContent() {
         used={paywallMeta.used}
         resetAt={paywallMeta.resetAt}
       />
+      </div>
     </div>
   )
 }
