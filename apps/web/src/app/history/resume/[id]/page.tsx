@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { PaywallModal } from "@/components/paywall-modal";
+import { FeedbackButton } from "@/components/creator-badge";
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -783,6 +784,19 @@ export default function ResumeHistoryDetail() {
 
           </div>
 
+        </div>
+
+        {/* Ending Archived Report Feedback */}
+        <div className="mt-8 p-5 rounded-xl bg-card border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div>
+            <h4 className="text-xs font-mono-tech font-bold uppercase tracking-wider text-foreground">
+              Placement Intelligence Feedback
+            </h4>
+            <p className="text-xs text-muted-foreground font-sans mt-0.5">
+              Have suggestions on historical bullet diagnostics or benchmark calibration?
+            </p>
+          </div>
+          <FeedbackButton context="Archived Resume Report" label="Share Report Feedback" />
         </div>
 
       </main>

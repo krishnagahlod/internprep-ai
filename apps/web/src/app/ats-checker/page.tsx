@@ -16,7 +16,7 @@ import {
   Briefcase, FolderGit2, Award, Wrench, Users
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { CreatorBadge } from "@/components/creator-badge"
+import { FeedbackButton } from "@/components/creator-badge"
 
 // Master Radial Gauge Component for ATS Score
 const MasterScoreGauge = ({ score, tier, mode, roleLabel }: { score: number, tier: string, mode: string, roleLabel: string }) => {
@@ -1752,6 +1752,19 @@ export default function ATSCheckerPage() {
                 </div>
               )}
 
+              {/* Bottom Placement Feedback (Only shown at the end of audit scorecard) */}
+              <div className="mt-8 p-5 rounded-xl bg-card border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div>
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-foreground font-mono-tech">
+                    ATS Audit & Rubric Feedback
+                  </h5>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">
+                    Have suggestions on this audit score, pillar rubrics, or missing role keywords?
+                  </p>
+                </div>
+                <FeedbackButton context="ATS Scorecard Studio" label="Share Audit Feedback" />
+              </div>
+
             </div>
           </div>
         )}
@@ -1998,11 +2011,6 @@ export default function ATSCheckerPage() {
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="py-6 border-t border-border text-center">
-        <CreatorBadge />
-      </footer>
     </div>
   )
 }

@@ -10,6 +10,7 @@ import {
   ChevronDown, ChevronUp, BarChart3, BookOpen, Quote
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { FeedbackButton } from "@/components/creator-badge"
 
 function FeedbackContent() {
   const router = useRouter()
@@ -665,6 +666,19 @@ function FeedbackContent() {
             </div>
           </div>
         )}
+
+        {/* Ending Scorecard & Simulation Feedback */}
+        <div className="mt-8 p-5 rounded-xl bg-card border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div>
+            <h4 className="text-xs font-mono-tech font-bold uppercase tracking-wider text-foreground">
+              Scorecard & Evaluation Feedback
+            </h4>
+            <p className="text-xs text-muted-foreground font-sans mt-0.5">
+              Was this simulation evaluation accurate to your practice? Share your observations with our engineering team.
+            </p>
+          </div>
+          <FeedbackButton context="Interview Scorecard" label="Share Evaluation Feedback" />
+        </div>
 
       </main>
     </div>

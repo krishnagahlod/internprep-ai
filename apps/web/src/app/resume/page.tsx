@@ -14,6 +14,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MilestoneProgress } from "@/components/ui/milestone-progress"
 import { PaywallModal } from "@/components/paywall-modal"
+import { FeedbackButton } from "@/components/creator-badge"
 
 // Helper SVG Radar Chart
 const RadarChart = ({ scores }: { scores: any }) => {
@@ -908,6 +909,19 @@ export default function ResumePage() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Ending Resume Analysis Feedback (Only shown when analysis is loaded) */}
+              <div className="mt-8 p-5 rounded-xl bg-card border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div>
+                  <h4 className="text-xs font-mono-tech font-bold uppercase tracking-wider text-foreground">
+                    Resume Diagnostic Feedback
+                  </h4>
+                  <p className="text-xs text-muted-foreground font-sans mt-0.5">
+                    Have feedback on the suggested bullet rewrites, section balance, or benchmark metrics?
+                  </p>
+                </div>
+                <FeedbackButton context="Resume Intelligence Analysis" label="Share Analysis Feedback" />
               </div>
 
             </div>
