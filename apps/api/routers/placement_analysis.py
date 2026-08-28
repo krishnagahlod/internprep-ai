@@ -1172,6 +1172,15 @@ async def get_macro_placement_trends(request: Request):
             "tier": c["tier_category"]
         })
 
+    velocity_path = os.path.join(os.path.dirname(__file__), "..", "data", "placement_velocity_analytics.json")
+    velocity_data = None
+    if os.path.exists(velocity_path):
+        try:
+            with open(velocity_path, "r", encoding="utf-8") as f:
+                velocity_data = json.load(f)
+        except Exception:
+            pass
+
     return {
         "status": "success",
         "overview": {
@@ -1184,6 +1193,28 @@ async def get_macro_placement_trends(request: Request):
         "sector_benchmarks": sector_benchmarks,
         "international_breakdown": country_distribution,
         "top_ctc_companies": top_ctc_companies,
-        "top_volume_recruiters": top_volume_recruiters
+        "top_volume_recruiters": top_volume_recruiters,
+        "placement_velocity": velocity_data
+    }
+
+
+@router.get("/analytics/placement-velocity")
+@limiter.limit("60/minute")
+async def get_placement_velocity(request: Request):
+    """
+    Returns the cumulative Day 1 to Day 15 hiring velocity curves
+    and department-wise trajectory models for IIT Bombay.
+    """
+    velocity_path = os.path.join(os.path.dirname(__file__), "..", "data", "placement_velocity_analytics.json")
+    if os.path.exists(velocity_path):
+        try:
+            with open(velocity_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "total_phase1_placed_candidates": 0,
+        "overall_cumulative_velocity": [],
+        "department_trajectories": []
     }
 

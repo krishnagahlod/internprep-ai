@@ -1,0 +1,242 @@
+{
+  "total_phase1_placed_candidates": 882,
+  "btech_students_tracked": 1378,
+  "overall_cumulative_velocity": [
+    {
+      "milestone": "Day 1",
+      "placed_in_window": 194,
+      "cumulative_placed": 194,
+      "cumulative_percentage": 22.0
+    },
+    {
+      "milestone": "Day 2",
+      "placed_in_window": 192,
+      "cumulative_placed": 386,
+      "cumulative_percentage": 43.8
+    },
+    {
+      "milestone": "Day 3",
+      "placed_in_window": 133,
+      "cumulative_placed": 519,
+      "cumulative_percentage": 58.8
+    },
+    {
+      "milestone": "Day 4",
+      "placed_in_window": 142,
+      "cumulative_placed": 661,
+      "cumulative_percentage": 74.9
+    },
+    {
+      "milestone": "Day 5",
+      "placed_in_window": 21,
+      "cumulative_placed": 682,
+      "cumulative_percentage": 77.3
+    },
+    {
+      "milestone": "Day 6-10",
+      "placed_in_window": 109,
+      "cumulative_placed": 791,
+      "cumulative_percentage": 89.7
+    },
+    {
+      "milestone": "Day 11-15",
+      "placed_in_window": 97,
+      "cumulative_placed": 888,
+      "cumulative_percentage": 100.7
+    }
+  ],
+  "department_trajectories": [
+    {
+      "department": "Computer Science & Engineering",
+      "total_phase1_placed": 155,
+      "day1_2_placed": 94,
+      "day1_2_pct": 60.6,
+      "day3_5_placed": 48,
+      "day3_5_pct": 31.0,
+      "day6_15_placed": 13,
+      "day6_15_pct": 8.4,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Electrical Engineering",
+      "total_phase1_placed": 148,
+      "day1_2_placed": 84,
+      "day1_2_pct": 56.8,
+      "day3_5_placed": 38,
+      "day3_5_pct": 25.7,
+      "day6_15_placed": 26,
+      "day6_15_pct": 17.6,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Mechanical Engineering",
+      "total_phase1_placed": 131,
+      "day1_2_placed": 33,
+      "day1_2_pct": 25.2,
+      "day3_5_placed": 63,
+      "day3_5_pct": 48.1,
+      "day6_15_placed": 35,
+      "day6_15_pct": 26.7,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Chemical Engineering",
+      "total_phase1_placed": 97,
+      "day1_2_placed": 39,
+      "day1_2_pct": 40.2,
+      "day3_5_placed": 24,
+      "day3_5_pct": 24.7,
+      "day6_15_placed": 34,
+      "day6_15_pct": 35.1,
+      "peak_hiring_window": "Days 5\u201315 (Steady Extended Placements)",
+      "strategic_advice": "Specialized manufacturing, consulting, and domain-specific roles open progressively."
+    },
+    {
+      "department": "Civil Engineering",
+      "total_phase1_placed": 94,
+      "day1_2_placed": 32,
+      "day1_2_pct": 34.0,
+      "day3_5_placed": 38,
+      "day3_5_pct": 40.4,
+      "day6_15_placed": 24,
+      "day6_15_pct": 25.5,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Aerospace Engineering",
+      "total_phase1_placed": 81,
+      "day1_2_placed": 33,
+      "day1_2_pct": 40.7,
+      "day3_5_placed": 14,
+      "day3_5_pct": 17.3,
+      "day6_15_placed": 34,
+      "day6_15_pct": 42.0,
+      "peak_hiring_window": "Days 5\u201315 (Steady Extended Placements)",
+      "strategic_advice": "Specialized manufacturing, consulting, and domain-specific roles open progressively."
+    },
+    {
+      "department": "Metallurgical Engineering & Materials Science",
+      "total_phase1_placed": 57,
+      "day1_2_placed": 20,
+      "day1_2_pct": 35.1,
+      "day3_5_placed": 23,
+      "day3_5_pct": 40.4,
+      "day6_15_placed": 14,
+      "day6_15_pct": 24.6,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Biosciences & Bioengineering",
+      "total_phase1_placed": 29,
+      "day1_2_placed": 9,
+      "day1_2_pct": 31.0,
+      "day3_5_placed": 8,
+      "day3_5_pct": 27.6,
+      "day6_15_placed": 12,
+      "day6_15_pct": 41.4,
+      "peak_hiring_window": "Days 5\u201315 (Steady Extended Placements)",
+      "strategic_advice": "Specialized manufacturing, consulting, and domain-specific roles open progressively."
+    },
+    {
+      "department": "Design",
+      "total_phase1_placed": 19,
+      "day1_2_placed": 10,
+      "day1_2_pct": 52.6,
+      "day3_5_placed": 5,
+      "day3_5_pct": 26.3,
+      "day6_15_placed": 4,
+      "day6_15_pct": 21.1,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Energy Science & Engineering",
+      "total_phase1_placed": 16,
+      "day1_2_placed": 3,
+      "day1_2_pct": 18.8,
+      "day3_5_placed": 9,
+      "day3_5_pct": 56.2,
+      "day6_15_placed": 4,
+      "day6_15_pct": 25.0,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Physics",
+      "total_phase1_placed": 15,
+      "day1_2_placed": 5,
+      "day1_2_pct": 33.3,
+      "day3_5_placed": 8,
+      "day3_5_pct": 53.3,
+      "day6_15_placed": 2,
+      "day6_15_pct": 13.3,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Humanities & Social Sciences",
+      "total_phase1_placed": 14,
+      "day1_2_placed": 9,
+      "day1_2_pct": 64.3,
+      "day3_5_placed": 4,
+      "day3_5_pct": 28.6,
+      "day6_15_placed": 1,
+      "day6_15_pct": 7.1,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Environmental Science & Engineering",
+      "total_phase1_placed": 14,
+      "day1_2_placed": 7,
+      "day1_2_pct": 50.0,
+      "day3_5_placed": 7,
+      "day3_5_pct": 50.0,
+      "day6_15_placed": 0,
+      "day6_15_pct": 0.0,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Chemistry",
+      "total_phase1_placed": 10,
+      "day1_2_placed": 4,
+      "day1_2_pct": 40.0,
+      "day3_5_placed": 5,
+      "day3_5_pct": 50.0,
+      "day6_15_placed": 1,
+      "day6_15_pct": 10.0,
+      "peak_hiring_window": "Days 3\u20135 (Mid-Season Surge)",
+      "strategic_advice": "Core engineering and techno-commercial hiring wave. Keep momentum through Day 4."
+    },
+    {
+      "department": "Engineering Physics",
+      "total_phase1_placed": 10,
+      "day1_2_placed": 5,
+      "day1_2_pct": 50.0,
+      "day3_5_placed": 4,
+      "day3_5_pct": 40.0,
+      "day6_15_placed": 1,
+      "day6_15_pct": 10.0,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    },
+    {
+      "department": "Economics",
+      "total_phase1_placed": 4,
+      "day1_2_placed": 4,
+      "day1_2_pct": 100.0,
+      "day3_5_placed": 0,
+      "day3_5_pct": 0.0,
+      "day6_15_placed": 0,
+      "day6_15_pct": 0.0,
+      "peak_hiring_window": "Days 1\u20132 (First 48 Hours)",
+      "strategic_advice": "Heavy early hiring wave. Target Day 1.1 / 1.2 shortlists and early technical rounds."
+    }
+  ]
+}

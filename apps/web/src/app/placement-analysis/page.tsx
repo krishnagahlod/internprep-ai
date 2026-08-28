@@ -195,6 +195,14 @@ interface Company {
     recommended_electives_projects: string[]
   }
   hiring_funnel_intelligence?: HiringFunnelIntelligence | null
+  placement_slot?: string | null
+  slot_timing?: string | null
+  has_assignment_deck_round?: boolean
+  assignment_details?: string | null
+  has_group_discussion?: boolean
+  gd_details?: string | null
+  bond_applicable?: boolean | null
+  bond_details?: string | null
   ai_overview: string
   difficulty_score?: number
   difficulty_tier?: string
@@ -207,6 +215,14 @@ interface HiringFunnelIntelligence {
   hiring_phases: string[]
   slots_recorded: string[]
   has_walkins: boolean
+  placement_slot?: string | null
+  slot_timing?: string | null
+  has_assignment_deck_round?: boolean
+  assignment_details?: string | null
+  has_group_discussion?: boolean
+  gd_details?: string | null
+  bond_applicable?: boolean | null
+  bond_details?: string | null
   cpi_criteria: {
     cutoff_stated: string
     bonus_jaf_allowed: boolean
@@ -214,7 +230,9 @@ interface HiringFunnelIntelligence {
   online_assessment: {
     platform: string
     mode: string
+    venue?: string | null
     duration_minutes: number | null
+    test_format?: string
     special_instructions: string[]
   }
   conversion_funnel: {
@@ -232,7 +250,7 @@ interface HiringFunnelIntelligence {
   }
   recruitment_timeline: Array<{
     date: string
-    phase: string
+    phase?: string
     stage: string
     headline: string
   }>
@@ -339,6 +357,15 @@ const POPULAR_SKILLS = [
   "VLSI Design"
 ]
 
+const DAY_SLOT_OPTIONS = [
+  "All Slots",
+  "Day 1.1",
+  "Day 1.2",
+  "Day 2",
+  "Day 3–5",
+  "Day 6+"
+]
+
 export default function PlacementAnalysisPage() {
   const router = useRouter()
   const { user, setTargetCompany } = useAuthStore()
@@ -383,6 +410,7 @@ export default function PlacementAnalysisPage() {
   const [selectedSkill, setSelectedSkill] = useState("All Skills")
   const [selectedSession, setSelectedSession] = useState<"all" | "25-26_p1" | "25-26_p2" | "25-26" | "24-25">("all")
   const [selectedTier, setSelectedTier] = useState<"all" | "C1" | "C2" | "C3">("all")
+  const [selectedDaySlot, setSelectedDaySlot] = useState<string>("All Slots")
   const [isInternationalOnly, setIsInternationalOnly] = useState(false)
   const [sortBy, setSortBy] = useState<"highest_ctc" | "median_ctc" | "roles_count" | "name">("highest_ctc")
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
@@ -1017,6 +1045,16 @@ export default function PlacementAnalysisPage() {
       // 6. International filter
       if (isInternationalOnly && !c.has_international_offers) return false
 
+      // 7. Day Slotting filter
+      if (selectedDaySlot !== "All Slots") {
+        const slot = (c.placement_slot || c.hiring_funnel_intelligence?.placement_slot || "").toLowerCase()
+        if (selectedDaySlot === "Day 1.1" && !slot.includes("day 1.1")) return false
+        if (selectedDaySlot === "Day 1.2" && !slot.includes("day 1.2")) return false
+        if (selectedDaySlot === "Day 2" && !slot.includes("day 2")) return false
+        if (selectedDaySlot === "Day 3–5" && !(slot.includes("day 3") || slot.includes("day 4") || slot.includes("day 5"))) return false
+        if (selectedDaySlot === "Day 6+" && !/day\s*(6|7|8|9|10|11|12|13|14|15)/.test(slot)) return false
+      }
+
       return true
     })
 
@@ -1382,6 +1420,18 @@ export default function PlacementAnalysisPage() {
                   </Button>
 
                   <select
+                    value={selectedDaySlot}
+                    onChange={(e: any) => setSelectedDaySlot(e.target.value)}
+                    className="h-9 px-3 text-xs rounded-xl bg-background border border-border text-foreground font-mono-tech outline-none focus:border-primary cursor-pointer"
+                  >
+                    {DAY_SLOT_OPTIONS.map((slot) => (
+                      <option key={slot} value={slot}>
+                        Slot: {slot}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
                     className="h-9 px-3 text-xs rounded-xl bg-background border border-border text-foreground font-mono-tech outline-none focus:border-primary"
@@ -1440,7 +1490,7 @@ export default function PlacementAnalysisPage() {
               <span>
                 Showing <strong className="text-foreground font-semibold">{filteredCompanies.length}</strong> companies matching current criteria
               </span>
-              {(searchQuery || selectedSector !== "All Sectors" || selectedSkill !== "All Skills" || selectedSession !== "all" || selectedTier !== "all" || isInternationalOnly) && (
+              {(searchQuery || selectedSector !== "All Sectors" || selectedSkill !== "All Skills" || selectedSession !== "all" || selectedTier !== "all" || isInternationalOnly || selectedDaySlot !== "All Slots") && (
                 <button
                   onClick={() => {
                     setSearchQuery("")
@@ -1449,6 +1499,7 @@ export default function PlacementAnalysisPage() {
                     setSelectedSession("all")
                     setSelectedTier("all")
                     setIsInternationalOnly(false)
+                    setSelectedDaySlot("All Slots")
                   }}
                   className="text-primary hover:underline font-semibold"
                 >
@@ -1613,6 +1664,30 @@ export default function PlacementAnalysisPage() {
                               {comp.hiring_funnel_intelligence.has_walkins && (
                                 <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[9px]">
                                   Day Walk-ins
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {(comp.placement_slot || comp.has_assignment_deck_round || comp.has_group_discussion || comp.bond_applicable) && (
+                            <div className="pt-1.5 border-t border-border/40 flex flex-wrap gap-1 items-center">
+                              {comp.placement_slot && (
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-extrabold text-[9px] border border-indigo-500/30 flex items-center gap-0.5">
+                                  <Zap className="h-2.5 w-2.5" /> {comp.placement_slot}
+                                </span>
+                              )}
+                              {comp.has_assignment_deck_round && (
+                                <span className="px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-bold text-[9px] border border-purple-500/30 flex items-center gap-0.5">
+                                  <FileText className="h-2.5 w-2.5" /> Deck / Case Round
+                                </span>
+                              )}
+                              {comp.has_group_discussion && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-[9px] border border-amber-500/30 flex items-center gap-0.5">
+                                  <Users className="h-2.5 w-2.5" /> GD Round
+                                </span>
+                              )}
+                              {comp.bond_applicable && (
+                                <span className="px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-[9px] border border-rose-500/30 flex items-center gap-0.5">
+                                  <Lock className="h-2.5 w-2.5" /> Service Bond
                                 </span>
                               )}
                             </div>
@@ -2092,6 +2167,110 @@ export default function PlacementAnalysisPage() {
               </div>
             ) : macroAnalytics ? (
               <div className="space-y-8">
+                {/* Branch Placement Velocity & Trajectory Reality */}
+                {macroAnalytics.placement_velocity && (
+                  <div className="p-6 rounded-3xl bg-card border border-border/70 space-y-6 shadow-xs">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <div>
+                        <h2 className="text-xl font-extrabold text-foreground font-outfit flex items-center gap-2">
+                          <TrendingUp className="h-6 w-6 text-primary" /> Phase 1 Placement Velocity & Department Trajectories
+                        </h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Cumulative Day 1 to Day 15 hiring progression reconstructed from {macroAnalytics.placement_velocity.total_phase1_placed_candidates} verified Phase 1 selections across departments.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-xs font-bold font-mono">
+                        {macroAnalytics.placement_velocity.total_phase1_placed_candidates} Selections Tracked
+                      </Badge>
+                    </div>
+
+                    {/* Cumulative Velocity Milestones Steps */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                        Cumulative Phase 1 Campus Placement Progression:
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                        {macroAnalytics.placement_velocity.overall_cumulative_velocity?.map((m: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-2xl bg-muted/40 border border-border/60 text-center space-y-1 relative overflow-hidden"
+                          >
+                            <div className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                              {m.milestone}
+                            </div>
+                            <div className="text-lg font-black text-foreground font-outfit">
+                              {m.cumulative_percentage}%
+                            </div>
+                            <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              +{m.placed_in_window} placed
+                            </div>
+                            <div className="text-[9px] text-muted-foreground font-mono">
+                              ({m.cumulative_placed} total)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Department Trajectories Grid */}
+                    <div className="space-y-3 pt-2 border-t border-border/50">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <GraduationCap className="h-4 w-4 text-emerald-500" /> When Do Different Branches Get Placed?
+                        </h3>
+                        <span className="text-[11px] text-muted-foreground">
+                          Circuital peaks in first 48 hours • Mechanical & Civil peak in Days 3–5
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                        {macroAnalytics.placement_velocity.department_trajectories?.map((dept: any, dIdx: number) => (
+                          <div
+                            key={dIdx}
+                            className="p-4.5 rounded-2xl bg-muted/30 border border-border/60 space-y-3 shadow-2xs hover:border-border transition-colors"
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <h4 className="font-extrabold text-xs text-foreground font-outfit line-clamp-1">
+                                {dept.department}
+                              </h4>
+                              <Badge
+                                variant="outline"
+                                className={`text-[9px] font-bold shrink-0 ${
+                                  dept.peak_hiring_window.includes("Days 1")
+                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
+                                    : dept.peak_hiring_window.includes("Days 3")
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                    : "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30"
+                                }`}
+                              >
+                                {dept.peak_hiring_window}
+                              </Badge>
+                            </div>
+
+                            {/* 3-Window Velocity Bar */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[10px] text-muted-foreground">
+                                <span>Days 1–2: <strong>{dept.day1_2_pct}%</strong></span>
+                                <span>Days 3–5: <strong>{dept.day3_5_pct}%</strong></span>
+                                <span>Days 6–15: <strong>{dept.day6_15_pct}%</strong></span>
+                              </div>
+                              <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
+                                <div style={{ width: `${dept.day1_2_pct}%` }} className="bg-blue-500 h-full" title={`Days 1-2: ${dept.day1_2_pct}%`} />
+                                <div style={{ width: `${dept.day3_5_pct}%` }} className="bg-amber-500 h-full" title={`Days 3-5: ${dept.day3_5_pct}%`} />
+                                <div style={{ width: `${dept.day6_15_pct}%` }} className="bg-purple-500 h-full" title={`Days 6-15: ${dept.day6_15_pct}%`} />
+                              </div>
+                            </div>
+
+                            <p className="text-[11px] text-muted-foreground leading-relaxed bg-card/60 p-2.5 rounded-xl border border-border/40">
+                              💡 {dept.strategic_advice}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sector Compensation Distributions & Base/Bonus Split */}
                 <div className="p-6 rounded-3xl bg-card border border-border/70 space-y-5">
                   <div>
@@ -3197,7 +3376,8 @@ export default function PlacementAnalysisPage() {
                               {funnel.online_assessment?.platform || "Standard OA Platform"}
                             </div>
                             <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
-                              <span>Mode: {funnel.online_assessment?.mode || "Online"}</span>
+                              <span>Mode: {funnel.online_assessment?.venue ? `Venue: ${funnel.online_assessment.venue}` : (funnel.online_assessment?.mode || "Online")}</span>
+                              <span>Format: {funnel.online_assessment?.test_format || "Coding & Aptitude"}</span>
                               {funnel.online_assessment?.duration_minutes && (
                                 <span>Duration: {funnel.online_assessment.duration_minutes} Mins</span>
                               )}
@@ -3229,19 +3409,56 @@ export default function PlacementAnalysisPage() {
                           {/* Tile 3: JAF Rules */}
                           <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-1.5">
                             <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              3. Eligibility & Bonus
+                              3. Eligibility & Slotting
                             </div>
                             <div className="text-xs font-bold text-foreground">
-                              CPI Cutoff: {funnel.cpi_criteria?.cutoff_stated || "None"}
+                              Slot: {funnel.placement_slot || companyDetails?.company?.placement_slot || "Phase 1 / Rolling"}
                             </div>
                             <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+                              <span>CPI Cutoff: {funnel.cpi_criteria?.cutoff_stated || "None"}</span>
                               <span>Bonus JAF: {funnel.cpi_criteria?.bonus_jaf_allowed ? "Allowed" : "Not Allowed"}</span>
-                              {funnel.slots_recorded && funnel.slots_recorded.length > 0 && (
-                                <span className="truncate">{funnel.slots_recorded.join(", ")}</span>
+                              {funnel.bond_applicable !== undefined && funnel.bond_applicable !== null && (
+                                <span className={funnel.bond_applicable ? "text-rose-500 font-bold" : "text-emerald-500 font-semibold"}>
+                                  Service Bond: {funnel.bond_applicable ? "Applicable" : "No Bond"}
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
+
+                        {/* Take-Home Assignment & Case Deck Alert */}
+                        {(funnel.has_assignment_deck_round || companyDetails?.company?.has_assignment_deck_round) && (
+                          <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-start gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5">
+                              <FileText className="h-4 w-4" />
+                            </div>
+                            <div className="space-y-0.5 text-xs">
+                              <span className="font-extrabold text-purple-700 dark:text-purple-400 uppercase tracking-wider block text-[10px]">
+                                Pre-Interview Take-Home Case Study / Deck Round Required
+                              </span>
+                              <p className="text-muted-foreground leading-relaxed">
+                                {funnel.assignment_details || companyDetails?.company?.assignment_details || "Shortlisted candidates are required to submit a product problem statement, case study deck, or take-home code task prior to interviews."}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Group Discussion (GD) Round Alert */}
+                        {(funnel.has_group_discussion || companyDetails?.company?.has_group_discussion) && (
+                          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
+                            <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                              <Users className="h-4 w-4" />
+                            </div>
+                            <div className="space-y-0.5 text-xs">
+                              <span className="font-extrabold text-amber-700 dark:text-amber-400 uppercase tracking-wider block text-[10px]">
+                                Group Discussion (GD) Round Included
+                              </span>
+                              <p className="text-muted-foreground leading-relaxed">
+                                {funnel.gd_details || companyDetails?.company?.gd_details || "This recruiter conducts a Group Discussion (GD) round to evaluate communication, structured thinking, and business logic before technical rounds."}
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Department Distribution Progress Bar */}
                         {branches.length > 0 && (
