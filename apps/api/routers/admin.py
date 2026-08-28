@@ -619,6 +619,15 @@ async def get_user_details(
     if not user_info:
         user_info = {"id": user_id, "email": user_id}
 
+    user_email = user_info.get("email") if isinstance(user_info, dict) else ""
+    ent = EntitlementService.get_active_entitlement(user_id=user_id, user_email=user_email)
+    plan_key = ent.get("plan_key", "free")
+
+    # Usage summary across core features
+    usage = {}
+    for feat in ["resume_analysis", "mock_interview", "bullet_refine", "placement_intelligence"]:
+        usage[feat] = UsageService.check_quota(user_id=user_id, plan_key=plan_key, feature_key=feat)
+
     topup = {
         "resume_analysis": UsageService.get_topup_balance(user_id=user_id, feature_key="resume_analysis"),
         "mock_interview": UsageService.get_topup_balance(user_id=user_id, feature_key="mock_interview")

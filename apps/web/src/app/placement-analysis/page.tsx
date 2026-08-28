@@ -1082,53 +1082,76 @@ export default function PlacementAnalysisPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* HERO & PLATFORM TELEMETRY */}
         <CommandHero
+          variant="card"
+          watermark="IITB // 2026"
           badge="[CAMPUS RECRUITING & JAF ARCHIVES (2024–2026)]"
           statusBadge={isAdmin ? "ADMIN ACTIVE" : undefined}
           statusVariant="amber"
-          title="Placement Intelligence & Company JAF Directory"
+          badges={
+            <>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-mono-tech text-[10px] font-bold flex items-center gap-1.5 px-2.5 py-0.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                627 VERIFIED RECRUITERS
+              </Badge>
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 font-mono-tech text-[10px] font-medium px-2.5 py-0.5">
+                PHASE 1 & 2 ARCHIVES
+              </Badge>
+            </>
+          }
+          title="Placement Intelligence & Recruiter JAF Vault"
           subtitle="Explore authentic Job Announcement Forms (JAFs), student interview questions, dual-currency compensation benchmarks, and AI preparation roadmaps across 627+ top recruiters."
           actions={
-            <SegmentedTabs
-              tabs={[
-                { id: "directory", label: "Company Directory", icon: Building2 },
-                { id: "crm", label: "Placement CRM", icon: BookmarkCheck, count: crmItems.length },
-                { id: "analytics", label: "Macro Trends", icon: BarChart3 },
-              ]}
-              activeTab={activeMainTab}
-              onChange={(k) => setActiveMainTab(k as "directory" | "crm" | "analytics")}
-            />
+            <div className="p-1 rounded-2xl bg-card border border-border/80 shadow-xs">
+              <SegmentedTabs
+                tabs={[
+                  { id: "directory", label: "Company Directory", icon: Building2 },
+                  { id: "crm", label: "Placement CRM", icon: BookmarkCheck, count: crmItems.length },
+                  { id: "analytics", label: "Macro Trends", icon: BarChart3 },
+                ]}
+                activeTab={activeMainTab}
+                onChange={(k) => setActiveMainTab(k as "directory" | "crm" | "analytics")}
+              />
+            </div>
           }
         />
 
         {/* METRIC COUNTERS GRID */}
         <KpiMetricGrid columns={6}>
           <KpiMetricCard
-            label={selectedSector !== "All Sectors" ? `${selectedSector} Companies` : "Total Companies"}
-            value={stats ? stats.total_companies : "627+"}
-            subtext="627+ verified"
-            icon={Building2}
-          />
-          <KpiMetricCard
-            label={selectedSector !== "All Sectors" ? `${selectedSector} Roles` : "Total JAF Roles"}
-            value={stats ? stats.total_roles.toLocaleString() : "2,246"}
-            subtext="Across all sectors"
-            icon={Briefcase}
-            badge="Roles"
-            badgeVariant="blue"
-          />
-          <KpiMetricCard
             label={selectedSector !== "All Sectors" ? "Sector Highest CTC" : "Highest CTC Offer"}
             value={stats?.highest_ctc_inr ? formatINRAmount(stats.highest_ctc_inr) : "₹2.51 Cr"}
-            subtext="Dual currency converted"
-            icon={DollarSign}
-            badge="Top CTC"
+            subtext="Dual-Currency Peak"
+            icon={Flame}
+            badge="Day 1 Peak"
             badgeVariant="amber"
+            accentColor="amber"
           />
           <KpiMetricCard
             label={selectedSector !== "All Sectors" ? "Sector Median CTC" : "Median Campus CTC"}
             value={stats?.median_ctc_inr ? formatINRAmount(stats.median_ctc_inr) : "₹18.0 LPA"}
-            subtext="IITB Campus benchmark"
+            subtext="IITB Campus Median"
             icon={Award}
+            badge="Benchmark"
+            badgeVariant="emerald"
+            accentColor="emerald"
+          />
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? `${selectedSector} Firms` : "Verified Firms"}
+            value={stats ? stats.total_companies : "627+"}
+            subtext="Day 1 to Phase 2"
+            icon={Building2}
+            badge="Directory"
+            badgeVariant="blue"
+            accentColor="blue"
+          />
+          <KpiMetricCard
+            label={selectedSector !== "All Sectors" ? `${selectedSector} Roles` : "Total JAF Roles"}
+            value={stats ? stats.total_roles.toLocaleString() : "2,246"}
+            subtext="Across All Sectors"
+            icon={Briefcase}
+            badge="JAFs"
+            badgeVariant="indigo"
+            accentColor="indigo"
           />
           <KpiMetricCard
             label="International Roles"
@@ -1137,14 +1160,16 @@ export default function PlacementAnalysisPage() {
             icon={Globe}
             badge="Global"
             badgeVariant="purple"
+            accentColor="purple"
           />
           <KpiMetricCard
             label="Student Q&A Logs"
             value="50+ Verified"
-            subtext="Real interview logs"
+            subtext="Authentic Interview Logs"
             icon={CheckCircle2}
-            badge="Verified"
-            badgeVariant="emerald"
+            badge="Field Intel"
+            badgeVariant="teal"
+            accentColor="teal"
           />
         </KpiMetricGrid>
 
@@ -1153,17 +1178,17 @@ export default function PlacementAnalysisPage() {
         {/* ----------------------------------------------------------------- */}
         {activeMainTab === "directory" && (
           <div className="space-y-6 animate-in fade-in duration-200">
-            {/* SEARCH & FILTERS */}
-            <div className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
-                <div className="relative w-full md:w-96">
-                  <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+            {/* SEARCH & FILTERS CONSOLE DECK */}
+            <div className="rounded-3xl border border-border/80 bg-card p-5 sm:p-6 shadow-xs space-y-4">
+              <div className="flex flex-col lg:flex-row gap-3.5 items-stretch lg:items-center justify-between">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="text"
                     placeholder="Search by company, role (e.g. APM), skill..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-10 rounded-xl bg-card border-border text-foreground font-mono-tech text-xs shadow-xs"
+                    className="pl-10 h-10 rounded-xl bg-background border-border text-foreground font-mono-tech text-xs shadow-xs focus-visible:ring-primary/20"
                   />
                   {searchQuery && (
                     <button
@@ -1175,7 +1200,7 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+                <div className="flex flex-wrap items-center gap-2.5 justify-start lg:justify-end">
                   {/* Descending Chronology Year & Phase Selector */}
                   <div className="inline-flex rounded-xl p-1 bg-muted/40 border border-border text-xs font-mono-tech flex-wrap gap-0.5">
                     <button
@@ -1256,7 +1281,7 @@ export default function PlacementAnalysisPage() {
                   <select
                     value={sortBy}
                     onChange={(e: any) => setSortBy(e.target.value)}
-                    className="h-9 px-3 text-xs rounded-xl bg-card border border-border text-foreground font-mono-tech outline-none focus:border-primary"
+                    className="h-9 px-3 text-xs rounded-xl bg-background border border-border text-foreground font-mono-tech outline-none focus:border-primary"
                   >
                     <option value="highest_ctc">Sort: Highest CTC</option>
                     <option value="median_ctc">Sort: Median CTC</option>
@@ -1283,25 +1308,27 @@ export default function PlacementAnalysisPage() {
                 </div>
               </div>
 
-              {/* Sector Filter Pills */}
-              <div className="space-y-1">
-                <FilterPills
-                  options={SECTOR_TABS}
-                  selected={selectedSector}
-                  onSelect={setSelectedSector}
-                />
-              </div>
+              <div className="pt-3 border-t border-border/50 space-y-2.5">
+                {/* Sector Filter Pills */}
+                <div className="space-y-1">
+                  <FilterPills
+                    options={SECTOR_TABS}
+                    selected={selectedSector}
+                    onSelect={setSelectedSector}
+                  />
+                </div>
 
-              {/* In-Demand Skills Cloud */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
-                <span className="text-[10px] font-bold font-mono-tech text-muted-foreground uppercase tracking-wider shrink-0 flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-primary" /> Key Skills:
-                </span>
-                <FilterPills
-                  options={POPULAR_SKILLS}
-                  selected={selectedSkill}
-                  onSelect={setSelectedSkill}
-                />
+                {/* In-Demand Skills Cloud */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                  <span className="text-[10px] font-bold font-mono-tech text-muted-foreground uppercase tracking-wider shrink-0 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-primary" /> Key Skills:
+                  </span>
+                  <FilterPills
+                    options={POPULAR_SKILLS}
+                    selected={selectedSkill}
+                    onSelect={setSelectedSkill}
+                  />
+                </div>
               </div>
             </div>
 
