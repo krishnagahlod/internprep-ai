@@ -183,3 +183,27 @@ class SessionService:
                 print(f"Error revoking other sessions: {e}")
 
         return max(revoked_count, 1 if len(user_sess) > 1 else 0)
+
+    @classmethod
+    def revoke_all_sessions(cls, user_id: str) -> int:
+        """Revokes all active sessions for a user (used during account deletion or security reset)."""
+        now = datetime.now(timezone.utc).isoformat()
+        revoked_count = 0
+
+        user_sess = _ACTIVE_SESSIONS.get(user_id, {})
+        for s_id, s_data in user_sess.items():
+            _REVOKED_SESSIONS.add(s_id)
+            s_data["revoked_at"] = now
+            revoked_count += 1
+
+        supabase = get_supabase()
+        if supabase:
+            try:
+                supabase.table("user_sessions") \
+                    .update({"revoked_at": now}) \
+                    .eq("user_id", user_id) \
+                    .execute()
+            except Exception as e:
+                pass
+
+        return revoked_count

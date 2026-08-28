@@ -79,7 +79,7 @@ async def start_case_endpoint(
     body: StartCaseRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -95,7 +95,7 @@ async def start_case_endpoint(
     try:
         random_case_dict = get_random_case(body.case_type)
         if not random_case_dict:
-            raise Exception("No cases found for the given criteria.")
+            raise HTTPException(status_code=404, detail="No cases found for the given criteria.")
             
         solution_transcript = random_case_dict.get("solution_transcript", "")
         problem_statement = random_case_dict.get("problem_statement", "")
@@ -155,8 +155,9 @@ async def start_case_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error starting case: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error("Error starting case interview", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to start case interview session.")
 
 @router.post("/start_domain", response_model=StartDomainResponse)
 @limiter.limit("10/hour")
@@ -165,7 +166,7 @@ async def start_domain_endpoint(
     body: StartDomainRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -181,8 +182,11 @@ async def start_domain_endpoint(
         resume_context = "No resume attached. Use standard candidate profile."
         file_url = ""
         if body.resume_id and supabase:
-            res = supabase.table("resumes").select("parsed_text, file_url").eq("id", body.resume_id).execute()
+            res = supabase.table("resumes").select("user_id, parsed_text, file_url").eq("id", body.resume_id).execute()
             if res.data:
+                resume_owner = res.data[0].get("user_id")
+                if resume_owner and (not auth_user or (auth_user.id != resume_owner and not auth_user.is_admin)):
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to attach this resume.")
                 resume_context = res.data[0].get("parsed_text", "")
                 file_url = res.data[0].get("file_url", "")
                 
@@ -330,6 +334,14 @@ async def chat_endpoint(
             )
         
         if supabase and body.session_id != "temp_session_id":
+            # Verify session ownership to prevent IDOR message injection
+            if auth_user:
+                sess_check = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
+                if sess_check.data and sess_check.data[0].get("user_id"):
+                    session_owner = sess_check.data[0].get("user_id")
+                    if session_owner != auth_user.id and not auth_user.is_admin:
+                        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify this interview session.")
+
             # Save user message
             if latest_user_msg:
                 supabase.table("session_messages").insert({
@@ -365,55 +377,89 @@ async def chat_endpoint(
             turn_count=user_turns,
             max_turns=20 if is_paid else 4
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error in chat endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error in chat endpoint for session {body.session_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to process interview message.")
 
 @router.post("/hint", response_model=HintResponse)
-async def hint_endpoint(request: ChatRequest):
+@limiter.limit("30/minute")
+async def hint_endpoint(request: Request, body: ChatRequest):
     try:
-        history = [{"role": m.role, "content": m.content} for m in request.messages]
+        history = [{"role": m.role, "content": m.content} for m in body.messages]
         
         dynamic_context = ""
         latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
-        if request.case_source and latest_user_msg:
+        if body.case_source and latest_user_msg:
             from services.rag import retrieve_context
-            dynamic_context = retrieve_context(latest_user_msg, source=request.case_source, top_k=2)
+            dynamic_context = retrieve_context(latest_user_msg, source=body.case_source, top_k=2)
             
-        combined_context = request.case_context or ""
+        combined_context = body.case_context or ""
         if dynamic_context:
             combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
             
         hint_reply = generate_hint(history=history, context=combined_context)
         return HintResponse(hint=hint_reply)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error("Error generating hint", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to generate hint.")
 
 @router.post("/end_session")
-async def end_session_endpoint(request: EndSessionRequest):
-    """Marks session as complete. The feedback router will handle generation."""
+@limiter.limit("20/hour")
+async def end_session_endpoint(
+    request: Request,
+    body: EndSessionRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """Marks session as complete with ownership verification."""
     try:
-        if supabase and request.session_id != "temp_session_id":
+        if supabase and body.session_id != "temp_session_id":
+            # Verify session ownership to prevent IDOR tampering
+            sess_res = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
+            if sess_res.data and sess_res.data[0].get("user_id"):
+                owner_id = sess_res.data[0].get("user_id")
+                if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to close this session.")
+
             import datetime
             supabase.table("interview_sessions").update({
                 "status": "completed",
                 "completed_at": datetime.datetime.utcnow().isoformat()
-            }).eq("id", request.session_id).execute()
+            }).eq("id", body.session_id).execute()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error ending session {body.session_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to complete session.")
 
 @router.get("/session/{session_id}")
 @limiter.limit("30/hour")
-async def get_session_endpoint(request: Request, session_id: str):
+async def get_session_endpoint(
+    request: Request,
+    session_id: str,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """Retrieves session transcript with strict ownership verification to prevent IDOR leaks."""
     if not supabase:
-        raise HTTPException(status_code=500, detail="Database not configured")
+        raise HTTPException(status_code=500, detail="Database connection unavailable")
     try:
         res = supabase.table("interview_sessions").select("*").eq("id", session_id).execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Session not found")
         session = res.data[0]
         
+        # Verify ownership
+        owner_id = session.get("user_id")
+        if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+            raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to view this session.")
+
         # Fetch messages
         msg_res = supabase.table("session_messages").select("*").eq("session_id", session_id).order("created_at").execute()
         messages = [{"role": m["role"], "content": m["content"]} for m in msg_res.data] if msg_res.data else session.get("messages", [])
@@ -425,5 +471,6 @@ async def get_session_endpoint(request: Request, session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error fetching session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error fetching session {session_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to fetch interview session.")

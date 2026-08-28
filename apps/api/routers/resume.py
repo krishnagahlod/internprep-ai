@@ -74,9 +74,10 @@ class UploadResponse(BaseModel):
 async def upload_resume(
     request: Request,
     file: UploadFile = File(...),
-    user_id: str = Form(...)
+    user_id: Optional[str] = Form(None),
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    if not (file.filename.lower().endswith(".pdf") or file.content_type == "application/pdf"):
+    if not (file.filename and file.filename.lower().endswith(".pdf")):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
     file.file.seek(0, 2)
@@ -91,13 +92,17 @@ async def upload_resume(
 
     try:
         pdf_bytes = await file.read()
-        file_name = file.filename
         
-        # 1. Upload to Storage
+        # Verify genuine PDF magic bytes
+        if not pdf_bytes.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
+
         import uuid
-        file_path = f"{user_id}/{uuid.uuid4()}_{file_name}"
+        effective_user_id = auth_user.id if auth_user else None
+        safe_file_name = os.path.basename(file.filename or "resume.pdf").replace("/", "_").replace("\\", "_")
+        folder_prefix = effective_user_id or "anonymous"
+        file_path = f"{folder_prefix}/{uuid.uuid4()}_{safe_file_name}"
         
-        # We need to read it again for upload or just use bytes
         res = supabase.storage.from_("resume_pdfs").upload(
             file_path,
             pdf_bytes,
@@ -116,12 +121,10 @@ async def upload_resume(
         # 3. Extract raw text for fallback or basic analytics
         raw_text = extract_pdf_raw_text(pdf_bytes)
         
-        db_user_id = None if user_id == "guest" else user_id
-        
         # 4. Save to database
         db_res = supabase.table("resumes").insert({
-            "user_id": db_user_id,
-            "file_name": file_name,
+            "user_id": effective_user_id,
+            "file_name": safe_file_name,
             "raw_text": raw_text,
             "file_url": file_url,
             "parsed_content": parsed_content
@@ -129,9 +132,9 @@ async def upload_resume(
         
         resume_id = db_res.data[0]["id"]
         
-        if posthog_client and user_id:
+        if posthog_client and effective_user_id:
             posthog_client.capture(
-                distinct_id=user_id,
+                distinct_id=effective_user_id,
                 event='resume_uploaded',
                 properties={
                     'resume_id': resume_id,
@@ -141,18 +144,21 @@ async def upload_resume(
         
         return UploadResponse(
             id=resume_id,
-            file_name=file_name,
+            file_name=safe_file_name,
             message="Resume uploaded and parsed successfully"
         )
         
     except asyncio.TimeoutError:
         raise HTTPException(status_code=503, detail="Resume parsing timed out.")
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error uploading resume: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error("Error uploading resume", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to process uploaded resume.")
 
 @router.post("/analyze", response_model=AnalysisResponse)
-@limiter.limit("3/hour")
+@limiter.limit("5/hour")
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...),
@@ -161,12 +167,12 @@ async def analyze_resume(
     user_id: Optional[str] = Form(None),
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    # Resolve user identity
-    effective_user_id = auth_user.id if auth_user else (user_id if user_id and user_id != "guest" else None)
+    # Resolve user identity strictly from authenticated token
+    effective_user_id = auth_user.id if auth_user else None
     user_email = auth_user.email if auth_user else None
 
     # Strict PDF Validation
-    if not file.filename.endswith(".pdf"):
+    if not (file.filename and file.filename.lower().endswith(".pdf")):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
     file.file.seek(0, 2)
@@ -190,6 +196,9 @@ async def analyze_resume(
         
     try:
         pdf_bytes = await file.read()
+        if not pdf_bytes.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
+
         text = extract_pdf_raw_text(pdf_bytes)
         
         if not text.strip():
@@ -380,7 +389,8 @@ async def ats_check(
     sub_track: Optional[str] = Form(None),
     mode: str = Form("iitb_placement"),
     job_description: Optional[str] = Form(None),
-    resume_id: Optional[str] = Form(None)
+    resume_id: Optional[str] = Form(None),
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
     try:
         from agents.ats_engine import compute_full_ats_report
@@ -390,10 +400,15 @@ async def ats_check(
         pdf_bytes = None
         if file:
             pdf_bytes = await file.read()
+            if not pdf_bytes.startswith(b"%PDF-"):
+                raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
             
         if not raw_text and not pdf_bytes and resume_id and supabase:
-            res = supabase.table("resumes").select("raw_text, parsed_content").eq("id", resume_id).execute()
+            res = supabase.table("resumes").select("user_id, raw_text, parsed_content").eq("id", resume_id).execute()
             if res.data:
+                owner_id = res.data[0].get("user_id")
+                if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to inspect this resume.")
                 raw_text = res.data[0].get("raw_text", "")
                 
         if not raw_text and not pdf_bytes:
@@ -413,8 +428,9 @@ async def ats_check(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error in ats_check: {e}")
-        raise HTTPException(status_code=500, detail=f"Error computing ATS report: {str(e)}")
+        from services.security_logger import safe_log_error
+        safe_log_error("Error in ats_check", exc=e)
+        raise HTTPException(status_code=500, detail="Error computing ATS report.")
 
 
 @router.post("/ats-fix-bullet")

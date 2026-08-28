@@ -328,26 +328,33 @@ class PaymentService:
         }
 
     @classmethod
-    def process_webhook(cls, payload_bytes: bytes, signature_header: Optional[str]) -> Dict[str, Any]:
-        """Processes server-to-server Razorpay webhooks with HMAC validation and idempotency."""
+    def process_webhook(
+        cls,
+        raw_body: bytes,
+        signature: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Processes server-to-server Razorpay webhooks with cryptographic HMAC validation and idempotency."""
         webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
         
-        if webhook_secret and signature_header:
+        if webhook_secret and signature:
             generated_sig = hmac.new(
                 webhook_secret.encode("utf-8"),
-                payload_bytes,
+                raw_body,
                 hashlib.sha256
             ).hexdigest()
-            if not hmac.compare_digest(generated_sig, signature_header):
-                raise HTTPException(status_code=400, detail="Invalid webhook signature")
+            if not hmac.compare_digest(generated_sig, signature):
+                from services.security_logger import safe_log_error
+                safe_log_error("Invalid Razorpay webhook HMAC signature.")
+                return False
 
         try:
-            event_data = json.loads(payload_bytes.decode("utf-8"))
+            event_data = payload or json.loads(raw_body.decode("utf-8"))
             event = event_data.get("event")
             
             if event in ["payment.captured", "order.paid"]:
-                payload = event_data.get("payload", {})
-                payment = payload.get("payment", {}).get("entity", {})
+                p_data = event_data.get("payload", {})
+                payment = p_data.get("payment", {}).get("entity", {})
                 order_id = payment.get("order_id")
                 payment_id = payment.get("id")
                 notes = payment.get("notes", {})
@@ -361,7 +368,8 @@ class PaymentService:
                         order_id=order_id,
                         payment_id=payment_id
                     )
-            return {"status": "processed", "event": event}
+            return True
         except Exception as e:
-            print(f"Webhook processing error: {e}")
-            return {"status": "error", "error": str(e)}
+            from services.security_logger import safe_log_error
+            safe_log_error("Webhook processing error", exc=e)
+            return False

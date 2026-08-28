@@ -59,9 +59,9 @@ async def get_current_user(
     user_id = None
     email = None
     session_id = None
-
-    # 1. Try Supabase Auth API validation
     is_verified_auth = False
+
+    # 1. Primary: Verify token cryptographically via Supabase Auth API
     try:
         supabase = get_supabase()
         if supabase:
@@ -69,38 +69,54 @@ async def get_current_user(
             if user_res and user_res.user:
                 user = user_res.user
                 user_id = str(user.id)
-                email = str(user.email)
+                email = str(user.email) if user.email else ""
                 is_verified_auth = True
     except Exception:
+        # Auth API error or invalid token
         pass
 
-    # 2. If Auth API is unavailable, decode token claims
-    if not user_id:
+    # 2. Secondary: Cryptographic HMAC-SHA256 verification using SUPABASE_JWT_SECRET
+    jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+    if not is_verified_auth and jwt_secret:
         try:
-            unverified_claims = jwt.decode(token, options={"verify_signature": False})
-            user_id = unverified_claims.get("sub")
-            email = unverified_claims.get("email")
-            session_id = unverified_claims.get("session_id") or unverified_claims.get("jti")
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid or expired authentication session.")
+            # Cryptographically verify the signature, algorithm, and audience
+            verified_claims = jwt.decode(
+                token,
+                key=jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_signature": True, "verify_exp": True},
+                audience="authenticated"
+            )
+            user_id = verified_claims.get("sub")
+            email = verified_claims.get("email") or ""
+            session_id = verified_claims.get("session_id") or verified_claims.get("jti")
+            is_verified_auth = True
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Your session token has expired. Please log in again.")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Invalid authentication token signature.")
 
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Could not resolve user identity from token.")
+    # 3. Reject any token that cannot be cryptographically verified (No unverified decode fallback!)
+    if not is_verified_auth or not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication failed: Invalid or unverifiable authentication credentials."
+        )
 
     session_id = session_id or user_id
 
-    # 3. Check Session Revocation
+    # 4. Check Session Revocation
     if SessionService.is_session_revoked(session_id):
         raise HTTPException(status_code=401, detail="Your session has been signed out. Please log in again.")
 
-    # 4. Record/update active session
+    # 5. Record/update active session telemetry
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "")
     SessionService.record_session(user_id=user_id, session_id=session_id, user_agent=user_agent, client_ip=client_ip)
 
-    # Privilege evaluation: strictly require verified identity for admin/partner tier
-    is_iitb = is_iitb_email(email) if is_verified_auth or not os.getenv("SUPABASE_SERVICE_ROLE_KEY") else False
-    is_admin = is_admin_email(email) if is_verified_auth or not os.getenv("SUPABASE_SERVICE_ROLE_KEY") else False
+    # 6. Privilege evaluation: Strictly requires cryptographically verified identity
+    is_iitb = is_iitb_email(email) if is_verified_auth else False
+    is_admin = is_admin_email(email) if is_verified_auth else False
 
     return AuthUser(id=user_id, email=email or "", is_iitb=is_iitb, is_admin=is_admin, session_id=session_id)
 

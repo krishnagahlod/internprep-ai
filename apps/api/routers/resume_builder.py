@@ -333,15 +333,27 @@ def edit_achievement(ach_id: str, req: EditAchievementRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/achievements/{ach_id}")
-def delete_achievement(ach_id: str):
+def delete_achievement(ach_id: str, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
     from dependencies import safe_execute
     try:
+        # Verify ownership if user is authenticated to prevent IDOR
+        if auth_user:
+            check_res = safe_execute(lambda s: s.table('achievements').select('user_id').eq('id', ach_id))
+            if check_res and check_res.data:
+                owner = check_res.data[0].get('user_id')
+                if owner and owner != auth_user.id and not auth_user.is_admin:
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this achievement.")
+
         # Also delete generated bullets linked to this
         safe_execute(lambda s: s.table('generated_bullets').delete().eq('achievement_id', ach_id))
         safe_execute(lambda s: s.table('achievements').delete().eq('id', ach_id))
         return {"status": "deleted"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error deleting achievement {ach_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to delete achievement.")
 
 # Generate and Save
 @router.post("/generate")
@@ -351,7 +363,7 @@ async def generate_bullets(
     req: GenerateBulletsRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -504,33 +516,57 @@ def save_bullet(req: SaveBulletRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/point-bank/{bullet_id}")
-def delete_saved_bullet(bullet_id: str):
+def delete_saved_bullet(bullet_id: str, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
     from dependencies import safe_execute
     try:
+        # Verify ownership if user is authenticated to prevent IDOR
+        if auth_user:
+            check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
+            if check_res and check_res.data:
+                owner = check_res.data[0].get('user_id')
+                if owner and owner != auth_user.id and not auth_user.is_admin:
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
+
         safe_execute(lambda s: s.table('generated_bullets').delete().eq('id', bullet_id))
         return {"status": "deleted"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error deleting bullet {bullet_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to delete bullet point.")
 
 @router.put("/point-bank/{bullet_id}")
-def edit_saved_bullet(bullet_id: str, req: EditBulletRequest):
+def edit_saved_bullet(bullet_id: str, req: EditBulletRequest, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
     from dependencies import safe_execute
     try:
+        # Verify ownership if user is authenticated to prevent IDOR
+        if auth_user:
+            check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
+            if check_res and check_res.data:
+                owner = check_res.data[0].get('user_id')
+                if owner and owner != auth_user.id and not auth_user.is_admin:
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
+
         res = safe_execute(
             lambda s: s.table('generated_bullets').update({
                 "bullet_text": req.bullet_text
             }).eq('id', bullet_id)
         )
         return res.data[0] if res.data else None
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        from services.security_logger import safe_log_error
+        safe_log_error(f"Error editing bullet {bullet_id}", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to edit bullet point.")
 
 @router.post("/metric-chat")
 def metric_chat(
     req: MetricChatRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")

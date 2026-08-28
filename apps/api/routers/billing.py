@@ -211,10 +211,64 @@ async def revoke_single_session(
     user: AuthUser = Depends(get_current_user)
 ):
     """
-    Revokes a specific session ID.
+    Revokes a specific session ID owned by the authenticated user.
+    Prevents IDOR by verifying user ownership.
     """
-    SessionService.revoke_session(session_id=body.session_id)
+    success = SessionService.revoke_session(user_id=user.id, session_id=body.session_id)
     return {
         "status": "success",
         "message": "Session revoked."
+    }
+
+
+@router.delete("/account")
+@limiter.limit("3/hour")
+async def delete_user_account(
+    request: Request,
+    user: AuthUser = Depends(get_current_user)
+):
+    """
+    Self-service account deletion flow (GDPR / DPDP Compliance).
+    Permanently erases all user personal data, resumes, interview sessions, and active credentials.
+    """
+    supabase = get_supabase()
+    if supabase:
+        try:
+            # 1. Fetch user's interview sessions to clean messages & feedback
+            sess_res = supabase.table("interview_sessions").select("id").eq("user_id", user.id).execute()
+            session_ids = [s["id"] for s in (sess_res.data or []) if s.get("id")]
+            if session_ids:
+                supabase.table("session_messages").delete().in_("session_id", session_ids).execute()
+                supabase.table("session_feedback").delete().in_("session_id", session_ids).execute()
+            supabase.table("interview_sessions").delete().eq("user_id", user.id).execute()
+
+            # 2. Delete resumes & analyses
+            supabase.table("resumes").delete().eq("user_id", user.id).execute()
+            supabase.table("resume_analyses").delete().eq("user_id", user.id).execute()
+
+            # 3. Delete achievements & bullets
+            supabase.table("generated_bullets").delete().eq("user_id", user.id).execute()
+            supabase.table("achievements").delete().eq("user_id", user.id).execute()
+
+            # 4. Delete entitlements & usage events
+            supabase.table("entitlements").delete().eq("user_id", user.id).execute()
+            supabase.table("usage_events").delete().eq("user_id", user.id).execute()
+            supabase.table("user_sessions").delete().eq("user_id", user.id).execute()
+
+            # 5. Revoke from Auth provider if service role is present
+            if hasattr(supabase, "auth") and hasattr(supabase.auth, "admin") and hasattr(supabase.auth.admin, "delete_user"):
+                try:
+                    supabase.auth.admin.delete_user(user.id)
+                except Exception:
+                    pass
+        except Exception as e:
+            from services.security_logger import safe_log_error
+            safe_log_error(f"Error during account deletion for user {user.id}", exc=e)
+
+    # 6. Revoke all active in-memory sessions
+    SessionService.revoke_all_sessions(user_id=user.id)
+
+    return {
+        "status": "success",
+        "message": "Your account and all associated personal data have been permanently deleted."
     }
