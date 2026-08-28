@@ -728,6 +728,9 @@ async def get_company_details(request: Request, id_or_slug: str):
             "recommended_electives_projects": insights.get("recommended_electives_projects", []) if insights else []
         }
     
+    if "locations" in company and isinstance(company["locations"], list):
+        company["locations"] = list(dict.fromkeys(l.strip() for l in company["locations"] if l and l.strip()))
+
     return {
         "company": company,
         "roles_count": len(company_roles),

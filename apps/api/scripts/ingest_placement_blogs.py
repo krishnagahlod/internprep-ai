@@ -766,7 +766,7 @@ def run_pipeline():
         json.dump(cleaned_intelligence_output, f, indent=2)
     print(f"✓ Saved cleaned, zero-PII blog intelligence to: {output_blogs_path}")
 
-    # Merge directly into placement_intelligence.json
+    # Merge directly into placement_intelligence.json preserving metadata, stats, and all roles
     merged_count = 0
     for comp in companies_data:
         c_slug = comp.get("slug")
@@ -783,9 +783,10 @@ def run_pipeline():
             comp["bond_details"] = blog_intel.get("bond_details")
             merged_count += 1
 
+    intel_json["companies"] = companies_data
     with open(intel_path, "w", encoding="utf-8") as f:
-        json.dump({"companies": companies_data}, f, indent=2)
-    print(f"✓ Merged hiring funnel intelligence directly into {merged_count}/{len(companies_data)} companies in placement_intelligence.json!")
+        json.dump(intel_json, f, indent=2)
+    print(f"✓ Merged hiring funnel intelligence directly into {merged_count}/{len(companies_data)} companies in placement_intelligence.json (preserved all {len(intel_json.get('roles', []))} roles)!")
 
     # Verify zero-PII
     print("\n🔍 Running Strict Zero-PII Leakage Assertion Check...")

@@ -433,6 +433,8 @@ export default function PlacementAnalysisPage() {
   const [matchResult, setMatchResult] = useState<ResumeMatchResult | null>(null)
   const [matchingResume, setMatchingResume] = useState(false)
   const [copiedBulletIdx, setCopiedBulletIdx] = useState<number | null>(null)
+  const [copiedJd, setCopiedJd] = useState(false)
+  const [isJdExpanded, setIsJdExpanded] = useState(false)
 
   // Salary Breakdown State
   const [salaryBreakdown, setSalaryBreakdown] = useState<SalaryBreakdownResult | null>(null)
@@ -1634,19 +1636,24 @@ export default function PlacementAnalysisPage() {
                               {formatINRAmount(effectiveCTC)}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Sparkles className="h-3 w-3 text-emerald-500" />
-                              Est. Monthly In-Hand Cash
-                            </span>
-                            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {effectiveInHand > 0
-                                ? effectiveInHand > 500000
-                                  ? `${formatINRAmount(Math.round(effectiveInHand / 12))} / mo`
-                                  : `${formatINRAmount(effectiveInHand)} / mo`
-                                : "Standard Net Cash"}
-                            </span>
-                          </div>
+                          {effectiveInHand > 0 ? (
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <Briefcase className="h-3 w-3 text-muted-foreground" />
+                                Fixed Base Component
+                              </span>
+                              <span className="font-semibold text-foreground font-outfit">
+                                {formatINRAmount(effectiveInHand)}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-muted-foreground">Available Roles</span>
+                              <span className="font-semibold text-foreground">
+                                {comp.roles_count || 1} JAF Roles
+                              </span>
+                            </div>
+                          )}
                           {comp.has_authentic_insights && (
                             <div className="pt-1.5 border-t border-border/40 flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
                               <Award className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
@@ -1832,7 +1839,7 @@ export default function PlacementAnalysisPage() {
                         <th className="p-4">Sector</th>
                         <th className="p-4">Hiring Tier</th>
                         <th className="p-4">{selectedSector !== "All Sectors" ? `${selectedSector} Highest CTC` : "Highest CTC"}</th>
-                        <th className="p-4">Base / In-Hand</th>
+                        <th className="p-4">Fixed Base</th>
                         <th className="p-4">Role Offers & Packages</th>
                         <th className="p-4">Hiring Phases</th>
                         <th className="p-4 text-right">Action</th>
@@ -1882,12 +1889,8 @@ export default function PlacementAnalysisPage() {
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-extrabold text-foreground font-outfit">
                               {formatINRAmount(effectiveCTC)}
                             </td>
-                            <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {effectiveInHand > 0
-                                ? effectiveInHand > 500000
-                                  ? `${formatINRAmount(Math.round(effectiveInHand / 12))}/mo`
-                                  : `${formatINRAmount(effectiveInHand)}/mo`
-                                : "Standard"}
+                            <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-foreground font-outfit">
+                              {effectiveInHand > 0 ? formatINRAmount(effectiveInHand) : "Standard"}
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
                               <div className="flex flex-wrap gap-1 max-w-[260px]">
@@ -2275,10 +2278,10 @@ export default function PlacementAnalysisPage() {
                 <div className="p-6 rounded-3xl bg-card border border-border/70 space-y-5">
                   <div>
                     <h2 className="text-xl font-extrabold text-foreground font-outfit flex items-center gap-2">
-                      <BarChart3 className="h-6 w-6 text-primary" /> Sector-wise Compensation & Take-Home Benchmarks
+                      <BarChart3 className="h-6 w-6 text-primary" /> Sector-wise Compensation & Fixed Base Benchmarks
                     </h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Median CTC, 75th/90th percentiles, and estimated Guaranteed Base vs Bonus vs ESOP splits.
+                      Median CTC, 75th/90th percentiles, and Guaranteed Base vs Bonus vs ESOP splits.
                     </p>
                   </div>
 
@@ -2303,7 +2306,7 @@ export default function PlacementAnalysisPage() {
                             <span className="font-extrabold text-foreground font-outfit">{formatINRAmount(sec.median_ctc_inr)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Median In-Hand:</span>
+                            <span className="text-muted-foreground">Median Fixed Base:</span>
                             <span className="font-bold text-emerald-600 dark:text-emerald-400 font-outfit">{formatINRAmount(sec.median_inhand_inr)}</span>
                           </div>
                           <div className="flex justify-between text-[11px]">
@@ -2567,7 +2570,7 @@ export default function PlacementAnalysisPage() {
                               </span>
                             </div>
                             <div className="flex justify-between items-center text-[11px]">
-                              <span className="text-muted-foreground">In-Hand Salary</span>
+                              <span className="text-muted-foreground">Fixed Base Component</span>
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
                                 {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
                               </span>
@@ -2781,10 +2784,10 @@ export default function PlacementAnalysisPage() {
                     <span>{companyDetails?.company?.primary_sector}</span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> {companyDetails?.company?.locations?.join(", ") || "Pan India"}
+                      <MapPin className="h-3 w-3" /> {Array.from(new Set((companyDetails?.company?.locations || []).map((l: string) => l.trim()))).slice(0, 3).join(", ") || "Pan India"}
                     </span>
                     <span>•</span>
-                    <span>{companyDetails?.roles_count || 0} JAF Postings</span>
+                    <span>{companyDetails?.roles_count || companyDetails?.roles?.length || 0} JAF Postings</span>
                   </p>
                 </div>
               </div>
@@ -2818,7 +2821,7 @@ export default function PlacementAnalysisPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Briefcase className="h-3.5 w-3.5" /> JAF Roles & In-Hand Pay ({companyDetails?.roles_count || 0})
+                <Briefcase className="h-3.5 w-3.5" /> JAF Roles & Job Profiles ({companyDetails?.roles_count || companyDetails?.roles?.length || 0})
               </button>
               <button
                 onClick={() => setActiveDossierTab("selection")}
@@ -2925,7 +2928,7 @@ export default function PlacementAnalysisPage() {
 
                               <div className="p-3 rounded-xl bg-card border border-border/60">
                                 <span className="text-[11px] text-muted-foreground font-medium block mb-1">
-                                  In-Hand Salary
+                                  Fixed Base Salary
                                 </span>
                                 <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 font-outfit">
                                   {curRole.compensation.inhand_median > 0
@@ -2944,18 +2947,18 @@ export default function PlacementAnalysisPage() {
                               </div>
                             </div>
 
-                            {/* Monthly Take-Home & Salary Reality Visualizer */}
+                            {/* Compensation Structure Visualizer (Annual Fixed vs Variable vs ESOPs) */}
                             {salaryBreakdown && (
                               <div className="p-4.5 rounded-2xl bg-card border border-border/80 shadow-xs space-y-4">
                                 <div className="flex justify-between items-center flex-wrap gap-2">
                                   <div className="flex items-center gap-2">
-                                    <Calculator className="h-4 w-4 text-emerald-500" />
+                                    <DollarSign className="h-4 w-4 text-primary" />
                                     <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                                      Salary Reality Check: In-Hand Cash vs Total CTC
+                                      Compensation Structure: Fixed Base vs Variable vs ESOPs
                                     </h4>
                                   </div>
-                                  <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold px-2.5 py-1">
-                                    ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()} / mo Net Take-Home
+                                  <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30 font-bold px-2.5 py-1">
+                                    Total CTC: {formatINRAmount(salaryBreakdown.ctc_inr)}
                                   </Badge>
                                 </div>
 
@@ -2965,7 +2968,7 @@ export default function PlacementAnalysisPage() {
                                     <div
                                       style={{ width: `${Math.min(100, Math.round((salaryBreakdown.base_pay_annual / (salaryBreakdown.ctc_inr || 1)) * 100))}%` }}
                                       className="bg-emerald-500 h-full"
-                                      title={`Base Cash: ₹${salaryBreakdown.base_pay_annual.toLocaleString()}`}
+                                      title={`Fixed Base: ₹${salaryBreakdown.base_pay_annual.toLocaleString()}`}
                                     />
                                     <div
                                       style={{ width: `${Math.min(100, Math.round((salaryBreakdown.variable_bonus_annual / (salaryBreakdown.ctc_inr || 1)) * 100))}%` }}
@@ -2979,24 +2982,24 @@ export default function PlacementAnalysisPage() {
                                     />
                                   </div>
                                   <div className="flex justify-between items-center text-[10px] text-muted-foreground flex-wrap gap-2">
-                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Fixed Base Cash ({Math.round((salaryBreakdown.base_pay_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Fixed Annual Base ({Math.round((salaryBreakdown.base_pay_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
                                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" /> Variable Bonus ({Math.round((salaryBreakdown.variable_bonus_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
-                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> ESOPs/Stocks ({Math.round((salaryBreakdown.esops_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> ESOPs / Equity ({Math.round((salaryBreakdown.esops_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
                                   </div>
                                 </div>
 
                                 {/* 4 Clean Metric Tiles */}
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-border/40">
                                   <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
-                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Fixed Annual Base</span>
+                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Total CTC</span>
                                     <span className="text-sm font-extrabold text-foreground font-outfit">
-                                      {formatINRAmount(salaryBreakdown.base_pay_annual)}
+                                      {formatINRAmount(salaryBreakdown.ctc_inr)}
                                     </span>
                                   </div>
                                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block mb-0.5">Monthly In-Hand</span>
+                                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block mb-0.5">Fixed Base Component</span>
                                     <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-outfit">
-                                      ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()}
+                                      {formatINRAmount(salaryBreakdown.base_pay_annual)}
                                     </span>
                                   </div>
                                   <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
@@ -3006,15 +3009,15 @@ export default function PlacementAnalysisPage() {
                                     </span>
                                   </div>
                                   <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
-                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Est. Annual Tax</span>
-                                    <span className="text-sm font-extrabold text-muted-foreground font-outfit">
-                                      ₹{salaryBreakdown.estimated_annual_tax.toLocaleString()}
+                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">ESOPs / Stocks</span>
+                                    <span className="text-sm font-extrabold text-purple-500 font-outfit">
+                                      {salaryBreakdown.esops_annual > 0 ? formatINRAmount(salaryBreakdown.esops_annual) : "No ESOPs"}
                                     </span>
                                   </div>
                                 </div>
 
                                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                  Projected post-tax take-home calculated under FY 2025–26 Indian New Tax Regime (with ₹75,000 standard deduction + statutory EPF). Real cash deposited in the candidate's bank account each month.
+                                  Official compensation breakdown derived from the company's Job Announcement Form (JAF), detailing guaranteed annual fixed compensation versus performance-based incentives and long-term equity.
                                 </p>
                               </div>
                             )}
@@ -3058,20 +3061,69 @@ export default function PlacementAnalysisPage() {
                             </div>
                           )}
 
-                          {/* Full Raw JAF Description */}
-                          {curRole.raw_jd && (
-                            <div className="space-y-2">
-                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                                Official Job Announcement Form (JAF Extract)
+                          {/* Official Job Announcement Form (JAF) & Detailed Description */}
+                          <div className="space-y-2.5">
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <FileText className="h-4 w-4 text-primary" /> Official Job Announcement Form (JAF & Job Description)
                               </h4>
-                              <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 text-xs text-muted-foreground leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap font-sans custom-scrollbar">
-                                {curRole.raw_jd}
+                              <div className="flex items-center gap-2">
+                                {curRole.raw_jd && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(curRole.raw_jd)
+                                      setCopiedJd(true)
+                                      setTimeout(() => setCopiedJd(false), 2000)
+                                    }}
+                                    className="h-7 px-2.5 text-[11px] font-bold text-primary flex items-center gap-1"
+                                  >
+                                    {copiedJd ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                    {copiedJd ? "Copied JD!" : "Copy Full JD"}
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setIsJdExpanded(!isJdExpanded)}
+                                  className="h-7 px-2.5 text-[11px] font-semibold text-muted-foreground"
+                                >
+                                  {isJdExpanded ? "Collapse" : "Expand Full View"}
+                                </Button>
                               </div>
                             </div>
-                          )}
+                            <div className={`p-4.5 rounded-2xl bg-muted/30 border border-border/60 text-xs text-foreground leading-relaxed overflow-y-auto whitespace-pre-wrap font-sans custom-scrollbar transition-all ${
+                              isJdExpanded ? "max-h-[600px]" : "max-h-72"
+                            }`}>
+                              {curRole.raw_jd || curRole.role_summary || companyDetails?.company?.ai_overview || "Detailed Job Announcement Form specifications currently on file."}
+                            </div>
+                          </div>
                         </div>
                       )
                     })()
+                  )}
+
+                  {/* Fallback if company has no roles list populated */}
+                  {(!companyDetails?.roles || companyDetails.roles.length === 0) && (
+                    <div className="p-8 rounded-2xl bg-muted/20 border border-dashed border-border/80 text-center space-y-3">
+                      <Briefcase className="h-8 w-8 text-muted-foreground mx-auto opacity-50" />
+                      <h4 className="text-sm font-bold text-foreground">
+                        Job Announcement Form (JAF Profile)
+                      </h4>
+                      <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
+                        {companyDetails?.company?.ai_overview || "Detailed JAF specifications and hiring parameters for this recruiter."}
+                      </p>
+                      {companyDetails?.company?.available_roles && (
+                        <div className="pt-2 flex flex-wrap justify-center gap-1.5 max-w-lg mx-auto">
+                          {companyDetails.company.available_roles.map((r: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                              {r}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : activeDossierTab === "keywords" ? (
