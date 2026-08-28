@@ -705,7 +705,7 @@ def ingest_placement_tijori_dataset(
                     "roles_count": 1,
                     "available_roles": [raw_title],
                     "highest_ctc_inr": ctc_inr_equiv,
-                    "highest_inhand_inr": salary_math["monthly_inhand_inr"],
+                    "highest_inhand_inr": inhand_inr_equiv,
                     "median_ctc_inr": ctc_inr_equiv,
                     "dominant_currency": currency,
                     "has_international_offers": currency != "INR",
@@ -732,8 +732,8 @@ def ingest_placement_tijori_dataset(
                     comp["highest_ctc_inr"] = ctc_inr_equiv
                     if standardized_sector in ["Product Management", "Finance & Quant", "AI, ML & Data Science", "Consulting & Strategy", "Software & Engineering"]:
                         comp["primary_sector"] = standardized_sector
-                if salary_math["monthly_inhand_inr"] > comp["highest_inhand_inr"]:
-                    comp["highest_inhand_inr"] = salary_math["monthly_inhand_inr"]
+                if inhand_inr_equiv > comp["highest_inhand_inr"]:
+                    comp["highest_inhand_inr"] = inhand_inr_equiv
                 if currency != "INR":
                     comp["has_international_offers"] = True
                 if location not in comp["locations"] and len(comp["locations"]) < 5:
@@ -851,7 +851,7 @@ def ingest_placement_tijori_dataset(
                 "roles_count": 1,
                 "available_roles": [meta["role"]],
                 "highest_ctc_inr": meta["ctc"],
-                "highest_inhand_inr": salary_math["monthly_inhand_inr"],
+                "highest_inhand_inr": salary_math["base_annual_inr"],
                 "median_ctc_inr": meta["ctc"],
                 "dominant_currency": "INR",
                 "has_international_offers": meta["ctc"] >= 10000000,
@@ -874,10 +874,10 @@ def ingest_placement_tijori_dataset(
         if ctc_vals:
             comp["median_ctc_inr"] = round(float(np.median(ctc_vals)))
             
-        # Ensure highest in-hand represents monthly cash take home
-        inhand_monthlys = [r["compensation"]["salary_breakdown"]["monthly_inhand_inr"] for r in comp_roles if "salary_breakdown" in r["compensation"]]
-        if inhand_monthlys:
-            comp["highest_inhand_inr"] = max(inhand_monthlys)
+        # Ensure highest in-hand represents annual fixed base salary component
+        inhand_annuals = [r["compensation"]["inhand_inr_equivalent"] for r in comp_roles if r["compensation"]["inhand_inr_equivalent"] > 0]
+        if inhand_annuals:
+            comp["highest_inhand_inr"] = max(inhand_annuals)
 
         # Attach selection blueprint
         if comp.get("selection_insights"):

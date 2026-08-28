@@ -1546,7 +1546,12 @@ export default function PlacementAnalysisPage() {
                   const isCompared = comparedSlugs.includes(comp.slug)
                   const isBookmarked = crmItems.some((x) => x.slug === comp.slug)
                   const effectiveCTC = comp.display_highest_ctc_inr || comp.highest_ctc_inr
-                  const effectiveInHand = comp.display_highest_inhand_inr || comp.highest_inhand_inr
+                  const roleInHandList = (comp.role_offers || [])
+                    .map((r: any) => r.inhand_inr || 0)
+                    .filter((v: number) => v > 0)
+                  const maxRoleInHand = roleInHandList.length > 0 ? Math.max(...roleInHandList) : 0
+                  const rawInHand = comp.display_highest_inhand_inr || maxRoleInHand || comp.highest_inhand_inr || 0
+                  const effectiveInHand = rawInHand >= 100000 ? rawInHand : 0
 
                   return (
                     <div
@@ -1850,7 +1855,12 @@ export default function PlacementAnalysisPage() {
                         const isCompared = comparedSlugs.includes(comp.slug)
                         const isBookmarked = crmItems.some((x) => x.slug === comp.slug)
                         const effectiveCTC = comp.display_highest_ctc_inr || comp.highest_ctc_inr
-                        const effectiveInHand = comp.display_highest_inhand_inr || comp.highest_inhand_inr
+                        const roleInHandList = (comp.role_offers || [])
+                          .map((r: any) => r.inhand_inr || 0)
+                          .filter((v: number) => v > 0)
+                        const maxRoleInHand = roleInHandList.length > 0 ? Math.max(...roleInHandList) : 0
+                        const rawInHand = comp.display_highest_inhand_inr || maxRoleInHand || comp.highest_inhand_inr || 0
+                        const effectiveInHand = rawInHand >= 100000 ? rawInHand : 0
 
                         return (
                           <tr
@@ -2572,7 +2582,7 @@ export default function PlacementAnalysisPage() {
                             <div className="flex justify-between items-center text-[11px]">
                               <span className="text-muted-foreground">Fixed Base Component</span>
                               <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                                {comp.highest_inhand_inr > 0 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
+                                {comp.highest_inhand_inr >= 100000 ? formatINRAmount(comp.highest_inhand_inr) : "Standard"}
                               </span>
                             </div>
                             <div className="flex justify-between items-center text-[10px] pt-1 border-t border-border/40">

@@ -587,7 +587,8 @@ async def list_placement_companies(
                                  sorted(other_roles, key=lambda x: (x["session_sheet"], x["ctc_inr"]), reverse=True)
         else:
             display_ctc = c.get("highest_ctc_inr", 0)
-            display_inhand = c.get("highest_inhand_inr", 0)
+            all_inhand_list = [r["inhand_inr"] for r in serialized_roles if r["inhand_inr"] > 0]
+            display_inhand = max(all_inhand_list) if all_inhand_list else c.get("highest_inhand_inr", 0)
             sector_role_count = len(serialized_roles)
             sorted_role_offers = sorted(serialized_roles, key=lambda x: (x["session_sheet"], x["ctc_inr"]), reverse=True)
             
