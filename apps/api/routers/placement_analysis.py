@@ -527,6 +527,7 @@ async def list_placement_companies(
     sector: Optional[str] = Query(None, description="Filter by primary sector"),
     session: Optional[str] = Query(None, description="'all', '25-26_p1', '25-26_p2', '25-26', '24-25'"),
     tier: Optional[str] = Query(None, description="'C1', 'C2', 'C3', etc."),
+    slot: Optional[str] = Query(None, description="Filter by placement slot (e.g. 'Day 1.1', 'Day 1.2', 'Day 2', 'Day 3–5', 'Day 6+')"),
     is_international: Optional[bool] = Query(None, description="Filter international offers only"),
     min_ctc_inr: Optional[float] = Query(None, description="Minimum CTC in INR"),
     max_ctc_inr: Optional[float] = Query(None, description="Maximum CTC in INR"),
@@ -646,13 +647,33 @@ async def list_placement_companies(
     if is_international is not None:
         filtered = [c for c in filtered if c.get("has_international_offers") == is_international]
         
-    # 7. CTC Range Filter
+    # 7. Slot Filter
+    if slot and slot.strip() and slot.lower() != "all" and slot.lower() != "all slots":
+        s_clean = slot.strip().lower()
+        if s_clean == "day 1.1":
+            filtered = [c for c in filtered if "day 1.1" in (c.get("placement_slot") or "").lower() or "day 1.1" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+        elif s_clean == "day 1.2":
+            filtered = [c for c in filtered if "day 1.2" in (c.get("placement_slot") or "").lower() or "day 1.2" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+        elif s_clean == "day 2.1":
+            filtered = [c for c in filtered if "day 2.1" in (c.get("placement_slot") or "").lower() or "day 2.1" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+        elif s_clean == "day 2.2":
+            filtered = [c for c in filtered if "day 2.2" in (c.get("placement_slot") or "").lower() or "day 2.2" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+        elif s_clean == "day 2":
+            filtered = [c for c in filtered if "day 2" in (c.get("placement_slot") or "").lower() or "day 2" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+        elif s_clean in ["day 3–5", "day 3-5", "day 3"]:
+            filtered = [c for c in filtered if any(f"day {d}" in (c.get("placement_slot") or "").lower() or f"day {d}" in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower() for d in [3, 4, 5])]
+        elif s_clean == "day 6+":
+            filtered = [c for c in filtered if re.search(r'day\s*(6|7|8|9|10|11|12|13|14|15)', (c.get("placement_slot") or "") + " " + (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or ""), re.IGNORECASE)]
+        else:
+            filtered = [c for c in filtered if s_clean in (c.get("placement_slot") or "").lower() or s_clean in (c.get("hiring_funnel_intelligence", {}).get("placement_slot") or "").lower()]
+
+    # 8. CTC Range Filter
     if min_ctc_inr is not None and min_ctc_inr > 0:
         filtered = [c for c in filtered if c.get("display_highest_ctc_inr", 0) >= min_ctc_inr]
     if max_ctc_inr is not None and max_ctc_inr > 0:
         filtered = [c for c in filtered if c.get("display_highest_ctc_inr", 0) <= max_ctc_inr]
         
-    # 8. Sorting (Respecting Sector-Specific CTC)
+    # 9. Sorting (Respecting Sector-Specific CTC)
     if sort_by == "highest_ctc":
         filtered.sort(key=lambda x: x.get("display_highest_ctc_inr", 0), reverse=True)
     elif sort_by == "median_ctc":

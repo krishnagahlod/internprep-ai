@@ -361,6 +361,8 @@ const DAY_SLOT_OPTIONS = [
   "All Slots",
   "Day 1.1",
   "Day 1.2",
+  "Day 2.1",
+  "Day 2.2",
   "Day 2",
   "Day 3–5",
   "Day 6+"
@@ -1017,31 +1019,50 @@ export default function PlacementAnalysisPage() {
 
       // 2. Sector filter (Instant client-side)
       if (selectedSector !== "All Sectors") {
-        if (c.primary_sector !== selectedSector && !c.primary_sector.toLowerCase().includes(selectedSector.toLowerCase())) {
+        const secLower = selectedSector.toLowerCase()
+        const matchCompSector = c.primary_sector && (c.primary_sector.toLowerCase() === secLower || c.primary_sector.toLowerCase().includes(secLower))
+        const matchRoleSector = (c.role_offers || []).some((r) => r.primary_sector && (r.primary_sector.toLowerCase() === secLower || r.primary_sector.toLowerCase().includes(secLower)))
+        if (!matchCompSector && !matchRoleSector) {
           return false
         }
       }
 
       // 3. Session filter (Instant client-side)
       if (selectedSession !== "all") {
-        if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
-        if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
-        if (selectedSession === "25-26_p1" && !c.is_hiring_25_26) return false
-        if (selectedSession === "25-26_p2" && !c.is_hiring_25_26) return false
+        if (selectedSession === "24-25") {
+          const match24 = c.has_24_25 || c.is_hiring_24_25 || (c.role_offers || []).some((r) => r.session_sheet?.includes("24-25") || r.session_label?.includes("2024"))
+          if (!match24) return false
+        }
+        if (selectedSession === "25-26") {
+          const match25 = c.has_phase_1 || c.has_phase_2 || c.is_hiring_25_26 || (c.role_offers || []).some((r) => r.session_sheet?.includes("25-26") || r.session_label?.includes("2025"))
+          if (!match25) return false
+        }
+        if (selectedSession === "25-26_p1") {
+          const matchP1 = c.has_phase_1 || (c.role_offers || []).some((r) => r.session_sheet?.includes("25-26 s1") || r.session_label?.toLowerCase().includes("phase 1"))
+          if (!matchP1) return false
+        }
+        if (selectedSession === "25-26_p2") {
+          const matchP2 = c.has_phase_2 || (c.role_offers || []).some((r) => r.session_sheet?.includes("25-26 s2") || r.session_label?.toLowerCase().includes("phase 2"))
+          if (!matchP2) return false
+        }
       }
 
       // 4. In-Demand Skill filter
       if (selectedSkill !== "All Skills") {
         const sk = selectedSkill.toLowerCase()
         const hasSkill = c.top_skills?.some((s) => s.toLowerCase().includes(sk))
-        const inRoleSkills = (c.role_offers || []).some((r) => r.required_skills?.some((rsk) => rsk.toLowerCase().includes(sk)))
+        const inRoleSkills = (c.role_offers || []).some((r) => r.required_skills?.some((rsk) => rsk.toLowerCase().includes(sk)) || r.job_title.toLowerCase().includes(sk))
         const inOverview = c.ai_overview?.toLowerCase().includes(sk)
-        if (!hasSkill && !inRoleSkills && !inOverview) return false
+        const inAvailableRoles = (c.available_roles || []).some((ar) => ar.toLowerCase().includes(sk))
+        if (!hasSkill && !inRoleSkills && !inOverview && !inAvailableRoles) return false
       }
 
       // 5. Tier filter
       if (selectedTier !== "all") {
-        if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
+        const tUpper = selectedTier.toUpperCase()
+        const compTier = (c.tier_category || "").toUpperCase()
+        const roleTier = (c.role_offers || []).some((r) => (r.category_tier || "").toUpperCase().includes(tUpper))
+        if (!compTier.includes(tUpper) && !roleTier) return false
       }
 
       // 6. International filter
@@ -1050,11 +1071,16 @@ export default function PlacementAnalysisPage() {
       // 7. Day Slotting filter
       if (selectedDaySlot !== "All Slots") {
         const slot = (c.placement_slot || c.hiring_funnel_intelligence?.placement_slot || "").toLowerCase()
-        if (selectedDaySlot === "Day 1.1" && !slot.includes("day 1.1")) return false
-        if (selectedDaySlot === "Day 1.2" && !slot.includes("day 1.2")) return false
-        if (selectedDaySlot === "Day 2" && !slot.includes("day 2")) return false
-        if (selectedDaySlot === "Day 3–5" && !(slot.includes("day 3") || slot.includes("day 4") || slot.includes("day 5"))) return false
-        if (selectedDaySlot === "Day 6+" && !/day\s*(6|7|8|9|10|11|12|13|14|15)/.test(slot)) return false
+        const recordedSlots = (c.hiring_funnel_intelligence?.slots_recorded || []).map((s: string) => s.toLowerCase()).join(" ")
+        const fullSlotText = `${slot} ${recordedSlots}`
+
+        if (selectedDaySlot === "Day 1.1" && !fullSlotText.includes("day 1.1")) return false
+        if (selectedDaySlot === "Day 1.2" && !fullSlotText.includes("day 1.2")) return false
+        if (selectedDaySlot === "Day 2.1" && !fullSlotText.includes("day 2.1")) return false
+        if (selectedDaySlot === "Day 2.2" && !fullSlotText.includes("day 2.2")) return false
+        if (selectedDaySlot === "Day 2" && !fullSlotText.includes("day 2")) return false
+        if ((selectedDaySlot === "Day 3–5" || selectedDaySlot === "Day 3-5") && !(fullSlotText.includes("day 3") || fullSlotText.includes("day 4") || fullSlotText.includes("day 5"))) return false
+        if (selectedDaySlot === "Day 6+" && !/day\s*(6|7|8|9|10|11|12|13|14|15)/i.test(fullSlotText)) return false
       }
 
       return true
@@ -1075,7 +1101,7 @@ export default function PlacementAnalysisPage() {
       }
       return 0
     })
-  }, [companies, searchQuery, selectedSector, selectedSession, selectedSkill, selectedTier, isInternationalOnly, sortBy])
+  }, [companies, searchQuery, selectedSector, selectedSession, selectedSkill, selectedTier, selectedDaySlot, isInternationalOnly, sortBy])
 
   // Filtered CRM Items
   const filteredCrmItems = useMemo(() => {
@@ -1410,6 +1436,14 @@ export default function PlacementAnalysisPage() {
                     >
                       C2 Core
                     </button>
+                    <button
+                      onClick={() => setSelectedTier("C3")}
+                      className={`px-2.5 py-1.5 rounded-lg font-medium transition-all ${
+                        selectedTier === "C3" ? "bg-card text-foreground shadow-xs font-bold border border-border" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      C3 Extended
+                    </button>
                   </div>
 
                   <Button
@@ -1533,6 +1567,7 @@ export default function PlacementAnalysisPage() {
                     setSelectedSession("all")
                     setSelectedTier("all")
                     setIsInternationalOnly(false)
+                    setSelectedDaySlot("All Slots")
                   }}
                 >
                   Clear All Filters
@@ -1580,7 +1615,12 @@ export default function PlacementAnalysisPage() {
 
                           {/* Tier, Compare & Bookmark Buttons */}
                           <div className="flex flex-col items-end gap-1.5">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              {comp.placement_slot && (
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-amber-500" /> {comp.placement_slot}
+                                </Badge>
+                              )}
                               {isC1 ? (
                                 <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold px-2 py-0.5 shrink-0 flex items-center gap-1">
                                   <Flame className="h-3 w-3 text-amber-500" /> C1 Dream
@@ -1892,9 +1932,16 @@ export default function PlacementAnalysisPage() {
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 text-muted-foreground font-medium">{comp.primary_sector}</td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
-                              <Badge variant="outline" className="text-[10px]">
-                                {comp.tier_category || "Standard"}
-                              </Badge>
+                              <div className="flex flex-col gap-1 items-start">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {comp.tier_category || "Standard"}
+                                </Badge>
+                                {comp.placement_slot && (
+                                  <span className="text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <Calendar className="h-2.5 w-2.5" /> {comp.placement_slot}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-extrabold text-foreground font-outfit">
                               {formatINRAmount(effectiveCTC)}
