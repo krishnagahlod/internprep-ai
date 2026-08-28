@@ -713,18 +713,20 @@ async def get_company_details(request: Request, id_or_slug: str):
                 seen_skills.add(sk.lower())
                 all_skills.append(sk)
                 
-    insights = company.get("selection_insights")
-    blueprint = {
-        "has_authentic_student_data": bool(insights),
-        "online_test_details": insights.get("test_details") if insights else "Standard Online Assessment: Coding Challenges (DSA), Aptitude / Probability & Math fundamentals.",
-        "interview_details": insights.get("interview_details") if insights else "2–3 Technical Interview rounds focusing on Core Problem Solving, System Design/Architecture, and Resume Deep-Dive, followed by 1 HR/Fit round.",
-        "questions_asked": insights.get("questions_asked", []) if insights else [
-            f"Walk me through your key technical project and the architectural decisions you made.",
-            f"Explain how you would optimize latency and scale under high throughput for {company['name']}.",
-            f"Why {company['name']} and what makes you a strong fit for this team?"
-        ],
-        "recommended_electives_projects": insights.get("recommended_electives_projects", []) if insights else []
-    }
+    blueprint = company.get("selection_blueprint")
+    if not blueprint:
+        insights = company.get("selection_insights")
+        blueprint = {
+            "has_authentic_student_data": bool(insights),
+            "online_test_details": insights.get("test_details") if insights else "Standard Online Assessment: Coding Challenges (DSA), Aptitude / Probability & Math fundamentals.",
+            "interview_details": insights.get("interview_details") if insights else "2–3 Technical Interview rounds focusing on Core Problem Solving, System Design/Architecture, and Resume Deep-Dive, followed by 1 HR/Fit round.",
+            "questions_asked": insights.get("questions_asked", []) if insights else [
+                f"Walk me through your key technical project and the architectural decisions you made.",
+                f"Explain how you would approach solving complex domain challenges for {company['name']}.",
+                f"Why {company['name']} and what makes you a strong fit for this team?"
+            ],
+            "recommended_electives_projects": insights.get("recommended_electives_projects", []) if insights else []
+        }
     
     return {
         "company": company,

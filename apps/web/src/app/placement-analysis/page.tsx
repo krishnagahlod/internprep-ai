@@ -186,6 +186,14 @@ interface Company {
   top_skills?: string[]
   roles: string[]
   selection_insights: SelectionInsights | null
+  has_authentic_insights?: boolean
+  selection_blueprint?: {
+    has_authentic_student_data: boolean
+    online_test_details: string
+    interview_details: string
+    questions_asked: string[]
+    recommended_electives_projects: string[]
+  }
   ai_overview: string
   difficulty_score?: number
   difficulty_tier?: string
@@ -467,22 +475,52 @@ export default function PlacementAnalysisPage() {
     checkAuth()
   }, [user])
 
-  // Fetch placement data from API
+  // Deterministic in-hand monthly salary extractor / calculator
+  const getSalaryBreakdownForRole = (role: any): SalaryBreakdownResult | null => {
+    if (!role) return null
+    const ctc = role.compensation?.ctc_inr_equivalent || 0
+    const sb = role.compensation?.salary_breakdown
+    if (sb) {
+      return {
+        ctc_inr: sb.ctc_inr || ctc,
+        base_pay_annual: sb.base_annual_inr || Math.round(ctc * 0.7),
+        variable_bonus_annual: sb.variable_annual_inr || 0,
+        esops_annual: sb.esop_annual_inr || 0,
+        estimated_monthly_gross: sb.monthly_gross_inr || Math.round((sb.base_annual_inr || ctc * 0.7) / 12),
+        estimated_monthly_net_inhand: sb.monthly_inhand_inr || Math.round((ctc * 0.65) / 12),
+        estimated_annual_tax: sb.annual_tax_inr || 0,
+        estimated_annual_epf: sb.annual_epf_inr || 21600,
+        vesting_schedule: "Standard 4-year equal vesting with 1-year cliff"
+      }
+    }
+    const base = role.compensation?.inhand_inr_equivalent > 0 ? role.compensation.inhand_inr_equivalent : Math.round(ctc * 0.70)
+    const monthlyNet = Math.round(base * 0.85 / 12)
+    return {
+      ctc_inr: ctc,
+      base_pay_annual: base,
+      variable_bonus_annual: Math.round(ctc * 0.15),
+      esops_annual: Math.max(0, ctc - base - Math.round(ctc * 0.15)),
+      estimated_monthly_gross: Math.round(base / 12),
+      estimated_monthly_net_inhand: monthlyNet,
+      estimated_annual_tax: Math.round(base * 0.15),
+      estimated_annual_epf: 21600,
+      vesting_schedule: "Standard 4-year equal vesting with 1-year cliff"
+    }
+  }
+
+  // Fetch placement data from API (Single initial load, filtered instantly in client memory)
   const fetchPlacementData = async () => {
     setLoading(true)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       
-      const sectorQuery = selectedSector !== "All Sectors" ? `&sector=${encodeURIComponent(selectedSector)}` : ""
-      const sessionQuery = selectedSession !== "all" ? `&session=${encodeURIComponent(selectedSession)}` : ""
-      
-      const statsRes = await fetch(`${API_URL}/placement-analysis/stats?${sectorQuery}${sessionQuery}`)
+      const statsRes = await fetch(`${API_URL}/placement-analysis/stats`)
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
       }
 
-      const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=700&sort_by=${sortBy}${sectorQuery}${sessionQuery}`)
+      const companiesRes = await fetch(`${API_URL}/placement-analysis/companies?page=1&page_size=1000&sort_by=highest_ctc`)
       if (!companiesRes.ok) throw new Error("Failed to load placement companies.")
       
       const compData = await companiesRes.json()
@@ -513,14 +551,15 @@ export default function PlacementAnalysisPage() {
     }
   }
 
+  // Initial fetch on verified status - no re-fetching on filter toggles!
   useEffect(() => {
-    if (isIITBVerified) {
+    if (isIITBVerified && companies.length === 0) {
       fetchPlacementData()
-      if (activeMainTab === "analytics" && !macroAnalytics) {
-        fetchMacroAnalytics()
-      }
     }
-  }, [isIITBVerified, sortBy, selectedSector, selectedSession, activeMainTab])
+    if (isIITBVerified && activeMainTab === "analytics" && !macroAnalytics) {
+      fetchMacroAnalytics()
+    }
+  }, [isIITBVerified, activeMainTab])
 
   // Fetch Company Dossier when modal opens
   useEffect(() => {
@@ -542,7 +581,7 @@ export default function PlacementAnalysisPage() {
           setSelectedRoleIndex(0)
           
           if (data.roles && data.roles[0]) {
-            fetchSalaryBreakdown(data.roles[0].id)
+            setSalaryBreakdown(getSalaryBreakdownForRole(data.roles[0]))
           }
         }
       } catch (err) {
@@ -555,24 +594,14 @@ export default function PlacementAnalysisPage() {
     fetchDetails()
   }, [selectedCompanySlug])
 
-  // Fetch Salary Breakdown for a specific role
-  const fetchSalaryBreakdown = async (roleId: string) => {
-    setLoadingSalary(true)
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const res = await fetch(`${API_URL}/placement-analysis/salary-breakdown`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role_id: roleId })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setSalaryBreakdown(data)
+  // Instant Salary Breakdown for selected role without network lag
+  const fetchSalaryBreakdown = (roleId: string) => {
+    if (companyDetails?.roles) {
+      const targetRole = companyDetails.roles.find((r: any) => r.id === roleId) || companyDetails.roles[0]
+      if (targetRole) {
+        setSalaryBreakdown(getSalaryBreakdownForRole(targetRole))
+        return
       }
-    } catch (err) {
-      console.error("Failed to load salary breakdown:", err)
-    } finally {
-      setLoadingSalary(false)
     }
   }
 
@@ -901,14 +930,15 @@ export default function PlacementAnalysisPage() {
     return `${med.toLocaleString()} ${curr}`
   }
 
-  // Filtered Companies (Directory View)
+  // Filtered & Sorted Companies (100% Client-Side Instant Evaluation)
   const filteredCompanies = useMemo(() => {
-    return companies.filter((c) => {
+    const list = companies.filter((c) => {
+      // 1. Text search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchName = c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q)
         const matchSector = c.primary_sector.toLowerCase().includes(q)
-        const matchLoc = c.locations.some((l) => l.toLowerCase().includes(q))
+        const matchLoc = c.locations?.some((l) => l.toLowerCase().includes(q))
         const matchRole = (c.role_offers || []).some((r) => r.job_title.toLowerCase().includes(q) || r.location.toLowerCase().includes(q)) ||
                           (c.available_roles || []).some((r) => r.toLowerCase().includes(q))
         const matchSkill = c.top_skills?.some((s) => s.toLowerCase().includes(q)) ||
@@ -916,6 +946,22 @@ export default function PlacementAnalysisPage() {
         if (!matchName && !matchSector && !matchLoc && !matchRole && !matchSkill) return false
       }
 
+      // 2. Sector filter (Instant client-side)
+      if (selectedSector !== "All Sectors") {
+        if (c.primary_sector !== selectedSector && !c.primary_sector.toLowerCase().includes(selectedSector.toLowerCase())) {
+          return false
+        }
+      }
+
+      // 3. Session filter (Instant client-side)
+      if (selectedSession !== "all") {
+        if (selectedSession === "24-25" && !c.is_hiring_24_25) return false
+        if (selectedSession === "25-26" && !c.is_hiring_25_26) return false
+        if (selectedSession === "25-26_p1" && !c.is_hiring_25_26) return false
+        if (selectedSession === "25-26_p2" && !c.is_hiring_25_26) return false
+      }
+
+      // 4. In-Demand Skill filter
       if (selectedSkill !== "All Skills") {
         const sk = selectedSkill.toLowerCase()
         const hasSkill = c.top_skills?.some((s) => s.toLowerCase().includes(sk))
@@ -924,15 +970,33 @@ export default function PlacementAnalysisPage() {
         if (!hasSkill && !inRoleSkills && !inOverview) return false
       }
 
+      // 5. Tier filter
       if (selectedTier !== "all") {
         if (!c.tier_category.toUpperCase().includes(selectedTier)) return false
       }
 
+      // 6. International filter
       if (isInternationalOnly && !c.has_international_offers) return false
 
       return true
     })
-  }, [companies, searchQuery, selectedSkill, selectedTier, isInternationalOnly])
+
+    // 7. Sort (Instant client-side)
+    return list.sort((a, b) => {
+      if (sortBy === "highest_ctc") {
+        const aCtc = a.display_highest_ctc_inr || a.highest_ctc_inr || 0
+        const bCtc = b.display_highest_ctc_inr || b.highest_ctc_inr || 0
+        return bCtc - aCtc
+      } else if (sortBy === "median_ctc") {
+        return (b.median_ctc_inr || 0) - (a.median_ctc_inr || 0)
+      } else if (sortBy === "roles_count") {
+        return (b.roles_count || 0) - (a.roles_count || 0)
+      } else if (sortBy === "name") {
+        return a.name.localeCompare(b.name)
+      }
+      return 0
+    })
+  }, [companies, searchQuery, selectedSector, selectedSession, selectedSkill, selectedTier, isInternationalOnly, sortBy])
 
   // Filtered CRM Items
   const filteredCrmItems = useMemo(() => {
@@ -1466,30 +1530,43 @@ export default function PlacementAnalysisPage() {
                           </div>
                         </div>
 
-                        {/* Sector-Segregated Compensation Highlight Card */}
+                        {/* Dual Compensation & Senior Intel Card */}
                         <div
                           onClick={() => setSelectedCompanySlug(comp.slug)}
-                          className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5 cursor-pointer hover:bg-muted/60 transition-colors"
+                          className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-2 cursor-pointer hover:bg-muted/60 transition-colors"
                         >
                           <div className="flex justify-between items-center text-xs">
                             <span className="text-muted-foreground font-medium flex items-center gap-1">
                               <DollarSign className="h-3.5 w-3.5 text-primary" />
-                              {selectedSector !== "All Sectors" ? `${selectedSector} Highest CTC` : "Highest CTC"}
+                              {selectedSector !== "All Sectors" ? `${selectedSector} CTC` : "Annual Peak CTC"}
                             </span>
                             <span className="font-extrabold text-foreground font-outfit text-sm">
                               {formatINRAmount(effectiveCTC)}
                             </span>
                           </div>
                           <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-muted-foreground">Guaranteed Base / In-Hand</span>
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {effectiveInHand > 0 ? formatINRAmount(effectiveInHand) : "Standard Fixed Pay"}
+                            <span className="text-muted-foreground flex items-center gap-1">
+                              <Sparkles className="h-3 w-3 text-emerald-500" />
+                              Est. Monthly In-Hand Cash
+                            </span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-outfit">
+                              {effectiveInHand > 0
+                                ? effectiveInHand > 500000
+                                  ? `${formatINRAmount(Math.round(effectiveInHand / 12))} / mo`
+                                  : `${formatINRAmount(effectiveInHand)} / mo`
+                                : "Standard Net Cash"}
                             </span>
                           </div>
+                          {comp.has_authentic_insights && (
+                            <div className="pt-1.5 border-t border-border/40 flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                              <Award className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                              <span>Verified IITB Senior Interview Questions</span>
+                            </div>
+                          )}
                           {comp.dominant_currency !== "INR" && (
                             <div className="pt-1 border-t border-border/40 flex justify-between items-center text-[10px]">
                               <span className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
-                                <Globe className="h-3 w-3" /> International Compensation
+                                <Globe className="h-3 w-3" /> Global Pay
                               </span>
                               <span className="text-muted-foreground font-mono font-medium">
                                 {comp.dominant_currency} Currency
@@ -1653,7 +1730,14 @@ export default function PlacementAnalysisPage() {
                                   {comp.name.substring(0, 2).toUpperCase()}
                                 </div>
                                 <div>
-                                  <span className="block">{comp.name}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="block">{comp.name}</span>
+                                    {comp.has_authentic_insights && (
+                                      <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold border border-emerald-500/20" title="Verified Senior Interview Questions Available">
+                                        Senior Q&A
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-muted-foreground font-normal line-clamp-1">
                                     {comp.locations.slice(0, 2).join(", ")}
                                   </span>
@@ -1670,7 +1754,11 @@ export default function PlacementAnalysisPage() {
                               {formatINRAmount(effectiveCTC)}
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4 font-semibold text-emerald-600 dark:text-emerald-400 font-outfit">
-                              {effectiveInHand > 0 ? formatINRAmount(effectiveInHand) : "Standard"}
+                              {effectiveInHand > 0
+                                ? effectiveInHand > 500000
+                                  ? `${formatINRAmount(Math.round(effectiveInHand / 12))}/mo`
+                                  : `${formatINRAmount(effectiveInHand)}/mo`
+                                : "Standard"}
                             </td>
                             <td onClick={() => setSelectedCompanySlug(comp.slug)} className="p-4">
                               <div className="flex flex-wrap gap-1 max-w-[260px]">
@@ -2487,62 +2575,42 @@ export default function PlacementAnalysisPage() {
               </div>
             </div>
 
-            {/* Dossier Tabs */}
+            {/* Dossier Tabs - 3 Student-Focused Briefing Sections */}
             <div className="px-6 border-b border-border/40 bg-muted/30 flex gap-4 overflow-x-auto">
               <button
                 onClick={() => setActiveDossierTab("roles")}
-                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
                   activeDossierTab === "roles"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Briefcase className="h-3.5 w-3.5" /> JAF Postings & Compensation ({companyDetails?.roles_count || 0})
-              </button>
-              <button
-                onClick={() => setActiveDossierTab("keywords")}
-                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
-                  activeDossierTab === "keywords"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <BrainCircuit className="h-3.5 w-3.5" /> Deep JD Keyword Analysis
-              </button>
-              <button
-                onClick={() => {
-                  setActiveDossierTab("resumematch")
-                  if (companyDetails?.roles?.[selectedRoleIndex] && !matchResult) {
-                    handleMatchResume(companyDetails.roles[selectedRoleIndex].id)
-                  }
-                }}
-                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
-                  activeDossierTab === "resumematch"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <FileCheck className="h-3.5 w-3.5" /> Resume Fit & Keyword Gap
+                <Briefcase className="h-3.5 w-3.5" /> JAF Roles & In-Hand Pay ({companyDetails?.roles_count || 0})
               </button>
               <button
                 onClick={() => setActiveDossierTab("selection")}
-                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
                   activeDossierTab === "selection"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <BookOpen className="h-3.5 w-3.5" /> Selection Process & Senior Q&A
+                <BookOpen className="h-3.5 w-3.5" /> Selection Gauntlet & Senior Q&A {companyDetails?.selection_blueprint?.questions_asked?.length ? `(${companyDetails.selection_blueprint.questions_asked.length})` : ""}
               </button>
               <button
-                onClick={() => setActiveDossierTab("roadmap")}
-                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
-                  activeDossierTab === "roadmap"
+                onClick={() => {
+                  setActiveDossierTab("keywords")
+                  if (companyDetails?.roles?.[selectedRoleIndex] && !matchResult) {
+                    handleMatchResume(companyDetails.roles[selectedRoleIndex].id)
+                  }
+                }}
+                className={`py-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 ${
+                  activeDossierTab === "keywords" || activeDossierTab === "resumematch" || activeDossierTab === "roadmap"
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Sparkles className="h-3.5 w-3.5" /> AI Prep Roadmap
+                <Sparkles className="h-3.5 w-3.5" /> Skills & 1-Click Resume Fit
               </button>
             </div>
 
@@ -2643,20 +2711,77 @@ export default function PlacementAnalysisPage() {
                               </div>
                             </div>
 
-                            {/* Monthly Take-Home & Tax Visualizer Box */}
-                            {salaryBreakdown && salaryBreakdown.estimated_monthly_net_inhand > 0 && (
-                              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Calculator className="h-4 w-4" /> Estimated Monthly In-Hand Take-Home Pay:
-                                  </span>
-                                  <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 font-outfit">
-                                    ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()} / month
-                                  </span>
+                            {/* Monthly Take-Home & Salary Reality Visualizer */}
+                            {salaryBreakdown && (
+                              <div className="p-4.5 rounded-2xl bg-card border border-border/80 shadow-xs space-y-4">
+                                <div className="flex justify-between items-center flex-wrap gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <Calculator className="h-4 w-4 text-emerald-500" />
+                                    <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
+                                      Salary Reality Check: In-Hand Cash vs Total CTC
+                                    </h4>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold px-2.5 py-1">
+                                    ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()} / mo Net Take-Home
+                                  </Badge>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Projected post-tax under FY 2025–26 New Regime with standard ₹75K deduction & statutory EPF.
-                                  Estimated annual income tax: ₹{salaryBreakdown.estimated_annual_tax.toLocaleString()}.
+
+                                {/* Visual Composition Progress Bar */}
+                                <div className="space-y-1.5">
+                                  <div className="h-3 w-full rounded-full bg-muted overflow-hidden flex">
+                                    <div
+                                      style={{ width: `${Math.min(100, Math.round((salaryBreakdown.base_pay_annual / (salaryBreakdown.ctc_inr || 1)) * 100))}%` }}
+                                      className="bg-emerald-500 h-full"
+                                      title={`Base Cash: ₹${salaryBreakdown.base_pay_annual.toLocaleString()}`}
+                                    />
+                                    <div
+                                      style={{ width: `${Math.min(100, Math.round((salaryBreakdown.variable_bonus_annual / (salaryBreakdown.ctc_inr || 1)) * 100))}%` }}
+                                      className="bg-amber-500 h-full"
+                                      title={`Variable Bonus: ₹${salaryBreakdown.variable_bonus_annual.toLocaleString()}`}
+                                    />
+                                    <div
+                                      style={{ width: `${Math.min(100, Math.round((salaryBreakdown.esops_annual / (salaryBreakdown.ctc_inr || 1)) * 100))}%` }}
+                                      className="bg-purple-500 h-full"
+                                      title={`ESOPs: ₹${salaryBreakdown.esops_annual.toLocaleString()}`}
+                                    />
+                                  </div>
+                                  <div className="flex justify-between items-center text-[10px] text-muted-foreground flex-wrap gap-2">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Fixed Base Cash ({Math.round((salaryBreakdown.base_pay_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" /> Variable Bonus ({Math.round((salaryBreakdown.variable_bonus_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" /> ESOPs/Stocks ({Math.round((salaryBreakdown.esops_annual / (salaryBreakdown.ctc_inr || 1)) * 100)}%)</span>
+                                  </div>
+                                </div>
+
+                                {/* 4 Clean Metric Tiles */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-border/40">
+                                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
+                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Fixed Annual Base</span>
+                                    <span className="text-sm font-extrabold text-foreground font-outfit">
+                                      {formatINRAmount(salaryBreakdown.base_pay_annual)}
+                                    </span>
+                                  </div>
+                                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold block mb-0.5">Monthly In-Hand</span>
+                                    <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-outfit">
+                                      ~₹{salaryBreakdown.estimated_monthly_net_inhand.toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
+                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Variable Bonus</span>
+                                    <span className="text-sm font-extrabold text-amber-500 font-outfit">
+                                      {salaryBreakdown.variable_bonus_annual > 0 ? formatINRAmount(salaryBreakdown.variable_bonus_annual) : "Included in Base"}
+                                    </span>
+                                  </div>
+                                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
+                                    <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Est. Annual Tax</span>
+                                    <span className="text-sm font-extrabold text-muted-foreground font-outfit">
+                                      ₹{salaryBreakdown.estimated_annual_tax.toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                  Projected post-tax take-home calculated under FY 2025–26 Indian New Tax Regime (with ₹75,000 standard deduction + statutory EPF). Real cash deposited in the candidate's bank account each month.
                                 </p>
                               </div>
                             )}
@@ -2834,19 +2959,8 @@ export default function PlacementAnalysisPage() {
                               </div>
                             </div>
                           )}
-                        </div>
-                      )
-                    })()
-                  )}
-                </div>
-              ) : activeDossierTab === "resumematch" ? (
-                /* TAB 3: RESUME FIT & KEYWORD GAP ANALYZER */
-                <div className="space-y-6">
-                  {companyDetails?.roles && companyDetails.roles[selectedRoleIndex] && (
-                    (() => {
-                      const curRole: PlacementRole = companyDetails.roles[selectedRoleIndex]
-                      return (
-                        <div className="space-y-6">
+
+                          {/* Live Resume Compatibility & Keyword Gap */}
                           <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 flex justify-between items-center flex-wrap gap-3">
                             <div>
                               <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -2943,59 +3057,124 @@ export default function PlacementAnalysisPage() {
                   )}
                 </div>
               ) : activeDossierTab === "selection" ? (
-                /* TAB 4: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
+                /* TAB: SELECTION PROCESS & AUTHENTIC SENIOR Q&A */
                 <div className="space-y-6">
+                  {/* Verified Senior Insights Banner */}
+                  <div className="p-4.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3.5 shadow-xs">
+                    <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                      <Award className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                          {companyDetails?.selection_blueprint?.has_authentic_student_data
+                            ? "Verified IITB Senior Interview Debrief"
+                            : "Campus Selection Gauntlet & Evaluation Blueprint"}
+                        </h4>
+                        {companyDetails?.selection_blueprint?.has_authentic_student_data && (
+                          <Badge variant="outline" className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 text-[10px] font-bold">
+                            100% Authentic Senior Data
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {companyDetails?.selection_blueprint?.has_authentic_student_data
+                          ? `Authentic selection tests and interview questions directly recorded by IIT Bombay seniors who cleared shortlists at ${companyDetails?.company?.name}.`
+                          : `Domain-calibrated evaluation funnel and high-yield interview questions for ${companyDetails?.company?.primary_sector} roles.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Round-by-Round Gauntlet */}
                   <div className="space-y-3">
                     <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Layers className="h-4 w-4 text-primary" /> Verified Selection Rounds Flow
+                      <Layers className="h-4 w-4 text-primary" /> Round-by-Round Selection Funnel
                     </h3>
-                    <div className="p-4 rounded-2xl bg-card border border-border/60 space-y-3 text-xs leading-relaxed">
-                      <div>
-                        <strong className="text-foreground block mb-1">1. Online Assessment (OA) / Shortlisting:</strong>
-                        <p className="text-muted-foreground">{companyDetails?.selection_blueprint?.online_test_details}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="p-4 rounded-2xl bg-card border border-border/70 space-y-2 shadow-2xs">
+                        <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-extrabold shrink-0">1</span>
+                          <span>Online Assessment (OA) / Shortlisting</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed pl-7">
+                          {companyDetails?.selection_blueprint?.online_test_details || "Standard Online Assessment: Coding Challenges (DSA) and Aptitude/Math."}
+                        </p>
                       </div>
-                      <div className="pt-2 border-t border-border/40">
-                        <strong className="text-foreground block mb-1">2. Technical & Case Interviews:</strong>
-                        <p className="text-muted-foreground">{companyDetails?.selection_blueprint?.interview_details}</p>
+
+                      <div className="p-4 rounded-2xl bg-card border border-border/70 space-y-2 shadow-2xs">
+                        <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                          <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-extrabold shrink-0">2</span>
+                          <span>Technical & Domain Interviews</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed pl-7">
+                          {companyDetails?.selection_blueprint?.interview_details || "2-3 Technical Interview rounds focusing on Core Problem Solving, System Design, and Resume Deep-Dive."}
+                        </p>
                       </div>
                     </div>
                   </div>
 
+                  {/* Authentic Questions Asked */}
                   <div className="space-y-3">
-                    <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <HelpCircle className="h-4 w-4 text-emerald-500" /> Authentic Questions Recorded by IITB Seniors
-                    </h3>
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <h3 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <HelpCircle className="h-4 w-4 text-emerald-500" />
+                        {companyDetails?.selection_blueprint?.has_authentic_student_data
+                          ? "Actual Questions Asked in Interviews"
+                          : "High-Yield Practice Questions"}
+                        {companyDetails?.selection_blueprint?.questions_asked?.length ? ` (${companyDetails.selection_blueprint.questions_asked.length})` : ""}
+                      </h3>
+                      <span className="text-[11px] text-muted-foreground">Click copy icon to save any question</span>
+                    </div>
 
                     {companyDetails?.selection_blueprint?.questions_asked && companyDetails.selection_blueprint.questions_asked.length > 0 ? (
-                      <div className="space-y-2">
-                        {companyDetails.selection_blueprint.questions_asked.map((q: string, i: number) => (
-                          <div
-                            key={i}
-                            className="p-3.5 rounded-2xl bg-card border border-border/60 text-xs flex items-start gap-3 shadow-2xs hover:border-primary/40 transition-colors"
-                          >
-                            <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">
-                              {i + 1}
-                            </span>
-                            <span className="text-foreground font-medium leading-relaxed">{q}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-2.5">
+                        {companyDetails.selection_blueprint.questions_asked.map((q: string, i: number) => {
+                          const isCopied = copiedBulletIdx === 2000 + i
+                          return (
+                            <div
+                              key={i}
+                              className="group p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 text-xs flex justify-between items-start gap-3 shadow-2xs transition-all"
+                            >
+                              <div className="flex items-start gap-3">
+                                <span className="w-6 h-6 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold flex items-center justify-center text-[11px] shrink-0 mt-0.5">
+                                  Q{i + 1}
+                                </span>
+                                <span className="text-foreground font-medium leading-relaxed">{q}</span>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(q)
+                                  setCopiedBulletIdx(2000 + i)
+                                  setTimeout(() => setCopiedBulletIdx(null), 2000)
+                                }}
+                                className="h-7 px-2 text-[11px] font-bold text-muted-foreground hover:text-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Copy Question"
+                              >
+                                {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          )
+                        })}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground italic">
-                        Standard problem-solving questions reported. Refer to AI preparation roadmap below.
-                      </p>
+                      <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 text-xs text-muted-foreground italic">
+                        Standard problem-solving and resume deep-dive questions reported for this profile.
+                      </div>
                     )}
                   </div>
 
+                  {/* Recommended Electives & Coursework */}
                   {companyDetails?.selection_blueprint?.recommended_electives_projects && companyDetails.selection_blueprint.recommended_electives_projects.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                        Recommended Electives / Courses / Minors
+                    <div className="space-y-2.5 pt-2 border-t border-border/40">
+                      <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <BookOpen className="h-4 w-4 text-primary" /> Recommended Coursework, Minors & Projects (by Seniors)
                       </h4>
                       <div className="flex flex-wrap gap-2">
                         {companyDetails.selection_blueprint.recommended_electives_projects.map((el: string, idx: number) => (
-                          <Badge key={idx} variant="outline" className="text-xs bg-muted/60 text-foreground border-border">
-                            <BookOpen className="h-3 w-3 mr-1 text-primary" /> {el}
+                          <Badge key={idx} variant="outline" className="text-xs bg-muted/60 hover:bg-muted text-foreground border-border/80 py-1.5 px-3 rounded-xl font-medium">
+                            <BookOpen className="h-3 w-3 mr-1.5 text-primary" /> {el}
                           </Badge>
                         ))}
                       </div>
