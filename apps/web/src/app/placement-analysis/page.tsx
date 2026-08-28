@@ -194,9 +194,48 @@ interface Company {
     questions_asked: string[]
     recommended_electives_projects: string[]
   }
+  hiring_funnel_intelligence?: HiringFunnelIntelligence | null
   ai_overview: string
   difficulty_score?: number
   difficulty_tier?: string
+}
+
+interface HiringFunnelIntelligence {
+  slug: string
+  company_name: string
+  total_updates: number
+  hiring_phases: string[]
+  slots_recorded: string[]
+  has_walkins: boolean
+  cpi_criteria: {
+    cutoff_stated: string
+    bonus_jaf_allowed: boolean
+  }
+  online_assessment: {
+    platform: string
+    mode: string
+    duration_minutes: number | null
+    special_instructions: string[]
+  }
+  conversion_funnel: {
+    oa_shortlisted_count: number
+    interview_shortlisted_count: number
+    final_selected_count: number
+    walkin_extended_shortlists_count: number
+    oa_to_interview_conversion_pct: number | null
+    interview_to_offer_conversion_pct: number | null
+  }
+  demographics: {
+    branch_distribution: Record<string, number>
+    degree_distribution: Record<string, number>
+    cluster_breakdown: Record<string, number>
+  }
+  recruitment_timeline: Array<{
+    date: string
+    phase: string
+    stage: string
+    headline: string
+  }>
 }
 
 interface PlatformStats {
@@ -1561,6 +1600,21 @@ export default function PlacementAnalysisPage() {
                             <div className="pt-1.5 border-t border-border/40 flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
                               <Award className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                               <span>Verified IITB Senior Interview Questions</span>
+                            </div>
+                          )}
+                          {comp.hiring_funnel_intelligence && (
+                            <div className="pt-1.5 border-t border-border/40 flex items-center justify-between text-[10px]">
+                              <span className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {comp.hiring_funnel_intelligence.conversion_funnel?.interview_shortlisted_count > 0
+                                  ? `${comp.hiring_funnel_intelligence.conversion_funnel.interview_shortlisted_count} Shortlisted for Interviews`
+                                  : `${comp.hiring_funnel_intelligence.conversion_funnel?.oa_shortlisted_count || 0} Test Shortlists`}
+                              </span>
+                              {comp.hiring_funnel_intelligence.has_walkins && (
+                                <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[9px]">
+                                  Day Walk-ins
+                                </span>
+                              )}
                             </div>
                           )}
                           {comp.dominant_currency !== "INR" && (
@@ -3084,6 +3138,189 @@ export default function PlacementAnalysisPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Official 2025-26 Recruitment Gauntlet & Shortlist Reality */}
+                  {(() => {
+                    const funnel = companyDetails?.hiring_funnel_intelligence || companyDetails?.company?.hiring_funnel_intelligence
+                    if (!funnel) return null
+
+                    const oaCount = funnel.conversion_funnel?.oa_shortlisted_count || 0
+                    const interviewCount = funnel.conversion_funnel?.interview_shortlisted_count || 0
+                    const walkinCount = funnel.conversion_funnel?.walkin_extended_shortlists_count || 0
+                    const convPct = funnel.conversion_funnel?.oa_to_interview_conversion_pct
+                    const branches: [string, number][] = Object.entries(funnel.demographics?.branch_distribution || {}).slice(0, 5) as [string, number][]
+                    const degrees: [string, number][] = Object.entries(funnel.demographics?.degree_distribution || {}).slice(0, 3) as [string, number][]
+
+                    return (
+                      <div className="p-5 rounded-2xl bg-card border border-border/80 shadow-xs space-y-4">
+                        <div className="flex justify-between items-start flex-wrap gap-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-xs font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <Users className="h-4 w-4 text-blue-500" />
+                                2025–26 Shortlist & Conversion Reality
+                              </h4>
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 text-[10px] font-bold">
+                                Verified Portal Data ({funnel.total_updates} Updates Logged)
+                              </Badge>
+                              {funnel.has_walkins && (
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] font-bold">
+                                  Day Walk-ins Offered
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Extracted from official placement announcements, test shortlists, and interview calls for the 2025–26 season.
+                            </p>
+                          </div>
+
+                          {funnel.hiring_phases && funnel.hiring_phases.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {funnel.hiring_phases.map((ph: string, pIdx: number) => (
+                                <span key={pIdx} className="text-[10px] font-bold bg-muted px-2 py-0.5 rounded-md text-foreground">
+                                  {ph}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3-Tile Funnel Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Tile 1: Assessment */}
+                          <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                              <span>1. Online Assessment</span>
+                              <span className="text-foreground font-mono font-extrabold">{oaCount > 0 ? oaCount : "Open Pool"}</span>
+                            </div>
+                            <div className="text-xs font-extrabold text-foreground">
+                              {funnel.online_assessment?.platform || "Standard OA Platform"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+                              <span>Mode: {funnel.online_assessment?.mode || "Online"}</span>
+                              {funnel.online_assessment?.duration_minutes && (
+                                <span>Duration: {funnel.online_assessment.duration_minutes} Mins</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Tile 2: Interviews */}
+                          <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                              <span>2. Interview Calls</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-mono font-extrabold text-sm">
+                                {interviewCount > 0 ? interviewCount : "Direct Shortlist"}
+                              </span>
+                            </div>
+                            <div className="text-xs font-bold text-foreground">
+                              {convPct !== null && convPct !== undefined ? `${convPct}% OA Clear Rate` : "Direct Shortlist Selection"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+                              {walkinCount > 0 ? (
+                                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                                  +{walkinCount} Extended / Walk-in shortlists
+                                </span>
+                              ) : (
+                                <span>Standard Interview Rounds</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Tile 3: JAF Rules */}
+                          <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-1.5">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              3. Eligibility & Bonus
+                            </div>
+                            <div className="text-xs font-bold text-foreground">
+                              CPI Cutoff: {funnel.cpi_criteria?.cutoff_stated || "None"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+                              <span>Bonus JAF: {funnel.cpi_criteria?.bonus_jaf_allowed ? "Allowed" : "Not Allowed"}</span>
+                              {funnel.slots_recorded && funnel.slots_recorded.length > 0 && (
+                                <span className="truncate">{funnel.slots_recorded.join(", ")}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Department Distribution Progress Bar */}
+                        {branches.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t border-border/50">
+                            <div className="flex justify-between items-center text-[11px] flex-wrap gap-1">
+                              <span className="font-extrabold text-foreground flex items-center gap-1.5">
+                                <PieChart className="h-3.5 w-3.5 text-primary" />
+                                Verified Branch Shortlist Breakdown
+                              </span>
+                              <span className="text-muted-foreground text-[10px]">
+                                {degrees.map(([deg, pct]) => `${deg}: ${pct}%`).join(" • ")}
+                              </span>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
+                              {branches.map(([branch, pct], bIdx) => {
+                                const colors = [
+                                  "bg-blue-500",
+                                  "bg-indigo-500",
+                                  "bg-emerald-500",
+                                  "bg-amber-500",
+                                  "bg-purple-500",
+                                ]
+                                return (
+                                  <div
+                                    key={bIdx}
+                                    style={{ width: `${pct}%` }}
+                                    className={`${colors[bIdx % colors.length]} transition-all`}
+                                    title={`${branch}: ${pct}%`}
+                                  />
+                                )
+                              })}
+                            </div>
+
+                            {/* Branch Pills */}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {branches.map(([branch, pct], bIdx) => (
+                                <span
+                                  key={bIdx}
+                                  className="text-[10px] font-medium bg-muted/60 text-foreground px-2 py-0.5 rounded-md border border-border/40 flex items-center gap-1"
+                                >
+                                  <span
+                                    className={`w-1.5 h-1.5 rounded-full ${
+                                      bIdx === 0 ? "bg-blue-500" : bIdx === 1 ? "bg-indigo-500" : bIdx === 2 ? "bg-emerald-500" : bIdx === 3 ? "bg-amber-500" : "bg-purple-500"
+                                    }`}
+                                  />
+                                  {branch}: <strong className="font-bold">{String(pct)}%</strong>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recruitment Timeline Updates */}
+                        {funnel.recruitment_timeline && funnel.recruitment_timeline.length > 0 && (
+                          <details className="text-[11px] pt-1 cursor-pointer group">
+                            <summary className="font-bold text-muted-foreground hover:text-foreground flex items-center justify-between select-none">
+                              <span>View Official Season Timeline ({funnel.recruitment_timeline.length} Updates)</span>
+                              <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                            </summary>
+                            <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                              {funnel.recruitment_timeline.map((ev: any, evIdx: number) => (
+                                <div key={evIdx} className="p-2 rounded-lg bg-muted/30 border border-border/40 flex justify-between items-center text-[10px]">
+                                  <div className="flex items-center gap-2 truncate">
+                                    <span className="font-mono text-muted-foreground shrink-0">{ev.date}</span>
+                                    <span className="font-semibold text-foreground truncate">{ev.headline}</span>
+                                  </div>
+                                  <Badge variant="outline" className="text-[9px] shrink-0 font-normal">
+                                    {ev.stage}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Round-by-Round Gauntlet */}
                   <div className="space-y-3">

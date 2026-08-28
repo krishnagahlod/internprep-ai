@@ -734,7 +734,8 @@ async def get_company_details(request: Request, id_or_slug: str):
         "roles": company_roles,
         "roles_by_session": roles_by_session,
         "unique_skills": all_skills[:15],
-        "selection_blueprint": blueprint
+        "selection_blueprint": blueprint,
+        "hiring_funnel_intelligence": company.get("hiring_funnel_intelligence")
     }
 
 

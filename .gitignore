@@ -44,3 +44,11 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Confidential Placement Blogs & Student Raw Data
+data/placement_blogs/
+data/raw_blogs/
+data/private/
+*.session.json
+*.har
+cookies.txt
