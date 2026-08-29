@@ -320,27 +320,33 @@ export default function ATSCheckerPage() {
       {/* Sticky Top Navbar */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => router.push("/dashboard")} 
-              className="text-muted-foreground hover:text-foreground h-8 px-2.5 text-xs font-mono-tech"
+              className="text-muted-foreground hover:text-foreground h-8 px-2 sm:px-2.5 text-xs font-mono-tech shrink-0"
             >
-              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Dashboard
+              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+              <span className="hidden sm:inline">Dashboard</span>
             </Button>
             <span className="text-border">/</span>
-            <span className="text-xs font-mono-tech text-muted-foreground">ATS SCORE CHECKER & AUDITOR</span>
+            <span className="text-xs font-mono-tech text-muted-foreground truncate">
+              <span className="hidden sm:inline">ATS SCORE CHECKER & AUDITOR</span>
+              <span className="sm:hidden">ATS AUDITOR</span>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             <Button 
               variant="outline" 
               size="sm" 
               onClick={() => router.push("/resume")} 
-              className="hidden sm:flex items-center gap-1.5 border-border text-foreground hover:bg-muted text-xs font-mono-tech h-8"
+              className="flex items-center gap-1.5 border-border text-foreground hover:bg-muted text-xs font-mono-tech h-8 px-2 sm:px-3"
             >
-              <Brain className="h-3.5 w-3.5 text-primary" /> Resume Workshop
+              <Brain className="h-3.5 w-3.5 text-primary" />
+              <span className="hidden sm:inline">Resume Workshop</span>
+              <span className="sm:hidden">Workshop</span>
             </Button>
             <ThemeToggle />
           </div>

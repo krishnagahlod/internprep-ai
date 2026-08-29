@@ -62,7 +62,7 @@ export function Hero() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 max-w-lg mx-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4 max-w-lg mx-auto">
           <Button
             onClick={handleStartPractice}
             size="lg"
@@ -83,6 +83,21 @@ export function Hero() {
             </Button>
           </Link>
         </div>
+
+        {/* Returning User Sign-in link */}
+        {!user && (
+          <div className="text-center mb-8">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-mono-tech transition-colors py-1 px-2 rounded-md hover:bg-muted/50"
+            >
+              <span>Already practicing?</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400 underline underline-offset-4">
+                Sign in to your candidate workspace →
+              </span>
+            </Link>
+          </div>
+        )}
 
         {/* Trust Signals */}
         <div className="flex flex-wrap items-center justify-center gap-6 text-xs font-mono-tech text-muted-foreground mb-14">

@@ -500,8 +500,22 @@ function InterviewEngine() {
           </Button>
 
           <div className="h-4 w-px bg-border hidden sm:block" />
+
+          {/* Mobile Phase Indicator */}
+          <div className="flex lg:hidden items-center">
+            {(() => {
+              const activePhaseList = interviewMode === "domain" ? DOMAIN_PHASES : PHASES
+              const activePhase = activePhaseList.find(p => p.id === currentPhase) || activePhaseList[0]
+              const phaseIdx = activePhaseList.findIndex(p => p.id === currentPhase) + 1
+              return (
+                <span className="text-[10px] font-mono-tech font-bold uppercase tracking-tight px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 truncate max-w-[130px] sm:max-w-[200px]">
+                  P{phaseIdx}: {activePhase.label}
+                </span>
+              )
+            })()}
+          </div>
           
-          {/* Phase Progress Indicator */}
+          {/* Phase Progress Indicator (Desktop) */}
           <div className="hidden lg:flex items-center gap-1">
             {(interviewMode === "domain" ? DOMAIN_PHASES : PHASES).map((phase, idx, arr) => {
               const isActive = currentPhase === phase.id

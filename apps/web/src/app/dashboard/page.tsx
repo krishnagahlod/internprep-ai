@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useEffect, useState, useRef } from "react"
+import Link from "next/link"
 import { 
   LayoutDashboard, FileText, Briefcase, ExternalLink, 
   Sparkles, LogOut, TrendingUp, Compass, Clock, 
   Users, Loader2, UploadCloud, Menu, X, Gauge, 
-  Building2, CreditCard, Crown, ArrowRight, ShieldCheck, CheckCircle2 
+  Building2, CreditCard, Crown, ArrowRight, ShieldCheck, CheckCircle2, LogIn 
 } from "lucide-react"
 import { motion, Variants } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -378,13 +379,33 @@ export default function DashboardPage() {
 
         {/* User Footer */}
         <div className="mt-auto pt-3 border-t border-border">
-          <div className="flex items-center gap-2.5 text-xs text-foreground p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors" onClick={handleLogout}>
-            <div className="h-7 w-7 rounded-md bg-muted border border-border flex items-center justify-center font-mono-tech font-bold text-foreground text-xs">
-              {isGuest ? "G" : user?.email?.charAt(0).toUpperCase()}
+          {isGuest || !user ? (
+            <div className="p-3 rounded-xl bg-muted/50 border border-border space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-mono-tech font-bold text-amber-600 dark:text-amber-400 text-xs shrink-0">
+                  G
+                </div>
+                <div className="truncate">
+                  <span className="text-xs font-bold text-foreground block truncate">Guest Sandbox</span>
+                  <span className="text-[10px] text-muted-foreground block truncate">Local storage only</span>
+                </div>
+              </div>
+              <Link href="/login" className="block w-full">
+                <Button size="sm" className="w-full h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 flex items-center justify-center gap-1.5 shadow-xs">
+                  <LogIn className="h-3.5 w-3.5" />
+                  Sign In to Sync
+                </Button>
+              </Link>
             </div>
-            <span className="truncate flex-1 font-medium">{isGuest ? "Guest User" : user?.email}</span>
-            <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-          </div>
+          ) : (
+            <div className="flex items-center gap-2.5 text-xs text-foreground p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors" onClick={handleLogout}>
+              <div className="h-7 w-7 rounded-md bg-muted border border-border flex items-center justify-center font-mono-tech font-bold text-foreground text-xs">
+                {user?.email?.charAt(0).toUpperCase()}
+              </div>
+              <span className="truncate flex-1 font-medium">{user?.email}</span>
+              <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+            </div>
+          )}
         </div>
       </aside>
 
@@ -407,7 +428,7 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        <nav className="flex-1 space-y-1 text-xs">
+        <nav className="flex-1 space-y-1 text-xs overflow-y-auto custom-scrollbar pr-1">
           <Button variant="secondary" className="w-full justify-start text-xs font-semibold bg-muted text-foreground" onClick={() => setIsMobileMenuOpen(false)}>
             <LayoutDashboard className="mr-2.5 h-4 w-4 text-primary" />
             Command Center
@@ -428,15 +449,82 @@ export default function DashboardPage() {
             <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
           </Button>
-          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/billing"); setIsMobileMenuOpen(false); }}>
-            <CreditCard className="mr-2.5 h-4 w-4 text-primary" />
-            Subscriptions & Quotas
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/dashboard/analytics"); setIsMobileMenuOpen(false); }}>
+            <TrendingUp className="mr-2.5 h-4 w-4" />
+            Analytics
           </Button>
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/history"); setIsMobileMenuOpen(false); }}>
             <Clock className="mr-2.5 h-4 w-4" />
             History
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/billing"); setIsMobileMenuOpen(false); }}>
+            <CreditCard className="mr-2.5 h-4 w-4 text-primary" />
+            Subscriptions & Quotas
+          </Button>
+
+          {isAdmin && (
+            <div className="pt-2 space-y-1">
+              <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
+                <Crown className="h-3 w-3" /> Admin Studio
+              </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-500/10 border border-purple-500/20"
+                onClick={() => { router.push("/admin"); setIsMobileMenuOpen(false); }}
+              >
+                <Crown className="mr-2.5 h-4 w-4 text-purple-500" />
+                Admin Console
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
+                onClick={() => {
+                  localStorage.setItem("iitb_placement_verified", "true")
+                  localStorage.setItem("iitb_placement_admin", "true")
+                  router.push("/placement-analysis")
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
+                Placement Intelligence
+                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
+                  VIP
+                </Badge>
+              </Button>
+            </div>
+          )}
         </nav>
+
+        {/* Mobile User Footer */}
+        <div className="mt-auto pt-3 border-t border-border">
+          {isGuest || !user ? (
+            <div className="p-3 rounded-xl bg-muted/60 border border-border space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-mono-tech font-bold text-amber-600 dark:text-amber-400 text-xs shrink-0">
+                  G
+                </div>
+                <div className="truncate">
+                  <span className="text-xs font-bold text-foreground block truncate">Guest Sandbox</span>
+                  <span className="text-[10px] text-muted-foreground block truncate">Session stored locally</span>
+                </div>
+              </div>
+              <Link href="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full">
+                <Button size="sm" className="w-full h-8 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 flex items-center justify-center gap-1.5 shadow-xs">
+                  <LogIn className="h-3.5 w-3.5" />
+                  Sign In / Create Account
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 text-xs text-foreground p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors" onClick={handleLogout}>
+              <div className="h-7 w-7 rounded-md bg-muted border border-border flex items-center justify-center font-mono-tech font-bold text-foreground text-xs">
+                {user?.email?.charAt(0).toUpperCase()}
+              </div>
+              <span className="truncate flex-1 font-medium">{user?.email}</span>
+              <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Main Content Area */}
@@ -451,12 +539,24 @@ export default function DashboardPage() {
             <span className="text-sm font-bold font-mono-tech text-foreground">InternPrep.ai</span>
           </div>
           <div className="flex items-center gap-2">
-            <QuotaBadge />
+            {isGuest || !user ? (
+              <Link href="/login">
+                <Button
+                  size="sm"
+                  className="h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech text-xs font-semibold flex items-center gap-1 shadow-xs"
+                >
+                  <LogIn className="h-3.5 w-3.5" />
+                  <span>Sign In</span>
+                </Button>
+              </Link>
+            ) : (
+              <QuotaBadge />
+            )}
             <ThemeToggle />
           </div>
         </header>
 
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full z-10 space-y-8">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full z-10 space-y-6">
           
           {/* Greeting & Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-border">
@@ -476,12 +576,60 @@ export default function DashboardPage() {
             </div>
             
             <div className="flex items-center gap-3">
+              {(isGuest || !user) && (
+                <Link href="/login">
+                  <Button size="sm" className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech text-xs font-semibold flex items-center gap-1.5 shadow-xs">
+                    <LogIn className="h-3.5 w-3.5" />
+                    <span>Sign In</span>
+                  </Button>
+                </Link>
+              )}
               <QuotaBadge />
               <div className="hidden lg:block">
                 <ThemeToggle />
               </div>
             </div>
           </div>
+
+          {/* Guest Mode Callout Banner */}
+          {(isGuest || !user) && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-card to-blue-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs"
+            >
+              <div className="flex items-start gap-3">
+                <div className="h-9 w-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-foreground font-mono-tech">
+                      EXPLORING IN GUEST SANDBOX
+                    </span>
+                    <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold">
+                      Free Preview
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Resumes and practice sessions in this session are stored locally in your browser. Sign in or create a free account to permanently save your progress and sync across devices.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
+                <Link href="/login" className="w-full sm:w-auto">
+                  <Button
+                    size="sm"
+                    className="w-full sm:w-auto h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <LogIn className="h-3.5 w-3.5" />
+                    Sign In / Register
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+          )}
           
           {/* Bento Box Layout */}
           <motion.div 

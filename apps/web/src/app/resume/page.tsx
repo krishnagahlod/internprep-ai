@@ -457,9 +457,10 @@ export default function ResumePage() {
               variant="outline"
               size="sm"
               onClick={() => router.push("/ats-checker")}
-              className="hidden sm:flex text-xs h-8 font-mono-tech border-border"
+              className="text-xs h-8 font-mono-tech border-border px-2.5 sm:px-3"
             >
-              Open ATS Checker →
+              <span className="hidden sm:inline">Open ATS Checker →</span>
+              <span className="sm:hidden">ATS →</span>
             </Button>
             <ThemeToggle />
           </div>

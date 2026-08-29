@@ -96,6 +96,20 @@ export function FinalCta() {
               </Link>
             </div>
 
+            {!user && (
+              <div className="text-center pt-2">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-mono-tech transition-colors py-1 px-2 rounded-md hover:bg-muted/40"
+                >
+                  <span>Already have an account?</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 underline underline-offset-4">
+                    Sign in to your candidate account →
+                  </span>
+                </Link>
+              </div>
+            )}
+
             {/* Trust Footer */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-mono-tech text-muted-foreground pt-4 border-t border-border/60">
               <div className="flex items-center gap-1.5">

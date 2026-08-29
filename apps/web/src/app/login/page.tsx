@@ -93,13 +93,13 @@ export default function LoginPage() {
       <Button 
         variant="ghost" 
         size="sm"
-        className="absolute top-4 left-4 z-50 text-muted-foreground hover:text-foreground hidden sm:flex text-xs font-mono-tech" 
+        className="absolute top-4 left-4 z-50 text-muted-foreground hover:text-foreground flex items-center text-xs font-mono-tech" 
         onClick={() => router.push("/")}
       >
         <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Home
       </Button>
 
-      <div className="w-full max-w-4xl grid md:grid-cols-2 bg-card border border-border shadow-xl rounded-xl overflow-hidden relative z-10">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 bg-card border border-border shadow-xl rounded-xl overflow-hidden relative z-10 my-8">
         
         {/* Left Side: Branding */}
         <div className="hidden md:flex flex-col justify-between p-8 lg:p-10 bg-muted/40 border-r border-border">
@@ -154,7 +154,7 @@ export default function LoginPage() {
             </div>
 
             {/* Toggle Switch */}
-            <div className="flex p-1 bg-muted rounded-lg border border-border font-mono-tech text-xs">
+            <div className="flex p-1 bg-muted rounded-lg border border-border font-mono-tech text-xs min-h-[40px] sm:min-h-0">
               <button
                 className={`flex-1 py-1.5 rounded-md transition-all ${isLoginView ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
                 onClick={() => setIsLoginView(true)}
@@ -177,7 +177,7 @@ export default function LoginPage() {
                     id="email" 
                     type="email" 
                     placeholder="student@iitb.ac.in" 
-                    className="h-9 rounded-md text-xs bg-background border-border"
+                    className="h-10 sm:h-9 rounded-md text-base sm:text-xs bg-background border-border"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
@@ -188,7 +188,7 @@ export default function LoginPage() {
                     id="password" 
                     type="password" 
                     placeholder="••••••••"
-                    className="h-9 rounded-md text-xs bg-background border-border"
+                    className="h-10 sm:h-9 rounded-md text-base sm:text-xs bg-background border-border"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -202,7 +202,7 @@ export default function LoginPage() {
               
               <div className="space-y-2 pt-1">
                 <Button 
-                  className="w-full h-9 rounded-md text-xs font-semibold font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-xs" 
+                  className="w-full h-10 sm:h-9 rounded-md text-xs font-semibold font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-xs" 
                   onClick={() => handleAuth(isLoginView ? "login" : "signup")}
                   disabled={isLoading || !email || !password}
                 >
@@ -220,7 +220,7 @@ export default function LoginPage() {
                 
                 <Button 
                   variant="outline" 
-                  className="w-full h-9 rounded-md text-xs font-mono-tech border-border bg-background hover:bg-muted" 
+                  className="w-full h-10 sm:h-9 rounded-md text-xs font-mono-tech border-border bg-background hover:bg-muted" 
                   onClick={handleGoogleLogin}
                   disabled={isLoading}
                 >
@@ -232,6 +232,20 @@ export default function LoginPage() {
                   </svg>
                   Continue with Google
                 </Button>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { setGuestMode } = useAuthStore.getState()
+                      setGuestMode()
+                      router.push("/dashboard")
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground font-mono-tech underline underline-offset-4 transition-colors py-1.5 px-2"
+                  >
+                    Skip for now • Continue as Guest →
+                  </button>
+                </div>
               </div>
             </div>
           </div>

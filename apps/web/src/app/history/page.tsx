@@ -10,7 +10,7 @@ import Link from "next/link";
 import { 
   ArrowLeft, ArrowRight, Clock, FileText, Bot, Loader2, Calendar, 
   Search, Filter, Sparkles, CheckCircle2, ShieldAlert, Award, 
-  RotateCcw, ExternalLink, Layers, Trash2
+  RotateCcw, ExternalLink, Layers, Trash2, LogIn
 } from "lucide-react";
 
 const DOMAINS = [
@@ -238,11 +238,46 @@ export default function HistoryPage() {
             </span>
           </div>
 
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {(!user || isGuest) && (
+              <Link href="/login">
+                <Button size="sm" className="h-8 px-2.5 rounded-lg bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 font-mono-tech text-xs font-semibold flex items-center gap-1 shadow-xs">
+                  <LogIn className="h-3.5 w-3.5" />
+                  <span>Sign In</span>
+                </Button>
+              </Link>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10 space-y-6">
+        
+        {/* Guest Mode Demo Notice Banner */}
+        {(!user || isGuest) && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-card to-blue-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-foreground font-mono-tech block">
+                  DEMO HISTORY ARCHIVE
+                </span>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  You are viewing sample interview transcripts and audit diffs. Sign in with your candidate account to automatically archive and sync your personal prep history.
+                </p>
+              </div>
+            </div>
+            <Link href="/login" className="w-full sm:w-auto shrink-0">
+              <Button size="sm" className="w-full sm:w-auto h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech shadow-xs flex items-center justify-center gap-1.5">
+                <LogIn className="h-3.5 w-3.5" />
+                Sign In to Save
+              </Button>
+            </Link>
+          </div>
+        )}
         
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-border">
