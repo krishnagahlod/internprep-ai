@@ -50,7 +50,20 @@ def test_cerebras_client_stream_generator():
     full_output = "".join(chunks)
     assert len(full_output) > 0
 
+import asyncio
+from main import health_check
+
+def test_health_endpoint():
+    """Verify health endpoint returns diagnostic telemetry."""
+    res = asyncio.run(health_check())
+    assert "status" in res
+    assert "uptime_seconds" in res
+    assert "database" in res
+    assert "llm_gateway" in res
+    assert res["version"] == "1.0.0"
+
 if __name__ == "__main__":
     test_create_error_response()
     test_cerebras_client_stream_generator()
-    print("SUCCESS: All Phase 5 backend tests passed!")
+    test_health_endpoint()
+    print("SUCCESS: All backend tests (including /health) passed!")

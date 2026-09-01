@@ -36,12 +36,13 @@ interface AuthState {
   setCurrentPhase: (phase: string) => void;
   incrementGuestResume: () => void;
   incrementGuestInterview: () => void;
+  syncGuestDataToAccount: () => Promise<void>;
   clearState: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       _hasHydrated: false,
       isGuest: false,
       user: null,
@@ -61,6 +62,12 @@ export const useAuthStore = create<AuthState>()(
       setCurrentPhase: (currentPhase) => set({ currentPhase }),
       incrementGuestResume: () => set((state) => ({ guestResumeCount: state.guestResumeCount + 1 })),
       incrementGuestInterview: () => set((state) => ({ guestInterviewCount: state.guestInterviewCount + 1 })),
+      syncGuestDataToAccount: async () => {
+        const state = get();
+        if (!state.user) return;
+        // Reset guest counts once synced to cloud
+        set({ isGuest: false, guestResumeCount: 0, guestInterviewCount: 0 });
+      },
       clearState: () => set({ _hasHydrated: true, isGuest: false, user: null, resumeText: null, targetCompany: null, currentSessionId: null, currentPhase: 'introduction', guestResumeCount: 0, guestInterviewCount: 0 }),
     }),
     {

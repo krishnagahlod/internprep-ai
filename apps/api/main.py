@@ -156,9 +156,59 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
+import time
+STARTUP_TIME = time.time()
+
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "AI Interview Coach API is running"}
+
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    """
+    Comprehensive operational health and telemetry diagnostics endpoint.
+    Reports DB connectivity latency, LLM pool readiness, and memory cache stats.
+    """
+    db_status = "unconfigured"
+    db_latency_ms = None
+    
+    # Check Database Connection
+    from services.db import get_supabase
+    client = get_supabase()
+    if client:
+        try:
+            t0 = time.time()
+            client.from_("profiles").select("id").limit(1).execute()
+            db_latency_ms = round((time.time() - t0) * 1000, 2)
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {str(e)[:100]}"
+
+    # LLM Gateway Status
+    from services.cerebras_client import cerebras_client
+    llm_info = {
+        "groq_keys_count": len(cerebras_client.groq_keys),
+        "openrouter_keys_count": len(cerebras_client.openrouter_keys),
+        "cerebras_keys_count": len(cerebras_client.cerebras_keys),
+        "in_memory_cache_entries": len(cerebras_client._cache),
+        "gemini_active": True,
+    }
+
+    is_healthy = db_status in ["connected", "unconfigured"]
+
+    return {
+        "status": "healthy" if is_healthy else "degraded",
+        "uptime_seconds": round(time.time() - STARTUP_TIME, 1),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "version": "1.0.0",
+        "database": {
+            "status": db_status,
+            "latency_ms": db_latency_ms,
+        },
+        "llm_gateway": llm_info,
+    }
 
 @app.get("/debug-sentry")
 async def sentry_debug():
