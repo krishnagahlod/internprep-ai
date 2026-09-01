@@ -24,6 +24,7 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://internprep.ai"),
   title: "InternPrep AI — Day 1 Placement & Case Interview Platform",
   description: "Rigorous case interview simulations and adaptive resume intelligence engineered for Day 1 placements at IIT Bombay and premier campuses.",
   openGraph: {

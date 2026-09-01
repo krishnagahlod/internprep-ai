@@ -16,6 +16,7 @@ const localForageStorage = {
 };
 
 interface AuthState {
+  _hasHydrated: boolean;
   isGuest: boolean;
   user: any | null; // Replace with proper Supabase User type later
   resumeText: string | null;
@@ -26,6 +27,7 @@ interface AuthState {
   guestInterviewCount: number;
   
   // Actions
+  setHasHydrated: (hasHydrated: boolean) => void;
   setGuestMode: () => void;
   setUser: (user: any | null) => void;
   setResumeText: (text: string) => void;
@@ -40,6 +42,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
+      _hasHydrated: false,
       isGuest: false,
       user: null,
       resumeText: null,
@@ -49,6 +52,7 @@ export const useAuthStore = create<AuthState>()(
       guestResumeCount: 0,
       guestInterviewCount: 0,
       
+      setHasHydrated: (_hasHydrated) => set({ _hasHydrated }),
       setGuestMode: () => set({ isGuest: true, user: null }),
       setUser: (user) => set({ user, isGuest: false }),
       setResumeText: (resumeText) => set({ resumeText }),
@@ -57,11 +61,17 @@ export const useAuthStore = create<AuthState>()(
       setCurrentPhase: (currentPhase) => set({ currentPhase }),
       incrementGuestResume: () => set((state) => ({ guestResumeCount: state.guestResumeCount + 1 })),
       incrementGuestInterview: () => set((state) => ({ guestInterviewCount: state.guestInterviewCount + 1 })),
-      clearState: () => set({ isGuest: false, user: null, resumeText: null, targetCompany: null, currentSessionId: null, currentPhase: 'introduction', guestResumeCount: 0, guestInterviewCount: 0 }),
+      clearState: () => set({ _hasHydrated: true, isGuest: false, user: null, resumeText: null, targetCompany: null, currentSessionId: null, currentPhase: 'introduction', guestResumeCount: 0, guestInterviewCount: 0 }),
     }),
     {
       name: 'internprep-auth-storage', // name of the item in the storage (must be unique)
       storage: createJSONStorage(() => localForageStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
+
+export const useAuthHydrated = () => useAuthStore((state) => state._hasHydrated);
+
