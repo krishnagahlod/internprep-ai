@@ -1,7 +1,9 @@
 import io
+import os
 import json
 import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 
@@ -431,6 +433,79 @@ async def ats_check(
         from services.security_logger import safe_log_error
         safe_log_error("Error in ats_check", exc=e)
         raise HTTPException(status_code=500, detail="Error computing ATS report.")
+
+@router.post("/ats-check/stream")
+@limiter.limit("20/hour")
+async def ats_check_stream(
+    request: Request,
+    file: Optional[UploadFile] = File(None),
+    raw_text: Optional[str] = Form(None),
+    target_role: str = Form("consulting"),
+    sub_track: Optional[str] = Form(None),
+    mode: str = Form("iitb_placement"),
+    job_description: Optional[str] = Form(None),
+    resume_id: Optional[str] = Form(None),
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """
+    Streams multi-stage telemetry progress events during ATS deep evaluation via SSE.
+    """
+    from agents.ats_engine import compute_full_ats_report
+    from dependencies import get_supabase
+    supabase = get_supabase()
+
+    pdf_bytes = None
+    if file:
+        pdf_bytes = await file.read()
+        if not pdf_bytes.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
+
+    if not raw_text and not pdf_bytes and resume_id and supabase:
+        res = supabase.table("resumes").select("user_id, raw_text, parsed_content").eq("id", resume_id).execute()
+        if res.data:
+            owner_id = res.data[0].get("user_id")
+            if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to inspect this resume.")
+            raw_text = res.data[0].get("raw_text", "")
+
+    if not raw_text and not pdf_bytes:
+        raise HTTPException(status_code=400, detail="Please upload a resume PDF file to perform ATS evaluation.")
+
+    async def sse_ats_stream():
+        try:
+            yield f"event: progress\ndata: {json.dumps({'stage': 'parsing_pdf', 'percent': 25, 'message': 'Extracting layout bounding boxes & text layers...'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            yield f"event: progress\ndata: {json.dumps({'stage': 'evaluating_pillars', 'percent': 50, 'message': 'Auditing typography, line-wrap budgets & section balance...'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            yield f"event: progress\ndata: {json.dumps({'stage': 'taxonomy_matching', 'percent': 75, 'message': 'Matching industry skill taxonomy against target role...'})}\n\n"
+
+            report = await asyncio.to_thread(
+                compute_full_ats_report,
+                pdf_bytes=pdf_bytes,
+                raw_text=raw_text,
+                target_role=target_role,
+                mode=mode,
+                job_description=job_description,
+                sub_track=sub_track
+            )
+
+            yield f"event: result\ndata: {json.dumps(report)}\n\n"
+        except Exception as e:
+            from services.security_logger import safe_log_error
+            safe_log_error("Error during ATS SSE streaming", exc=e)
+            yield f"event: error\ndata: {json.dumps({'error': 'ATS scan failed'})}\n\n"
+
+    return StreamingResponse(
+        sse_ats_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @router.post("/ats-fix-bullet")

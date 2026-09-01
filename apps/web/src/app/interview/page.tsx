@@ -15,6 +15,7 @@ import {
 import ReactMarkdown from "react-markdown"
 import dynamic from "next/dynamic"
 import { PaywallModal } from "@/components/paywall-modal"
+import { fetchEventSourceStream } from "@/lib/sse-client"
 
 // Dynamically import Excalidraw to prevent SSR hydration errors
 const ExcalidrawWrapper = dynamic(
@@ -333,7 +334,8 @@ function InterviewEngine() {
 
     if (window.speechSynthesis) window.speechSynthesis.cancel()
 
-    const newMessages = [...messages, { role: "user" as const, content: inputValue }]
+    const userMessageContent = inputValue
+    const newMessages = [...messages, { role: "user" as const, content: userMessageContent }]
     setMessages(newMessages)
     setInputValue("")
     setIsTyping(true)
@@ -347,7 +349,10 @@ function InterviewEngine() {
       }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-      const response = await fetch(`${API_URL}/interview/chat`, {
+      let streamedText = ""
+      let hasInsertedAssistant = false
+
+      await fetchEventSourceStream(`${API_URL}/interview/chat/stream`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -363,38 +368,54 @@ function InterviewEngine() {
           resume_context: interviewMode === "domain" ? caseContext : undefined,
           user_id: user?.id || (isGuest ? "guest" : undefined)
         }),
-      })
-
-      if (!response.ok) throw new Error("Failed to fetch response")
-
-      const data = await response.json()
-      
-      if (data.is_paywall_locked) {
-        setIsPaywallLocked(true)
-        if (data.response && data.response.trim()) {
-          setMessages([...newMessages, { role: "assistant", content: data.response }])
-        }
-        setPaywallMeta({
-          title: "Trial Limit Reached (4 Free Questions)",
-          description: "You've completed your free 4-question trial preview! Unlock the full 45-minute simulation, dynamic edge-case follow-ups, and comprehensive partner rubric scorecard.",
-          featureKey: "mock_interview"
-        })
-        setPaywallOpen(true)
-      } else {
-        if (data.response && data.response.trim()) {
-          setMessages([...newMessages, { role: "assistant", content: data.response }])
-          if (ttsEnabled) {
-            speakResponse(data.response)
+        onPhase: (phase) => {
+          if (phase) setCurrentPhase(phase)
+        },
+        onToken: (token) => {
+          setIsTyping(false)
+          streamedText += token
+          if (!hasInsertedAssistant) {
+            hasInsertedAssistant = true
+            setMessages([...newMessages, { role: "assistant", content: streamedText }])
+          } else {
+            setMessages((prev) => {
+              const updated = [...prev]
+              if (updated.length > 0 && updated[updated.length - 1].role === "assistant") {
+                updated[updated.length - 1] = { role: "assistant", content: streamedText }
+              }
+              return updated
+            })
           }
+        },
+        onPaywall: () => {
+          setIsPaywallLocked(true)
+          setPaywallMeta({
+            title: "Trial Limit Reached (4 Free Questions)",
+            description: "You've completed your free 4-question trial preview! Unlock the full 45-minute simulation, dynamic edge-case follow-ups, and comprehensive partner rubric scorecard.",
+            featureKey: "mock_interview"
+          })
+          setPaywallOpen(true)
+        },
+        onDone: (data) => {
+          if (data?.new_phase) {
+            setCurrentPhase(data.new_phase)
+          }
+          if (streamedText && ttsEnabled) {
+            speakResponse(streamedText)
+          }
+        },
+        onError: (err) => {
+          console.error("Interview streaming error:", err)
         }
-        if (data.new_phase) {
-          setCurrentPhase(data.new_phase)
-        }
-      }
-
+      })
     } catch (error) {
       console.error(error)
-      setMessages([...newMessages, { role: "system", content: "Error: Connection lost. Please try again." }])
+      setMessages((prev) => {
+        if (prev.length > 0 && prev[prev.length - 1].role === "assistant" && prev[prev.length - 1].content.trim()) {
+          return prev
+        }
+        return [...newMessages, { role: "system", content: "Error: Connection lost. Please try again." }]
+      })
     } finally {
       setIsTyping(false)
     }

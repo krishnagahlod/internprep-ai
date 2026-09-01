@@ -182,3 +182,35 @@ def generate_domain_interview_response(
     except Exception as e:
         print(f"Generation error: {e}")
         return "I'm having trouble connecting right now. Could you repeat that?", current_phase
+
+def generate_domain_interview_response_stream(
+    history: List[Dict[str, str]], 
+    current_phase: str, 
+    resume_context: str,
+    domain: str,
+    company: str,
+    question_bank: str = None
+):
+    """
+    Returns (stream_generator, new_phase)
+    """
+    if len(history) > 1 and check_phase_advance(history, current_phase):
+        current_phase = get_next_phase(current_phase)
+        
+    if not question_bank and current_phase == "technical":
+        question_bank = get_domain_questions(domain, company)
+    elif not question_bank:
+        question_bank = "Not needed for this phase."
+
+    system_prompt = get_phase_instructions(current_phase, question_bank, resume_context, domain, company)
+    
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+    
+    stream_generator = cerebras_client.stream_chat_completion(
+        messages=messages,
+        temperature=0.7,
+        max_tokens=350,
+        model=MODEL
+    )
+    return stream_generator, current_phase

@@ -36,6 +36,7 @@ import {
   ATSReasoningModal,
   ATSBulletFixModal,
 } from "@/components/ats-checker";
+import { fetchEventSourceStream } from "@/lib/sse-client";
 
 export default function ATSCheckerPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -102,17 +103,7 @@ export default function ATSCheckerPage() {
 
     setIsScanning(true);
     setError(null);
-    setScanProgress(10);
-
-    const progressInterval = setInterval(() => {
-      setScanProgress((prev) => {
-        if (prev >= 95) {
-          clearInterval(progressInterval);
-          return 95;
-        }
-        return prev + (prev < 50 ? 12 : 3);
-      });
-    }, 600);
+    setScanProgress(15);
 
     try {
       const formData = new FormData();
@@ -130,29 +121,30 @@ export default function ATSCheckerPage() {
       }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const response = await fetch(`${API_URL}/resume/ats-check`, {
+
+      await fetchEventSourceStream(`${API_URL}/resume/ats-check/stream`, {
         method: "POST",
         body: formData,
+        onProgress: (prog) => {
+          if (prog?.percent) {
+            setScanProgress(prog.percent);
+          }
+        },
+        onDone: (data) => {
+          setAtsReport(data);
+          setScanProgress(100);
+          if (isGuest && !atsReport) {
+            incrementGuestResume();
+          }
+        },
+        onError: (err) => {
+          throw err;
+        },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Failed to evaluate ATS score");
-      }
-
-      const data = await response.json();
-      clearInterval(progressInterval);
-      setAtsReport(data);
-      setScanProgress(100);
-      if (isGuest && !atsReport) {
-        incrementGuestResume();
-      }
     } catch (err: any) {
-      clearInterval(progressInterval);
       setError(err.message || "An unexpected error occurred during ATS evaluation.");
       setScanProgress(0);
     } finally {
-      clearInterval(progressInterval);
       setIsScanning(false);
     }
   };

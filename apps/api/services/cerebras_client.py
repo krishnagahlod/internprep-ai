@@ -442,4 +442,112 @@ class CerebrasClient:
 
         return result
 
+    # ==========================
+    # Real-Time SSE Streaming Entrypoint
+    # ==========================
+    def stream_chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.6,
+        max_tokens: int = 500,
+        model: str = "gpt-oss-120b"
+    ):
+        """
+        Generator yielding text token chunks live from Groq / OpenRouter / Gemini with fallback.
+        """
+        # 1. Tier 1: Groq Multi-Key Streaming (<150ms TTFT)
+        if self.groq_keys and time.time() >= self.groq_circuit_tripped_until:
+            key = self._get_next_healthy_groq_key()
+            if key:
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type": "application/json"
+                }
+                models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini"]
+                for model_candidate in models_to_try:
+                    payload = {
+                        "model": model_candidate,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max(max_tokens, 150),
+                        "stream": True
+                    }
+                    try:
+                        with httpx.Client(timeout=self.per_request_timeout) as client:
+                            with client.stream("POST", self.groq_url, headers=headers, json=payload) as response:
+                                if response.status_code == 200:
+                                    self.groq_failures = 0
+                                    for line in response.iter_lines():
+                                        if line.startswith("data: "):
+                                            data_str = line[6:].strip()
+                                            if data_str == "[DONE]":
+                                                return
+                                            try:
+                                                data_json = json.loads(data_str)
+                                                delta = data_json["choices"][0].get("delta", {})
+                                                content = delta.get("content", "")
+                                                if content:
+                                                    yield content
+                                            except Exception:
+                                                continue
+                                    return
+                    except Exception as e:
+                        print(f"Groq streaming exception: {e}")
+                        self._mark_groq_key_cooldown(key, duration=30)
+                        break
+
+        # 2. Tier 2: OpenRouter Free Models Streaming
+        if self.openrouter_keys and time.time() >= self.openrouter_circuit_tripped_until:
+            key = self._get_next_healthy_openrouter_key()
+            if key:
+                headers = {
+                    "Authorization": f"Bearer {key}",
+                    "HTTP-Referer": "https://internprep.ai",
+                    "X-Title": "InternPrep AI",
+                    "Content-Type": "application/json"
+                }
+                free_models = [
+                    "nvidia/nemotron-3.5-lightning:free",
+                    "google/gemma-4-26b-a4b-it:free",
+                    "z-ai/glm-5.2:free"
+                ]
+                for model_candidate in free_models:
+                    payload = {
+                        "model": model_candidate,
+                        "messages": messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "stream": True
+                    }
+                    try:
+                        with httpx.Client(timeout=self.per_request_timeout) as client:
+                            with client.stream("POST", self.openrouter_url, headers=headers, json=payload) as response:
+                                if response.status_code == 200:
+                                    self.openrouter_failures = 0
+                                    for line in response.iter_lines():
+                                        if line.startswith("data: "):
+                                            data_str = line[6:].strip()
+                                            if data_str == "[DONE]":
+                                                return
+                                            try:
+                                                data_json = json.loads(data_str)
+                                                delta = data_json["choices"][0].get("delta", {})
+                                                content = delta.get("content", "")
+                                                if content:
+                                                    yield content
+                                            except Exception:
+                                                continue
+                                    return
+                    except Exception as e:
+                        print(f"OpenRouter streaming exception: {e}")
+                        self._mark_openrouter_key_cooldown(key, duration=30)
+                        break
+
+        # 3. Tier 3: Non-streaming fallback chunked generator
+        full_res = self.generate_chat_completion(model, messages, temperature, max_tokens)
+        if full_res:
+            words = full_res.split(" ")
+            for i, word in enumerate(words):
+                yield word + (" " if i < len(words) - 1 else "")
+
 cerebras_client = CerebrasClient()

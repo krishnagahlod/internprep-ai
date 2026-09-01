@@ -139,13 +139,22 @@ app.include_router(placement_analysis.router)
 app.include_router(billing.router)
 app.include_router(admin.router)
 
-# --- Rate Limiter Setup ---
+# --- Rate Limiter & Unified Error Handlers Setup ---
 from dependencies import limiter
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from fastapi.exceptions import RequestValidationError
+from services.error_handler import (
+    http_exception_handler,
+    validation_exception_handler,
+    rate_limit_handler,
+    unhandled_exception_handler,
+)
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_exception_handler(Exception, unhandled_exception_handler)
 
 @app.get("/")
 def read_root():

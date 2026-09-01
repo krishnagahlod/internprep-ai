@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
-from agents.case_interviewer import generate_case_response, generate_hint, get_random_case
-from agents.domain_interviewer import generate_domain_interview_response
+import json
+from agents.case_interviewer import generate_case_response, generate_case_response_stream, generate_hint, get_random_case
+from agents.domain_interviewer import generate_domain_interview_response, generate_domain_interview_response_stream
 from services.rag import retrieve_context
 from supabase import create_client
 from dependencies import limiter, posthog_client, AuthUser, get_optional_user
@@ -383,6 +385,141 @@ async def chat_endpoint(
         from services.security_logger import safe_log_error
         safe_log_error(f"Error in chat endpoint for session {body.session_id}", exc=e)
         raise HTTPException(status_code=500, detail="Failed to process interview message.")
+
+@router.post("/chat/stream")
+@limiter.limit("60/hour")
+async def chat_stream_endpoint(
+    request: Request,
+    body: ChatRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """
+    Streams AI Interviewer response chunks in real-time via Server-Sent Events (SSE).
+    """
+    history = [{"role": m.role, "content": m.content} for m in body.messages]
+    user_turns = sum(1 for m in history if m.get("role") == "user")
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+
+    # Determine user tier
+    is_paid = False
+    if auth_user:
+        if auth_user.is_admin or auth_user.is_iitb:
+            is_paid = True
+        else:
+            ent = EntitlementService.get_active_entitlement(user_id=auth_user.id, user_email=auth_user.email)
+            pk = ent.get("plan_key", "free")
+            if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
+                is_paid = True
+            else:
+                mock_credits = UsageService.get_topup_balance(auth_user.id, "mock_interview")
+                if mock_credits > 0:
+                    is_paid = True
+    elif effective_user_id:
+        ent = EntitlementService.get_active_entitlement(user_id=effective_user_id)
+        pk = ent.get("plan_key", "free")
+        if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
+            is_paid = True
+        else:
+            mock_credits = UsageService.get_topup_balance(effective_user_id, "mock_interview")
+            if mock_credits > 0:
+                is_paid = True
+
+    # 1. Free tier teaser cutoff at 4 questions
+    if not is_paid and user_turns >= 4:
+        async def paywall_generator():
+            yield f"event: paywall\ndata: {json.dumps({'is_paywall_locked': True, 'new_phase': 'trial_limit_reached', 'turn_count': user_turns, 'max_turns': 4})}\n\n"
+        return StreamingResponse(paywall_generator(), media_type="text/event-stream")
+
+    # 2. Paid user cap at 19 turns
+    if user_turns >= 19:
+        wrapup_reply = (
+            "👏 **Excellent analysis!** We have thoroughly covered the case framework, quantitative estimation, and risk synthesis over our session.\n\n"
+            "We have reached the conclusion of this interview. Please click **'End & Generate Scorecard'** below to receive your comprehensive rubric evaluation and recruiter feedback!"
+        )
+        async def wrapup_generator():
+            yield f"event: phase\ndata: {json.dumps({'phase': 'conclusion'})}\n\n"
+            yield f"event: token\ndata: {json.dumps({'token': wrapup_reply})}\n\n"
+            yield f"event: done\ndata: {json.dumps({'response': wrapup_reply, 'new_phase': 'conclusion', 'turn_count': user_turns, 'max_turns': 20})}\n\n"
+        return StreamingResponse(wrapup_generator(), media_type="text/event-stream")
+
+    # Check context & build stream
+    dynamic_context = ""
+    latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
+    if body.case_source and latest_user_msg:
+        dynamic_context = retrieve_context(latest_user_msg, source=body.case_source, top_k=2)
+
+    combined_context = body.case_context or ""
+    if dynamic_context:
+        combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
+
+    if body.interview_type == "domain":
+        stream_gen, new_phase = generate_domain_interview_response_stream(
+            history=history,
+            current_phase=body.current_phase,
+            resume_context=body.resume_context or "No resume provided.",
+            domain=body.domain or "General",
+            company=body.company
+        )
+    else:
+        stream_gen, new_phase = generate_case_response_stream(
+            history=history,
+            current_phase=body.current_phase,
+            context=combined_context,
+            scratchpad=body.scratchpad
+        )
+
+    async def sse_event_stream():
+        try:
+            yield f"event: phase\ndata: {json.dumps({'phase': new_phase})}\n\n"
+            full_text_chunks = []
+
+            for chunk in stream_gen:
+                full_text_chunks.append(chunk)
+                yield f"event: token\ndata: {json.dumps({'token': chunk})}\n\n"
+
+            full_reply = "".join(full_text_chunks)
+
+            # Persist session messages
+            if supabase and body.session_id != "temp_session_id":
+                if latest_user_msg:
+                    supabase.table("session_messages").insert({
+                        "session_id": body.session_id,
+                        "role": "user",
+                        "content": latest_user_msg,
+                        "phase": body.current_phase
+                    }).execute()
+                supabase.table("session_messages").insert({
+                    "session_id": body.session_id,
+                    "role": "assistant",
+                    "content": full_reply,
+                    "phase": new_phase
+                }).execute()
+
+                if new_phase != body.current_phase:
+                    sess = supabase.table("interview_sessions").select("case_state").eq("id", body.session_id).execute()
+                    if sess.data:
+                        case_state = sess.data[0].get("case_state", {})
+                        case_state["current_phase"] = new_phase
+                        supabase.table("interview_sessions").update({
+                            "case_state": case_state,
+                            "scratchpad_content": body.scratchpad
+                        }).eq("id", body.session_id).execute()
+
+            yield f"event: done\ndata: {json.dumps({'response': full_reply, 'new_phase': new_phase, 'turn_count': user_turns, 'max_turns': 20 if is_paid else 4})}\n\n"
+        except Exception as e:
+            from services.security_logger import safe_log_error
+            safe_log_error("Error during interview SSE streaming", exc=e)
+            yield f"event: error\ndata: {json.dumps({'error': 'Streaming interrupted'})}\n\n"
+
+    return StreamingResponse(
+        sse_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @router.post("/hint", response_model=HintResponse)
 @limiter.limit("30/minute")

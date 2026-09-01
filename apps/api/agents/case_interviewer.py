@@ -183,6 +183,34 @@ def generate_case_response(
     
     return bot_reply, new_phase
 
+def generate_case_response_stream(
+    history: List[Dict[str, str]], 
+    current_phase: str, 
+    context: str, 
+    scratchpad: str
+):
+    """Generates the next step in the case interview and yields token chunks live."""
+    new_phase = current_phase
+    if check_phase_advance(history, current_phase):
+        new_phase = get_next_phase(current_phase)
+        
+    system_prompt = get_phase_instructions(new_phase, context)
+    if scratchpad.strip():
+        system_prompt += f"\n\nCandidate's Excalidraw Scratchpad Text:\n{scratchpad}"
+        
+    messages = [{"role": "system", "content": system_prompt}]
+    filtered_history = [m for m in history if m["role"] in ["user", "assistant"]]
+    messages.extend(filtered_history)
+    
+    stream_generator = cerebras_client.stream_chat_completion(
+        messages=messages,
+        temperature=0.6,
+        max_tokens=1024,
+        model=MODEL
+    )
+    
+    return stream_generator, new_phase
+
 def get_random_case(case_type: str = None) -> Dict[str, Any]:
     """Fetches a random case from Supabase, optionally filtered by type."""
     if not supabase:
