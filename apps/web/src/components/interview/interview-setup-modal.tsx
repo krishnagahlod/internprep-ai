@@ -109,6 +109,17 @@ export function InterviewSetupModal({
           <Play className="h-4 w-4 fill-current" />
           <span>{isInitializing ? "Calibrating AI Persona..." : "Begin Live Mock Interview"}</span>
         </Button>
+
+        {/* Company Specialized Studio Link */}
+        <div className="pt-1 text-center border-t border-border/50">
+          <a
+            href="/interview/accenture"
+            className="text-[11px] font-mono-tech text-muted-foreground hover:text-emerald-500 transition-colors inline-flex items-center gap-1.5"
+          >
+            <span>Preparing specifically for Accenture Consulting?</span>
+            <span className="font-bold underline">Launch Accenture Studio →</span>
+          </a>
+        </div>
       </div>
     </div>
   );

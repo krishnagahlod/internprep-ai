@@ -1,0 +1,165 @@
+[
+  {
+    "interview_id": "iitb_acc_2025_01",
+    "source": {
+      "institute": "IIT Bombay",
+      "year": 2025,
+      "role": "Management Consulting Associate Summer Intern",
+      "cohort": "2028 Batch",
+      "round": 1,
+      "collection_method": "direct_debrief"
+    },
+    "metadata": {
+      "duration_minutes": 25,
+      "interviewer_count": 1,
+      "interviewer_seniority": "Senior Manager (Strategy & Consulting)"
+    },
+    "candidate_profile": {
+      "branch": "Computer Science / Electrical Engineering",
+      "resume_features": [
+        "ML/NLP Internship at FinTech Startup",
+        "Campus Consulting Club Core Member",
+        "Inter-IIT Tech Meet Bronze Medalist"
+      ]
+    },
+    "sequence": [
+      {
+        "step": 1,
+        "category": "opening_closing",
+        "canonical_topic": "Introduction and Resume Walkthrough",
+        "question": "Good morning! Walk me through your resume, highlighting the inflection points that shaped your interest in management consulting.",
+        "candidate_response_summary": "Introduced engineering background, interest in data-backed decision making, and transition from pure coding to strategic problem solving during a startup internship.",
+        "follow_ups": [
+          "What made you realize you wanted to solve client business problems rather than write code all day?"
+        ],
+        "interviewer_reaction": "Nodded, pivoted directly into fintech internship",
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "category": "resume",
+        "canonical_topic": "Internship Metric Validation",
+        "question": "In your FinTech internship, you wrote: 'Engineered an automated document parsing pipeline reducing verification turnaround time by 45%'. How was that 45% measured, and what was the baseline?",
+        "candidate_response_summary": "Explained manual review took 22 minutes on average across 1,000 documents; automated pipeline cut it to 12 minutes.",
+        "follow_ups": [
+          "What was the error rate of the automated model compared to human reviewers?",
+          "How did you convince operations to trust an automated pipeline with sensitive financial documents?"
+        ],
+        "interviewer_reaction": "Probed deeply into edge-case errors and operational change management",
+        "confidence": "very_high"
+      },
+      {
+        "step": 3,
+        "category": "consulting_case",
+        "canonical_topic": "Retail Footfall Decline & Profitability",
+        "question": "Let's pivot to a case. A premier nationwide supermarket chain in India has observed a 15% decline in operating profits over the past two quarters, despite stable overall footfall. How would you diagnose this?",
+        "candidate_response_summary": "Structured profit into Revenue minus Costs. Clarified stable footfall meant either basket size dropped, product mix shifted to low-margin items, or operating costs increased. Asked for data on average basket value and gross margins.",
+        "follow_ups": [
+          "Interesting. Average basket value actually remained unchanged, but gross margin dropped from 22% to 16%. Where would you look next?",
+          "Suppose the drop in margin is due to supply chain inflation in perishables. What 3 strategic levers would you recommend to the executive committee?"
+        ],
+        "interviewer_reaction": "Provided margin numbers only when candidate asked, tested structured synthesis",
+        "confidence": "very_high"
+      },
+      {
+        "step": 4,
+        "category": "ai_genai",
+        "canonical_topic": "Enterprise GenAI Adoption & Tradeoffs",
+        "question": "Accenture is helping enterprise clients deploy Generative AI. How would you explain the difference between fine-tuning a foundation model versus using a Retrieval-Augmented Generation (RAG) architecture to a non-technical Chief Marketing Officer?",
+        "candidate_response_summary": "Used an analogy: RAG is like an open-book exam where the model looks up latest company docs in real-time, whereas fine-tuning is like studying extensively before the exam to learn a specific style or jargon.",
+        "follow_ups": [
+          "Under what client circumstances would fine-tuning be a waste of budget compared to RAG?",
+          "How would you address data privacy and hallucination risks for a banking client?"
+        ],
+        "interviewer_reaction": "Appreciated the clear business-friendly analogy, pushed on hallucination mitigation",
+        "confidence": "very_high"
+      },
+      {
+        "step": 5,
+        "category": "behavioral",
+        "canonical_topic": "Why Consulting & Conflict Resolution",
+        "question": "Why Accenture Strategy & Consulting specifically over pure-play strategy firms, and tell me about a time you faced strong disagreement in a team deliverable.",
+        "candidate_response_summary": "Highlighted Accenture's end-to-end transformation capability (strategy through technology execution). Described a disagreement in Inter-IIT team on task allocation, resolved by data-driven sub-deliverable benchmarks.",
+        "follow_ups": [
+          "What did you learn about your own leadership style from that conflict?"
+        ],
+        "interviewer_reaction": "Satisfied with STAR structure, wrapped up and invited candidate questions",
+        "confidence": "high"
+      }
+    ],
+    "interviewer_behavior": {
+      "probing_intensity": 4,
+      "style": ["conversational", "challenging", "direct", "no_fluff"],
+      "interruptions_for_course_correction": 1
+    }
+  },
+  {
+    "interview_id": "iitd_acc_2025_02",
+    "source": {
+      "institute": "IIT Delhi",
+      "year": 2025,
+      "role": "Management Consulting Associate Intern",
+      "cohort": "2028 Batch",
+      "round": 1,
+      "collection_method": "immediate_debrief"
+    },
+    "metadata": {
+      "duration_minutes": 22,
+      "interviewer_count": 1,
+      "interviewer_seniority": "Manager (Strategy & Consulting)"
+    },
+    "candidate_profile": {
+      "branch": "Mechanical Engineering",
+      "resume_features": [
+        "Supply Chain Analytics Research Project",
+        "Department Academic Mentorship Lead",
+        "Case Competition National Finalist"
+      ]
+    },
+    "sequence": [
+      {
+        "step": 1,
+        "category": "resume",
+        "canonical_topic": "Research Project Scope & Impact",
+        "question": "Tell me about your supply chain optimization project. What was the core business constraint you were trying to model?",
+        "candidate_response_summary": "Explained inventory holding cost vs stockout penalty tradeoff for automotive spare parts.",
+        "follow_ups": [
+          "How did you handle non-linear demand spikes during festival seasons?",
+          "What assumptions in your mathematical model would fail if deployed in a real Tier-2 Indian warehouse?"
+        ],
+        "interviewer_reaction": "Tested practical ground reality vs pure academic simulation",
+        "confidence": "high"
+      },
+      {
+        "step": 2,
+        "category": "consulting_case",
+        "canonical_topic": "Market Entry / EV Charging Infrastructure",
+        "question": "An oil marketing PSU in India wants to enter the EV fast-charging market along national highways. How would you estimate the market size and evaluate financial feasibility?",
+        "candidate_response_summary": "Used top-down guesstimate on highway traffic, EV adoption curve (5% by 2027), average daily charging cycles, and power tariffs vs CAPEX of DC fast chargers.",
+        "follow_ups": [
+          "What is the payback period if utilization is only 30% in year one?",
+          "What ancillary revenue streams can turn this charging hub into a profitable destination?"
+        ],
+        "interviewer_reaction": "Tested back-of-the-envelope calculation and commercial creativity",
+        "confidence": "high"
+      },
+      {
+        "step": 3,
+        "category": "behavioral",
+        "canonical_topic": "Dealing with Ambiguity",
+        "question": "In consulting, clients often provide incomplete data and expect answers by Monday morning. Give me an example of how you navigated extreme ambiguity in your past work.",
+        "candidate_response_summary": "Explained mentorship lead role during sudden curriculum overhaul with zero documentation, setting up peer crowdsourced FAQs.",
+        "follow_ups": [
+          "How did you prioritize what was critical vs nice-to-have?"
+        ],
+        "interviewer_reaction": "Positive response, ended on time",
+        "confidence": "high"
+      }
+    ],
+    "interviewer_behavior": {
+      "probing_intensity": 3,
+      "style": ["encouraging_structure", "fast_paced"],
+      "interruptions_for_course_correction": 0
+    }
+  }
+]

@@ -1,0 +1,170 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "target_company": "Accenture Global",
+    "target_role": "Management Consulting Associate / Summer Internship",
+    "target_cohort": "IIT Bombay 2028 Cohort & Top IITs",
+    "total_processed_interviews": 2,
+    "iitb_interviews": 1,
+    "last_updated": "2026-09-01"
+  },
+  "taxonomy": [
+    "opening_closing",
+    "resume",
+    "consulting_case",
+    "ai_genai",
+    "behavioral"
+  ],
+  "interviewer_persona": {
+    "title": "Manager / Senior Manager (Accenture Strategy & Consulting)",
+    "tone": "Professional, curious, direct, conversational, rigorous",
+    "probing_intensity": 4,
+    "prohibited_behaviors": [
+      "Never give generic cheerleader validation like 'Great answer!' or 'Awesome!'",
+      "Never read off a static checklist without dynamic follow-ups",
+      "Never reveal hidden evaluation scores during the live interview"
+    ],
+    "required_behaviors": [
+      "Probe unsupported claims and quantitative metrics",
+      "Ask one question at a time and listen attentively to candidate responses",
+      "Offer subtle hints during consulting cases only if candidate gets stuck",
+      "Maintain time awareness (20-25 mins pacing)"
+    ]
+  },
+  "candidate_trigger_rules": [
+    {
+      "trigger_type": "quantitative_metric_claim",
+      "regex_signals": [
+        "([0-9]+%|[0-9]+x|improved by|reduced by|increased by)"
+      ],
+      "interviewer_probing_directive": "Probe the baseline, sample size, measurement methodology, and isolate the candidate's personal contribution from the broader team."
+    },
+    {
+      "trigger_type": "ai_or_rag_claim",
+      "regex_signals": [
+        "(rag|llm|fine-tuning|agent|embeddings|langchain|transformer)"
+      ],
+      "interviewer_probing_directive": "Probe the business rationale (Why RAG vs Fine-tuning? How do you explain latency/cost tradeoffs to a non-technical CXO?)."
+    },
+    {
+      "trigger_type": "team_leadership_claim",
+      "regex_signals": [
+        "(led a team|headed|managed|spearheaded|core member)"
+      ],
+      "interviewer_probing_directive": "Probe conflict resolution, alignment under ambiguity, and practical stakeholder pushback."
+    }
+  ],
+  "question_bank_by_category": {
+    "opening_closing": [
+      {
+        "topic": "Introduction and Resume Walkthrough",
+        "question": "Good morning! Walk me through your resume, highlighting the inflection points that shaped your interest in management consulting.",
+        "answer_summary": "Introduced engineering background, interest in data-backed decision making, and transition from pure coding to strategic problem solving during a startup internship.",
+        "follow_ups": [
+          "What made you realize you wanted to solve client business problems rather than write code all day?"
+        ],
+        "interviewer_reaction": "Nodded, pivoted directly into fintech internship",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "high"
+      }
+    ],
+    "resume": [
+      {
+        "topic": "Internship Metric Validation",
+        "question": "In your FinTech internship, you wrote: 'Engineered an automated document parsing pipeline reducing verification turnaround time by 45%'. How was that 45% measured, and what was the baseline?",
+        "answer_summary": "Explained manual review took 22 minutes on average across 1,000 documents; automated pipeline cut it to 12 minutes.",
+        "follow_ups": [
+          "What was the error rate of the automated model compared to human reviewers?",
+          "How did you convince operations to trust an automated pipeline with sensitive financial documents?"
+        ],
+        "interviewer_reaction": "Probed deeply into edge-case errors and operational change management",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "very_high"
+      },
+      {
+        "topic": "Research Project Scope & Impact",
+        "question": "Tell me about your supply chain optimization project. What was the core business constraint you were trying to model?",
+        "answer_summary": "Explained inventory holding cost vs stockout penalty tradeoff for automotive spare parts.",
+        "follow_ups": [
+          "How did you handle non-linear demand spikes during festival seasons?",
+          "What assumptions in your mathematical model would fail if deployed in a real Tier-2 Indian warehouse?"
+        ],
+        "interviewer_reaction": "Tested practical ground reality vs pure academic simulation",
+        "source_institute": "IIT Delhi",
+        "weight": 0.85,
+        "confidence": "high"
+      }
+    ],
+    "consulting_case": [
+      {
+        "topic": "Retail Footfall Decline & Profitability",
+        "question": "Let's pivot to a case. A premier nationwide supermarket chain in India has observed a 15% decline in operating profits over the past two quarters, despite stable overall footfall. How would you diagnose this?",
+        "answer_summary": "Structured profit into Revenue minus Costs. Clarified stable footfall meant either basket size dropped, product mix shifted to low-margin items, or operating costs increased. Asked for data on average basket value and gross margins.",
+        "follow_ups": [
+          "Interesting. Average basket value actually remained unchanged, but gross margin dropped from 22% to 16%. Where would you look next?",
+          "Suppose the drop in margin is due to supply chain inflation in perishables. What 3 strategic levers would you recommend to the executive committee?"
+        ],
+        "interviewer_reaction": "Provided margin numbers only when candidate asked, tested structured synthesis",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "very_high"
+      },
+      {
+        "topic": "Market Entry / EV Charging Infrastructure",
+        "question": "An oil marketing PSU in India wants to enter the EV fast-charging market along national highways. How would you estimate the market size and evaluate financial feasibility?",
+        "answer_summary": "Used top-down guesstimate on highway traffic, EV adoption curve (5% by 2027), average daily charging cycles, and power tariffs vs CAPEX of DC fast chargers.",
+        "follow_ups": [
+          "What is the payback period if utilization is only 30% in year one?",
+          "What ancillary revenue streams can turn this charging hub into a profitable destination?"
+        ],
+        "interviewer_reaction": "Tested back-of-the-envelope calculation and commercial creativity",
+        "source_institute": "IIT Delhi",
+        "weight": 0.85,
+        "confidence": "high"
+      }
+    ],
+    "ai_genai": [
+      {
+        "topic": "Enterprise GenAI Adoption & Tradeoffs",
+        "question": "Accenture is helping enterprise clients deploy Generative AI. How would you explain the difference between fine-tuning a foundation model versus using a Retrieval-Augmented Generation (RAG) architecture to a non-technical Chief Marketing Officer?",
+        "answer_summary": "Used an analogy: RAG is like an open-book exam where the model looks up latest company docs in real-time, whereas fine-tuning is like studying extensively before the exam to learn a specific style or jargon.",
+        "follow_ups": [
+          "Under what client circumstances would fine-tuning be a waste of budget compared to RAG?",
+          "How would you address data privacy and hallucination risks for a banking client?"
+        ],
+        "interviewer_reaction": "Appreciated the clear business-friendly analogy, pushed on hallucination mitigation",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "very_high"
+      }
+    ],
+    "behavioral": [
+      {
+        "topic": "Why Consulting & Conflict Resolution",
+        "question": "Why Accenture Strategy & Consulting specifically over pure-play strategy firms, and tell me about a time you faced strong disagreement in a team deliverable.",
+        "answer_summary": "Highlighted Accenture's end-to-end transformation capability (strategy through technology execution). Described a disagreement in Inter-IIT team on task allocation, resolved by data-driven sub-deliverable benchmarks.",
+        "follow_ups": [
+          "What did you learn about your own leadership style from that conflict?"
+        ],
+        "interviewer_reaction": "Satisfied with STAR structure, wrapped up and invited candidate questions",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "high"
+      },
+      {
+        "topic": "Dealing with Ambiguity",
+        "question": "In consulting, clients often provide incomplete data and expect answers by Monday morning. Give me an example of how you navigated extreme ambiguity in your past work.",
+        "answer_summary": "Explained mentorship lead role during sudden curriculum overhaul with zero documentation, setting up peer crowdsourced FAQs.",
+        "follow_ups": [
+          "How did you prioritize what was critical vs nice-to-have?"
+        ],
+        "interviewer_reaction": "Positive response, ended on time",
+        "source_institute": "IIT Delhi",
+        "weight": 0.85,
+        "confidence": "high"
+      }
+    ]
+  }
+}

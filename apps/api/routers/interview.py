@@ -611,3 +611,164 @@ async def get_session_endpoint(
         from services.security_logger import safe_log_error
         safe_log_error(f"Error fetching session {session_id}", exc=e)
         raise HTTPException(status_code=500, detail="Failed to fetch interview session.")
+
+
+# ---------------------------------------------------------
+# ACCENTURE MANAGEMENT CONSULTING SIMULATION ENDPOINTS
+# ---------------------------------------------------------
+
+class AccentureStartRequest(BaseModel):
+    practice_mode: str = "full_simulation"
+    resume_context: Optional[str] = None
+    user_id: Optional[str] = None
+
+class AccentureChatStreamRequest(BaseModel):
+    session_id: str
+    messages: List[Dict[str, str]]
+    current_phase: str = "introduction"
+    practice_mode: str = "full_simulation"
+    time_elapsed_secs: int = 0
+    resume_context: Optional[str] = None
+
+class AccentureEvaluateRequest(BaseModel):
+    session_id: str
+    messages: List[Dict[str, str]]
+    resume_context: Optional[str] = None
+
+
+@router.post("/accenture/start")
+@limiter.limit("20/minute")
+async def start_accenture_session(
+    request: Request,
+    body: AccentureStartRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """Initializes an Accenture Strategy & Consulting mock session with dynamic mode calibration."""
+    try:
+        import uuid
+        from agents.accenture_interviewer import build_accenture_system_prompt, PHASE_MAP
+        from services.cerebras_client import cerebras_client
+
+        session_id = f"acc_{uuid.uuid4().hex[:12]}"
+        practice_mode = body.practice_mode or "full_simulation"
+        active_phases = PHASE_MAP.get(practice_mode, PHASE_MAP["full_simulation"])
+        initial_phase = active_phases[0]
+
+        sys_prompt = build_accenture_system_prompt(
+            session_id=session_id,
+            practice_mode=practice_mode,
+            current_phase=initial_phase,
+            time_elapsed_secs=0,
+            resume_context=body.resume_context
+        )
+
+        initial_greeting = cerebras_client.generate_chat_completion(
+            model="gpt-oss-120b",
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": f"Start the interview for an IIT Bombay candidate preparing for the {practice_mode} mode. Greet them professionally as an Accenture Manager and ask the opening question."}
+            ],
+            temperature=0.4,
+            max_tokens=200
+        )
+
+        return {
+            "session_id": session_id,
+            "practice_mode": practice_mode,
+            "initial_phase": initial_phase,
+            "initial_message": initial_greeting.strip(),
+            "phases": active_phases
+        }
+    except Exception as e:
+        import uuid
+        from services.security_logger import safe_log_error
+        safe_log_error("Error starting Accenture session", exc=e)
+        return {
+            "session_id": f"acc_{uuid.uuid4().hex[:12]}",
+            "practice_mode": body.practice_mode or "full_simulation",
+            "initial_phase": "introduction",
+            "initial_message": "Good morning. I'm a Manager here at Accenture Strategy & Consulting. Walk me through your resume, highlighting the inflection points that shaped your interest in management consulting.",
+            "phases": ["introduction", "resume_deep_dive", "consulting_case", "ai_genai_strategy", "behavioral_fit", "closing"]
+        }
+
+
+@router.post("/accenture/chat/stream")
+@limiter.limit("45/minute")
+async def stream_accenture_chat(
+    request: Request,
+    body: AccentureChatStreamRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """Streams live token responses from the stateful Accenture Manager interviewer."""
+    from agents.accenture_interviewer import build_accenture_system_prompt, PHASE_MAP
+    from services.cerebras_client import cerebras_client
+
+    active_phases = PHASE_MAP.get(body.practice_mode, PHASE_MAP["full_simulation"])
+    current_phase_idx = active_phases.index(body.current_phase) if body.current_phase in active_phases else 0
+
+    candidate_last_msg = body.messages[-1].get("content", "") if body.messages else ""
+
+    # Natural phase pacing
+    turns_in_phase = len(body.messages) // 2
+    next_phase = body.current_phase
+    if turns_in_phase >= 2 and current_phase_idx + 1 < len(active_phases):
+        next_phase = active_phases[current_phase_idx + 1]
+
+    sys_prompt = build_accenture_system_prompt(
+        session_id=body.session_id,
+        practice_mode=body.practice_mode,
+        current_phase=next_phase,
+        time_elapsed_secs=body.time_elapsed_secs,
+        resume_context=body.resume_context,
+        candidate_last_message=candidate_last_msg
+    )
+
+    llm_messages = [{"role": "system", "content": sys_prompt}]
+    for m in body.messages:
+        llm_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+
+    async def event_generator():
+        try:
+            yield f"data: {json.dumps({'type': 'phase', 'phase': next_phase})}\n\n"
+            for token in cerebras_client.stream_chat_completion(llm_messages, temperature=0.3, max_tokens=350):
+                yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'session_id': body.session_id, 'new_phase': next_phase})}\n\n"
+        except Exception as err:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(err)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.post("/accenture/evaluate")
+@limiter.limit("15/minute")
+async def evaluate_accenture_session(
+    request: Request,
+    body: AccentureEvaluateRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """Evaluates full interview transcript against the 6-dimension Accenture scorecard."""
+    try:
+        from agents.accenture_evaluator import evaluate_accenture_interview
+        report = evaluate_accenture_interview(
+            session_id=body.session_id,
+            messages=body.messages,
+            resume_context=body.resume_context
+        )
+        return {"status": "success", "feedback": report}
+    except Exception as e:
+        from services.security_logger import safe_log_error
+        safe_log_error("Error evaluating Accenture session", exc=e)
+        raise HTTPException(status_code=500, detail="Failed to evaluate Accenture interview.")
+
+
+@router.get("/accenture/knowledge")
+async def get_accenture_knowledge():
+    """Returns summarized stats and patterns from the Accenture Knowledge Base."""
+    from services.accenture_kb_service import get_accenture_kb
+    kb = get_accenture_kb()
+    return {
+        "metadata": kb.get("metadata", {}),
+        "taxonomy": kb.get("taxonomy", []),
+        "sample_counts": {k: len(v) for k, v in kb.get("question_bank_by_category", {}).items()}
+    }
+

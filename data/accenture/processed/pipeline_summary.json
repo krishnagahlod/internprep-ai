@@ -1,0 +1,12 @@
+{
+  "status": "success",
+  "total_interviews": 2,
+  "categories_extracted": {
+    "opening_closing": 1,
+    "resume": 2,
+    "consulting_case": 2,
+    "ai_genai": 1,
+    "behavioral": 2
+  },
+  "output_file": "C:\\Interview Preparation Platform\\data\\accenture\\knowledge_base.json"
+}
