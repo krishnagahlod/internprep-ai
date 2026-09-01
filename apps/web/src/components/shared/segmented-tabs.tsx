@@ -39,6 +39,8 @@ export function SegmentedTabs<T extends string = string>({
 
   return (
     <div
+      role="tablist"
+      aria-label="Section Tabs"
       className={`inline-flex items-center gap-1 rounded-xl bg-muted/40 p-1 border border-border overflow-x-auto custom-scrollbar max-w-full ${sizeClasses[size]} ${className}`}
     >
       {tabs.map((tab) => {
@@ -48,8 +50,13 @@ export function SegmentedTabs<T extends string = string>({
         return (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`panel-${tab.id}`}
+            id={`tab-${tab.id}`}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(tab.id)}
-            className={`inline-flex items-center gap-1.5 rounded-lg font-mono-tech whitespace-nowrap transition-all select-none ${
+            className={`inline-flex items-center gap-1.5 rounded-lg font-mono-tech whitespace-nowrap transition-all select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary ${
               tabPadding[size]
             } ${
               isActive

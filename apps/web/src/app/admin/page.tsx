@@ -24,9 +24,11 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth-store";
 import { getAuthHeaders } from "@/lib/billing-api";
 import { CommandNav, CommandHero, KpiMetricGrid, SegmentedTabs } from "@/components/shared";
+import { KpiGridSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import {
   AdminStats,
   AdminUserRecord,
@@ -183,6 +185,11 @@ export default function AdminPage() {
 
   const showToast = (type: "success" | "error", text: string) => {
     setToastMessage({ type, text });
+    if (type === "success") {
+      toast.success(text);
+    } else {
+      toast.error(text);
+    }
     setTimeout(() => {
       setToastMessage((prev) => (prev?.text === text ? null : prev));
     }, 4000);
@@ -664,18 +671,25 @@ export default function AdminPage() {
           )}
         </AnimatePresence>
 
-        {/* Platform Overview Metric Cards via KpiMetricGrid */}
-        <KpiMetricGrid
-          columns={6}
-          metrics={[
-            {
-              label: "Total Candidates",
-              value: stats?.total_users || usersList.length,
-              subtext: "Auth Candidate Fleet",
-              icon: Users,
-              badge: "Live Pool",
-              badgeVariant: "blue",
-            },
+        {/* Platform Overview Metric Cards via KpiMetricGrid or Zero-CLS Skeleton */}
+        {loading && !stats ? (
+          <div className="space-y-6">
+            <KpiGridSkeleton columns={6} />
+            <TableSkeleton rows={8} cols={5} />
+          </div>
+        ) : (
+          <>
+            <KpiMetricGrid
+              columns={6}
+              metrics={[
+                {
+                  label: "Total Candidates",
+                  value: stats?.total_users || usersList.length,
+                  subtext: "Auth Candidate Fleet",
+                  icon: Users,
+                  badge: "Live Pool",
+                  badgeVariant: "blue",
+                },
             {
               label: "IIT Bombay Verified",
               value:
@@ -798,6 +812,8 @@ export default function AdminPage() {
 
         {/* TAB 4: AUDIT ACTIVITY LOG STREAM */}
         {activeTab === "logs" && <AdminLogsTab auditLogs={auditLogs} />}
+        </>
+        )}
       </div>
 
       {/* MODAL 1: MANUAL GRANT SUBSCRIPTION */}

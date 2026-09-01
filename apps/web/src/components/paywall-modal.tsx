@@ -55,6 +55,9 @@ export function PaywallModal({
 
         {/* Modal Container */}
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="paywall-title"
           initial={{ scale: 0.95, opacity: 0, y: 15 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 15 }}
@@ -65,22 +68,24 @@ export function PaywallModal({
           <div className="bg-gradient-to-r from-primary/20 via-blue-500/20 to-purple-600/20 px-6 py-5 border-b border-border/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shadow-sm">
-                <Sparkles className="h-5 w-5 animate-pulse" />
+                <Sparkles className="h-5 w-5 animate-pulse" aria-hidden="true" />
               </div>
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wider text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 inline-block mb-1">
                   Placement Power Pass
                 </span>
-                <h3 className="text-lg font-bold tracking-tight text-foreground">
+                <h3 id="paywall-title" className="text-lg font-bold tracking-tight text-foreground">
                   {title}
                 </h3>
               </div>
             </div>
             <button
+              type="button"
+              aria-label="Close paywall modal"
               onClick={onClose}
-              className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+              className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary cursor-pointer"
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
 

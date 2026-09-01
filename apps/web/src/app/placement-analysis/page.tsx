@@ -12,6 +12,8 @@ import {
 } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton, CardListSkeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   Building2,
   BookmarkCheck,
@@ -568,6 +570,7 @@ export default function PlacementAnalysisPage() {
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    toast.success("Invite passcode copied to clipboard!");
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -575,6 +578,7 @@ export default function PlacementAnalysisPage() {
   const handleCopyBullet = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
     setCopiedBulletIdx(idx);
+    toast.success("Bullet point copied to clipboard!");
     setTimeout(() => setCopiedBulletIdx(null), 2000);
   };
 
@@ -1068,12 +1072,11 @@ export default function PlacementAnalysisPage() {
             />
 
             {loading ? (
-              <div className="text-center py-20">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mb-4" />
-                <p className="text-sm text-muted-foreground font-mono-tech">
-                  Loading verified placement intelligence dataset...
-                </p>
-              </div>
+              viewMode === "grid" ? (
+                <CardListSkeleton count={6} />
+              ) : (
+                <TableSkeleton rows={8} cols={6} />
+              )
             ) : filteredCompanies.length === 0 ? (
               <div className="text-center py-20 rounded-3xl border border-dashed border-border/80 bg-card/40 p-8">
                 <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />

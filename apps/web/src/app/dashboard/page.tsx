@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { QuotaBadge } from "@/components/quota-badge"
+import { toast } from "sonner"
 
 export default function DashboardPage() {
   const { isGuest, user, clearState, setUser } = useAuthStore()
@@ -97,9 +98,11 @@ export default function DashboardPage() {
         setResumes((prev) => [{ id: data.id, file_name: file.name, created_at: new Date().toISOString() }, ...prev])
       }
       setSelectedResumeId(data.id)
+      toast.success("Resume uploaded and parsed successfully!")
     } catch (err: any) {
       console.error(err)
       setUploadError("Failed to upload and parse resume.")
+      toast.error("Failed to upload resume. Please try again.")
     } finally {
       setUploadingResume(false)
       if (fileInputRef.current) fileInputRef.current.value = ""
