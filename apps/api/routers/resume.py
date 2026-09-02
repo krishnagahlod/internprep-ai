@@ -68,8 +68,9 @@ class SectionAnalysisRequest(BaseModel):
 class UploadResponse(BaseModel):
     id: str
     file_name: str
-    raw_text: str
-    file_url: str
+    raw_text: Optional[str] = ""
+    file_url: Optional[str] = ""
+    message: Optional[str] = "Resume uploaded and parsed successfully"
 
 @router.post("/upload", response_model=UploadResponse)
 @limiter.limit("10/hour")
@@ -147,6 +148,8 @@ async def upload_resume(
         return UploadResponse(
             id=resume_id,
             file_name=safe_file_name,
+            raw_text=raw_text or "",
+            file_url=file_url or "",
             message="Resume uploaded and parsed successfully"
         )
         

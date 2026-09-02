@@ -16,9 +16,11 @@ export interface AccentureDimensionScore {
 export interface AccentureTurnRewrite {
   turn_number: number;
   question_context: string;
+  competence_area?: string;
   what_you_said: string;
   gap_identified: string;
   golden_benchmark_answer: string;
+  key_levers?: string[];
 }
 
 export interface AccentureTimelineTurn {

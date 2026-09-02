@@ -20,6 +20,7 @@ interface AuthState {
   isGuest: boolean;
   user: any | null; // Replace with proper Supabase User type later
   resumeText: string | null;
+  resumePdfUrl: string | null;
   targetCompany: string | null;
   currentSessionId: string | null;
   currentPhase: string;
@@ -31,6 +32,7 @@ interface AuthState {
   setGuestMode: () => void;
   setUser: (user: any | null) => void;
   setResumeText: (text: string) => void;
+  setResumePdfUrl: (url: string | null) => void;
   setTargetCompany: (company: string) => void;
   setCurrentSessionId: (id: string | null) => void;
   setCurrentPhase: (phase: string) => void;
@@ -47,6 +49,7 @@ export const useAuthStore = create<AuthState>()(
       isGuest: false,
       user: null,
       resumeText: null,
+      resumePdfUrl: null,
       targetCompany: null,
       currentSessionId: null,
       currentPhase: 'introduction',
@@ -57,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
       setGuestMode: () => set({ isGuest: true, user: null }),
       setUser: (user) => set({ user, isGuest: false }),
       setResumeText: (resumeText) => set({ resumeText }),
+      setResumePdfUrl: (resumePdfUrl) => set({ resumePdfUrl }),
       setTargetCompany: (targetCompany) => set({ targetCompany }),
       setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
       setCurrentPhase: (currentPhase) => set({ currentPhase }),

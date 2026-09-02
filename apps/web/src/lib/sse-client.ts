@@ -94,10 +94,14 @@ export async function fetchEventSourceStream(
           try {
             const parsed = JSON.parse(dataStr);
 
-            switch (currentEvent) {
+            const eventType = parsed?.type || currentEvent;
+
+            switch (eventType) {
               case "token":
                 if (parsed?.token !== undefined) {
                   onToken?.(parsed.token);
+                } else if (parsed?.text !== undefined) {
+                  onToken?.(parsed.text);
                 }
                 break;
               case "phase":
@@ -116,19 +120,21 @@ export async function fetchEventSourceStream(
                 onDone?.(parsed);
                 break;
               case "error":
-                onError?.(new Error(parsed?.error || "Stream error"));
+                onError?.(new Error(parsed?.error || parsed?.message || "Stream error"));
                 break;
               default:
                 if (parsed?.token) onToken?.(parsed.token);
+                else if (parsed?.phase) onPhase?.(parsed.phase);
                 break;
             }
           } catch {
             // raw string data
-            if (currentEvent === "token") onToken?.(dataStr);
+            if (currentEvent === "token" || dataStr) onToken?.(dataStr);
           }
         }
       }
     }
+    onDone?.({ isCompleted: true });
   } catch (err: any) {
     if (err.name !== "AbortError") {
       onError?.(err);

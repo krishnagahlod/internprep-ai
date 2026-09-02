@@ -94,10 +94,10 @@ export function AccentureSetupModal({
   isInitializing,
 }: AccentureSetupModalProps) {
   const router = useRouter();
-  const { user, isGuest, resumeText, setResumeText } = useAuthStore();
+  const { user, isGuest, resumeText, setResumeText, setResumePdfUrl } = useAuthStore();
   const supabase = createClient();
 
-  const [resumes, setResumes] = useState<Array<{ id: string; file_name: string; raw_text?: string }>>([]);
+  const [resumes, setResumes] = useState<Array<{ id: string; file_name: string; raw_text?: string; file_url?: string }>>([]);
   const [selectedResumeId, setSelectedResumeId] = useState<string>("");
   const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -112,7 +112,7 @@ export function AccentureSetupModal({
         try {
           const { data } = await supabase
             .from("resumes")
-            .select("id, file_name, raw_text, created_at")
+            .select("id, file_name, raw_text, file_url, created_at")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
 
@@ -122,6 +122,9 @@ export function AccentureSetupModal({
             setActiveFileName(data[0].file_name || "Primary Resume.pdf");
             if (data[0].raw_text && !resumeText) {
               setResumeText(data[0].raw_text);
+            }
+            if (data[0].file_url) {
+              setResumePdfUrl(data[0].file_url);
             }
           }
         } catch {
@@ -142,6 +145,9 @@ export function AccentureSetupModal({
       if (selected.raw_text) {
         setResumeText(selected.raw_text);
       }
+      if (selected.file_url) {
+        setResumePdfUrl(selected.file_url);
+      }
     }
   };
 
@@ -161,6 +167,9 @@ export function AccentureSetupModal({
 
     setUploadingResume(true);
     setUploadError("");
+
+    const localPdfUrl = URL.createObjectURL(file);
+    setResumePdfUrl(localPdfUrl);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -186,8 +195,11 @@ export function AccentureSetupModal({
       if (data.raw_text) {
         setResumeText(data.raw_text);
       }
+      if (data.file_url) {
+        setResumePdfUrl(data.file_url);
+      }
 
-      const newEntry = { id: data.id, file_name: file.name, raw_text: data.raw_text };
+      const newEntry = { id: data.id, file_name: file.name, raw_text: data.raw_text, file_url: data.file_url || localPdfUrl };
       setResumes((prev) => [newEntry, ...prev]);
       setSelectedResumeId(data.id);
     } catch {

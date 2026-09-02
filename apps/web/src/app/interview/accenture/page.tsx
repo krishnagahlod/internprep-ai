@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { fetchEventSourceStream } from "@/lib/sse-client";
@@ -26,6 +26,7 @@ import {
   User,
   PanelRightOpen,
   PanelRightClose,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -52,7 +53,7 @@ const FRAMEWORK_CHIPS = [
 
 function AccentureInterviewEngine() {
   const router = useRouter();
-  const { user, isGuest, resumeText } = useAuthStore();
+  const { user, isGuest, resumeText, resumePdfUrl } = useAuthStore();
 
   const [practiceMode, setPracticeMode] = useState<AccenturePracticeMode>("full_simulation");
   const [showSetupModal, setShowSetupModal] = useState(true);
@@ -243,9 +244,18 @@ function AccentureInterviewEngine() {
     setInterimTranscript("");
     setIsTyping(true);
 
+    let streamedText = "";
+    let hasSpokenForThisTurn = false;
+
+    const playSpeechIfReady = (text: string) => {
+      if (!hasSpokenForThisTurn && text.trim() && ttsEnabled) {
+        hasSpokenForThisTurn = true;
+        ttsEngine.speak(text.trim());
+      }
+    };
+
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      let streamedText = "";
       let hasInsertedAssistant = false;
 
       await fetchEventSourceStream(`${API_URL}/interview/accenture/chat/stream`, {
@@ -282,8 +292,8 @@ function AccentureInterviewEngine() {
           if (data?.new_phase) {
             setCurrentPhase(data.new_phase);
           }
-          if (streamedText && ttsEnabled) {
-            ttsEngine.speak(streamedText);
+          if (streamedText) {
+            playSpeechIfReady(streamedText);
           }
         },
         onError: (err) => {
@@ -299,9 +309,12 @@ function AccentureInterviewEngine() {
           content: errorMsg,
         },
       ]);
-      if (ttsEnabled) ttsEngine.speak(errorMsg);
+      playSpeechIfReady(errorMsg);
     } finally {
       setIsTyping(false);
+      if (streamedText) {
+        playSpeechIfReady(streamedText);
+      }
     }
   };
 
@@ -379,11 +392,16 @@ function AccentureInterviewEngine() {
           turn_by_turn_rewrites: [
             {
               turn_number: 1,
-              question_context: "Project impact and personal ownership defense",
+              question_context: "Resume Walkthrough & Inflection Points",
+              competence_area: "Cultural Fit & Storytelling",
               what_you_said: "I worked on the project and we helped improve the overall sustainability pipeline.",
               gap_identified: "Lacked baseline metrics and specific personal ownership.",
               golden_benchmark_answer:
-                "I led the quantitative ESG benchmarking across 8 conglomerates, personally designing the carbon reduction model that identified a 14% energy savings reviewed by the CSO.",
+                "I spearheaded the sustainability benchmark across 8 conglomerates, directly designing the carbon reduction model that identified a $12M cost-saving roadmap presented to the CSO.",
+              key_levers: [
+                "Stated baseline of 8 conglomerates before quoting savings",
+                "Connected analysis directly to CXO decision roadmap"
+              ]
             },
           ],
           fix_before_real_interview: [
@@ -751,14 +769,14 @@ function AccentureInterviewEngine() {
         <AnimatePresence>
           {showDrawer && (
             <motion.div
-              initial={{ x: 380, opacity: 0 }}
+              initial={{ x: 500, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 380, opacity: 0 }}
+              exit={{ x: 500, opacity: 0 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="w-80 sm:w-96 border-l border-border bg-card/95 backdrop-blur-xl h-full flex flex-col z-20 shadow-2xl absolute right-0 top-0 bottom-0"
+              className="w-full sm:w-[480px] lg:w-[560px] border-l border-border bg-card/95 backdrop-blur-xl h-full flex flex-col z-20 shadow-2xl absolute right-0 top-0 bottom-0"
             >
               {/* Drawer Header */}
-              <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -787,26 +805,53 @@ function AccentureInterviewEngine() {
               </div>
 
               {/* Drawer Body */}
-              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar text-xs font-sans leading-relaxed">
+              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar text-xs font-sans leading-relaxed flex flex-col min-h-0">
                 {drawerTab === "resume" ? (
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-mono-tech uppercase text-muted-foreground font-bold block">
-                      Active Resume Extracted Content:
-                    </span>
-                    <div className="p-3 rounded-xl bg-muted/40 border border-border whitespace-pre-wrap font-mono-tech text-[11px] text-muted-foreground">
-                      {resumeText || "No resume text currently extracted. The AI is operating with IIT candidate context."}
-                    </div>
+                  <div className="space-y-3 h-full flex flex-col min-h-0">
+                    {resumePdfUrl ? (
+                      <div className="flex-1 flex flex-col space-y-2 min-h-0">
+                        <div className="flex items-center justify-between shrink-0">
+                          <span className="text-[10px] font-mono-tech uppercase text-muted-foreground font-bold">
+                            Attached Resume PDF:
+                          </span>
+                          <a
+                            href={resumePdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-mono-tech text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                          >
+                            <span>Open in Tab ↗</span>
+                          </a>
+                        </div>
+                        <div className="flex-1 w-full rounded-2xl overflow-hidden border border-border bg-muted/20 min-h-[480px]">
+                          <iframe
+                            src={resumePdfUrl}
+                            className="w-full h-full min-h-[480px] border-none rounded-2xl"
+                            title="Candidate Resume PDF Preview"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-mono-tech uppercase text-muted-foreground font-bold block">
+                          Active Resume Extracted Content:
+                        </span>
+                        <div className="p-3 rounded-xl bg-muted/40 border border-border whitespace-pre-wrap font-mono-tech text-[11px] text-muted-foreground">
+                          {resumeText || "No resume text currently extracted. The AI is operating with IIT candidate context."}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="space-y-2 h-full flex flex-col">
-                    <span className="text-[10px] font-mono-tech uppercase text-muted-foreground font-bold block">
+                  <div className="space-y-2 h-full flex flex-col min-h-0">
+                    <span className="text-[10px] font-mono-tech uppercase text-muted-foreground font-bold block shrink-0">
                       Case Math & Framework Scratchpad:
                     </span>
                     <textarea
                       value={scratchpadText}
                       onChange={(e) => setScratchpadText(e.target.value)}
                       placeholder="Jot down quick MECE trees, revenue = P × Q math, or candidate notes..."
-                      className="flex-1 w-full p-3 rounded-xl bg-muted/30 border border-border text-xs font-mono-tech text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
+                      className="flex-1 w-full p-3 rounded-xl bg-muted/30 border border-border text-xs font-mono-tech text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none min-h-[300px]"
                     />
                   </div>
                 )}

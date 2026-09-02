@@ -70,10 +70,15 @@ OUTPUT STRICTLY AS VALID JSON MATCHING THIS EXACT SCHEMA:
   "turn_by_turn_rewrites": [
     {
       "turn_number": 1,
-      "question_context": "Short description of what interviewer asked",
-      "what_you_said": "Exact snippet of candidate response",
-      "gap_identified": "Specific weakness (e.g., omitted metric baseline, lacked MECE structure)",
-      "golden_benchmark_answer": "Top-tier candidate response modeled on real IIT Bombay offer holders"
+      "question_context": "Short descriptive topic (e.g. Resume Walkthrough & Inflection Points)",
+      "competence_area": "Accenture Competency (e.g. Cultural Fit & Storytelling, Resume Claim Defense, MECE Case Structuring, AI ROI Strategy)",
+      "what_you_said": "Exact concise snippet of candidate response",
+      "gap_identified": "Specific weakness (e.g. Omitted quantitative baseline, lacked MECE structure, no linkage to Accenture transformation)",
+      "golden_benchmark_answer": "Top-tier candidate model answer modeled on real IIT offer holders (direct clean string without redundant escaped outer quotes)",
+      "key_levers": [
+        "Key winning tactic 1 (e.g. Stated baseline of 8 conglomerates before quoting 14% savings)",
+        "Key winning tactic 2 (e.g. Connected tech solution directly to CXO decision criteria)"
+      ]
     }
   ],
   "fix_before_real_interview": [
@@ -107,6 +112,21 @@ def evaluate_accenture_interview(
         )
         data = json.loads(raw_response)
         data["session_id"] = session_id
+
+        # Clean any escaped outer quotes from answers
+        if "turn_by_turn_rewrites" in data and isinstance(data["turn_by_turn_rewrites"], list):
+            for item in data["turn_by_turn_rewrites"]:
+                if "golden_benchmark_answer" in item and isinstance(item["golden_benchmark_answer"], str):
+                    ans = item["golden_benchmark_answer"].strip()
+                    if (ans.startswith('""') and ans.endswith('""')) or (ans.startswith("''") and ans.endswith("''")):
+                        item["golden_benchmark_answer"] = ans[1:-1].strip()
+                    elif (ans.startswith('"') and ans.endswith('"')) or (ans.startswith("'") and ans.endswith("'")):
+                        item["golden_benchmark_answer"] = ans[1:-1].strip()
+                if "what_you_said" in item and isinstance(item["what_you_said"], str):
+                    said = item["what_you_said"].strip()
+                    if (said.startswith('""') and said.endswith('""')) or (said.startswith('"') and said.endswith('"')):
+                        item["what_you_said"] = said[1:-1].strip()
+
         return data
     except Exception as e:
         print(f"[Accenture Evaluator] Error: {e}")
@@ -159,15 +179,20 @@ def evaluate_accenture_interview(
             "turn_by_turn_rewrites": [
                 {
                     "turn_number": 1,
-                    "question_context": "Walk me through your key project and state its business impact.",
+                    "question_context": "Resume Walkthrough & Inflection Points",
+                    "competence_area": "Cultural Fit & Storytelling",
                     "what_you_said": "I worked on this project and we improved the net-zero sustainability pipeline.",
                     "gap_identified": "Lacked specific baseline, methodology, and personal ownership.",
-                    "golden_benchmark_answer": "I spearheaded the sustainability benchmark model for 8 conglomerates, directly engineering the carbon reduction estimation that identified 14% energy savings reviewed by the CSO."
+                    "golden_benchmark_answer": "I spearheaded the sustainability benchmark model for 8 conglomerates, directly engineering the carbon reduction estimation that identified 14% energy savings reviewed by the CSO.",
+                    "key_levers": [
+                        "Stated baseline of 8 conglomerates before quoting 14% energy savings",
+                        "Demonstrated executive presentation ownership directly to the CSO"
+                    ]
                 }
             ],
             "fix_before_real_interview": [
                 "State baseline numbers before quoting percentage improvements on your resume.",
                 "Structure case recommendations into 3 crisp executive takeaways.",
-                "Tie 'Why Accenture' directly to end-to-end digital transformation."
+                "Explicitly link your background to Accenture's technology-plus-strategy value proposition."
             ]
         }
