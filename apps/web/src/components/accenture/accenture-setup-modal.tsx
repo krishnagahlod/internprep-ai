@@ -26,6 +26,7 @@ import {
   Lock,
   LogIn,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthStore } from "@/stores/auth-store";
@@ -56,8 +57,8 @@ const MODES: Array<{
     badge: "RECOMMENDED",
     icon: Layers,
     description:
-      "Complete end-to-end Accenture Consulting trajectory: Intro, Resume metric probing, Consulting case, GenAI strategy, and Fit.",
-    topics: ["Resume Metric Probing", "Consulting Case", "GenAI Client ROI", "Behavioral & Fit"],
+      "End-to-end Accenture trajectory: Intro, Resume deep dive, Consulting Case, GenAI strategy, and Fit.",
+    topics: ["Resume Metric Probing", "Consulting Case", "GenAI Client ROI", "Behavioral Fit"],
   },
   {
     id: "case_ai_drill",
@@ -66,7 +67,7 @@ const MODES: Array<{
     badge: "FOCUSED DRILL",
     icon: Brain,
     description:
-      "High-intensity drill on MECE issue trees, retail/EV revenue diagnosis, and translating GenAI tech to non-technical CXOs.",
+      "MECE problem solving, retail/EV market sizing, and translating GenAI tech into client ROI.",
     topics: ["Retail/EV Sizing", "RAG vs Fine-tuning", "Executive Synthesis"],
   },
   {
@@ -76,7 +77,7 @@ const MODES: Array<{
     badge: "STRESS PROBING",
     icon: ShieldAlert,
     description:
-      "Direct probing on project metric baselines, architecture choices, teammate task division, and academic domain pushback.",
+      "Direct probing on project metric baselines, architecture choices, and academic domain pushback.",
     topics: ["Baseline Verification", "Tradeoff Defense", "Domain Pushback"],
   },
   {
@@ -86,7 +87,7 @@ const MODES: Array<{
     badge: "CULTURE FIT",
     icon: Users,
     description:
-      "STAR-method drill on 'Why Consulting from an IIT', 'Why Accenture vs MBB', team conflict, and navigating ambiguity.",
+      "STAR-method drill on 'Why Consulting', 'Why Accenture', team conflict, and navigating ambiguity.",
     topics: ["Why Consulting & IIT", "Why Accenture", "Handling Ambiguity"],
   },
 ];
@@ -112,7 +113,6 @@ export function AccentureSetupModal({
 
   const isAuthenticated = Boolean(user && !isGuest);
 
-  // Fetch candidate resumes
   useEffect(() => {
     async function loadResumes() {
       if (user && !isGuest) {
@@ -208,22 +208,31 @@ export function AccentureSetupModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl bg-card/95 backdrop-blur-xl border border-border p-6 sm:p-8 rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <DialogContent className="max-w-4xl w-[95vw] bg-card/95 backdrop-blur-2xl border border-border p-6 sm:p-8 rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto custom-scrollbar">
         {/* Header */}
-        <DialogHeader className="space-y-2 text-left pb-2 border-b border-border/60">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-mono-tech uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
-              ACCENTURE // STRATEGY & CONSULTING
-            </span>
-            <Badge variant="outline" className="text-[10px] font-mono-tech border-border bg-muted/60">
-              IIT Bombay 2028 Cohort Calibration
-            </Badge>
+        <DialogHeader className="space-y-1.5 text-left pb-3 border-b border-border/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-mono-tech uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
+                ACCENTURE // STRATEGY & CONSULTING
+              </span>
+              <Badge variant="outline" className="text-[10px] font-mono-tech border-border bg-muted/60">
+                IIT Bombay 2028 Cohort Calibration
+              </Badge>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
           <DialogTitle className="text-xl sm:text-2xl font-bold font-display tracking-tight text-foreground">
-            Accenture Consulting Simulation Setup
+            Configure Accenture Mock Interview
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground font-sans">
-            Calibrate your live mock interview trajectory modeled on real manager debriefs at premier IITs.
+            Calibrate your live mock interview trajectory modeled on manager debriefs at premier IITs.
           </DialogDescription>
         </DialogHeader>
 
@@ -263,9 +272,9 @@ export function AccentureSetupModal({
             </div>
           </div>
         ) : (
-          <div className="space-y-6 py-4">
-            {/* Step 1: Mode Selection */}
-            <div className="space-y-2.5">
+          <div className="space-y-5 py-3">
+            {/* Step 1: Mode Selection Grid */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono-tech uppercase tracking-wider text-muted-foreground font-bold">
                   Step 1: Select Practice Track
@@ -284,31 +293,31 @@ export function AccentureSetupModal({
                     <div
                       key={mode.id}
                       onClick={() => setSelectedMode(mode.id)}
-                      className={`rounded-2xl border p-4 cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                      className={`rounded-2xl border p-4 cursor-pointer transition-all flex flex-col justify-between space-y-2.5 ${
                         isSelected
                           ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40 shadow-xs"
                           : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-muted/40"
                       }`}
                     >
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <div className="h-8 w-8 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground">
-                            <Icon className="h-4 w-4" />
+                          <div className="flex items-center gap-2">
+                            <div className="h-7 w-7 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+                              <Icon className="h-3.5 w-3.5" />
+                            </div>
+                            <h4 className="text-xs font-bold text-foreground font-display flex items-center gap-1.5">
+                              {mode.title}
+                              {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                            </h4>
                           </div>
                           <span className="text-[10px] font-mono-tech px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                             {mode.duration}
                           </span>
                         </div>
 
-                        <div>
-                          <h4 className="text-xs font-bold text-foreground font-display flex items-center gap-1.5">
-                            {mode.title}
-                            {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
-                          </h4>
-                          <p className="text-[11px] text-muted-foreground font-sans leading-relaxed mt-1">
-                            {mode.description}
-                          </p>
-                        </div>
+                        <p className="text-[11px] text-muted-foreground font-sans leading-relaxed">
+                          {mode.description}
+                        </p>
                       </div>
 
                       <div className="pt-2 border-t border-border/60 flex flex-wrap gap-1">
@@ -328,7 +337,7 @@ export function AccentureSetupModal({
             </div>
 
             {/* Step 2: Mandatory Resume Context */}
-            <div className="space-y-2.5 pt-2 border-t border-border/60">
+            <div className="space-y-2 pt-2 border-t border-border/60">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono-tech uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5">
                   <span>Step 2: Candidate Resume Context</span>
@@ -336,18 +345,15 @@ export function AccentureSetupModal({
                 </label>
                 {hasResume && (
                   <span className="text-[10px] font-mono-tech text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" /> Resume Attached
+                    <CheckCircle2 className="h-3 w-3" /> Ready for Project Probing
                   </span>
                 )}
               </div>
 
-              {resumes.length > 0 && (
-                <div className="space-y-1.5">
-                  <span className="text-[11px] text-muted-foreground font-sans">
-                    Select from your existing uploaded resumes:
-                  </span>
+              {resumes.length > 1 && (
+                <div className="space-y-1">
                   <select
-                    className="w-full p-2.5 rounded-xl border border-border bg-background text-xs text-foreground font-sans focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+                    className="w-full p-2 rounded-xl border border-border bg-background text-xs text-foreground font-sans focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
                     value={selectedResumeId}
                     onChange={(e) => handleResumeSelect(e.target.value)}
                     disabled={uploadingResume}
@@ -361,9 +367,9 @@ export function AccentureSetupModal({
                 </div>
               )}
 
-              {/* Upload Card */}
+              {/* Upload & Active Resume Card */}
               <div
-                className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                className={`border border-dashed rounded-2xl p-3.5 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                   hasResume
                     ? "border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10"
                     : "border-border hover:border-emerald-500/40 hover:bg-muted/40"
@@ -371,22 +377,22 @@ export function AccentureSetupModal({
                 onClick={() => fileInputRef.current?.click()}
               >
                 {uploadingResume ? (
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-mono-tech text-xs py-2">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-mono-tech text-xs py-1">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Parsing resume layout geometry and project metrics...</span>
+                    <span>Parsing resume layout and project metrics...</span>
                   </div>
                 ) : hasResume ? (
-                  <div className="flex items-center gap-3 py-1 text-left w-full justify-between">
+                  <div className="flex items-center gap-3 text-left w-full justify-between">
                     <div className="flex items-center gap-2.5 truncate">
                       <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                         <FileText className="h-4 w-4" />
                       </div>
                       <div className="truncate">
                         <span className="text-xs font-bold text-foreground font-mono-tech block truncate">
-                          {activeFileName || "Resume Attached"}
+                          ✓ Attached: {activeFileName || "Resume Attached"}
                         </span>
                         <span className="text-[10px] text-muted-foreground block">
-                          Projects, metrics, and academic major loaded for AI probing
+                          Projects, metric baselines, and academic major loaded into AI context
                         </span>
                       </div>
                     </div>
@@ -395,13 +401,13 @@ export function AccentureSetupModal({
                     </span>
                   </div>
                 ) : (
-                  <div className="py-2 space-y-1">
-                    <UploadCloud className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
+                  <div className="py-1 space-y-1">
+                    <UploadCloud className="h-5 w-5 text-muted-foreground mx-auto mb-0.5" />
                     <span className="text-xs font-bold text-foreground block">
                       Upload PDF Resume
                     </span>
                     <span className="text-[11px] text-muted-foreground block max-w-sm">
-                      Required so the AI Manager can probe your specific project metrics, team leadership, and major.
+                      Required for the AI Manager to probe your specific project metrics and major.
                     </span>
                   </div>
                 )}
@@ -423,7 +429,7 @@ export function AccentureSetupModal({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between pt-2 border-t border-border/60">
               <span className="text-[11px] font-sans text-muted-foreground">
                 {hasResume ? (
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium">

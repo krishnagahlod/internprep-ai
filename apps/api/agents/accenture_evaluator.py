@@ -1,7 +1,7 @@
 """
 Accenture Readiness Evaluator Agent
-Synthesizes the complete interview transcript into a structured, evidence-backed
-Accenture Readiness Scorecard with 6 evaluation dimensions and concrete prep advice.
+Synthesizes the complete interview transcript into a structured, visual, evidence-backed
+Accenture Readiness Scorecard with 6 evaluation dimensions, metric meters, and golden benchmark rewrites.
 """
 
 import json
@@ -10,46 +10,76 @@ from services.cerebras_client import cerebras_client
 
 
 EVALUATION_SYSTEM_PROMPT = """
-You are a Senior Partner & Head of Recruitment at Accenture Strategy & Consulting evaluating an IIT Bombay candidate for the Management Consulting Associate Summer Internship.
+You are a Senior Partner & Managing Director at Accenture Strategy & Consulting evaluating an IIT candidate for the Management Consulting Summer Internship / Associate role.
 
-Your task is to analyze the full interview transcript and produce a rigorous, constructive, evidence-backed Accenture Readiness Dossier.
+Your task is to analyze the full interview transcript against real Day-1 Accenture consulting standards and output an intuitive, evidence-backed, highly actionable evaluation.
 
-EVALUATE ACROSS 6 FIXED DIMENSIONS:
-1. accenture_alignment: Understanding of Accenture's end-to-end transformation model, clarity on 'Why Consulting', cultural fit.
-2. resume_ownership: Ability to defend project claims, clarify baselines, and demonstrate personal ownership vs team riding.
-3. business_and_digital_thinking: Commercial intuition, market dynamics, revenue/cost levers, digital transformation feasibility.
+EVALUATE ACROSS 6 FIXED DIMENSIONS (Score 0-100 each):
+1. accenture_alignment: Understanding of Accenture's end-to-end transformation model, clarity on 'Why Consulting from an engineering major', cultural fit.
+2. resume_ownership: Ability to defend project claims, clarify metric baselines, and demonstrate personal contribution vs team riding.
+3. business_and_digital_thinking: Commercial intuition, market dynamics, revenue/cost levers, and digital transformation feasibility.
 4. structured_problem_solving: MECE problem breakdown, structured issue trees, mental math rigor during cases/guesstimates.
-5. ai_tech_fluency: Translating AI/GenAI (RAG, LLMs, agents) into tangible business ROI and communicating clearly to non-technical stakeholders.
-6. executive_presence_under_pressure: Conciseness, professional poise, adapting to interviewer course-corrections.
+5. ai_tech_fluency: Translating AI/GenAI (RAG, LLMs, fine-tuning) into tangible business ROI and communicating clearly to non-technical CXOs.
+6. executive_presence_under_pressure: Conciseness, professional poise, adapting to interviewer probing without being defensive.
 
 OUTPUT STRICTLY AS VALID JSON MATCHING THIS EXACT SCHEMA:
 {
   "overall_verdict": "Strong Hire (Fast-Track)" | "Hire" | "Borderline / Needs Polish" | "Needs Substantial Prep",
   "candidate_level": "Accenture Strategy & Consulting Ready (Top 10% IITB)" | "Consulting Associate Baseline" | "Developing",
-  "readiness_score": 88,
-  "executive_summary": "Comprehensive 2-3 paragraph appraisal citing specific answers.",
+  "readiness_score": 85,
+  "percentile_estimate": 88,
+  "executive_summary": "Concise 2-sentence executive assessment highlighting core strength and single most urgent gap.",
   "dimension_scores": {
-    "accenture_alignment": {"score": 85, "critique": "...", "recommendation": "..."},
-    "resume_ownership": {"score": 90, "critique": "...", "recommendation": "..."},
-    "business_and_digital_thinking": {"score": 82, "critique": "...", "recommendation": "..."},
-    "structured_problem_solving": {"score": 80, "critique": "...", "recommendation": "..."},
-    "ai_tech_fluency": {"score": 88, "critique": "...", "recommendation": "..."},
-    "executive_presence_under_pressure": {"score": 84, "critique": "...", "recommendation": "..."}
+    "accenture_alignment": {
+      "score": 85,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment of what candidate demonstrated.",
+      "recommendation": "Concrete 1-sentence action step."
+    },
+    "resume_ownership": {
+      "score": 80,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment.",
+      "recommendation": "Concrete 1-sentence action step."
+    },
+    "business_and_digital_thinking": {
+      "score": 75,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment.",
+      "recommendation": "Concrete 1-sentence action step."
+    },
+    "structured_problem_solving": {
+      "score": 82,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment.",
+      "recommendation": "Concrete 1-sentence action step."
+    },
+    "ai_tech_fluency": {
+      "score": 90,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment.",
+      "recommendation": "Concrete 1-sentence action step."
+    },
+    "executive_presence_under_pressure": {
+      "score": 78,
+      "status": "mastered" | "proficient" | "needs_drill",
+      "critique": "Crisp 1-sentence assessment.",
+      "recommendation": "Concrete 1-sentence action step."
+    }
   },
-  "fix_before_real_interview": [
-    "Action item 1 citing specific moment from transcript",
-    "Action item 2 citing specific moment from transcript",
-    "Action item 3 citing specific moment from transcript"
-  ],
-  "timeline_data": [
+  "turn_by_turn_rewrites": [
     {
       "turn_number": 1,
-      "phase": "Introduction",
-      "question": "...",
-      "candidate_response": "...",
-      "evaluator_feedback": "...",
-      "trajectory": "positive" | "neutral" | "negative"
+      "question_context": "Short description of what interviewer asked",
+      "what_you_said": "Exact snippet of candidate response",
+      "gap_identified": "Specific weakness (e.g., omitted metric baseline, lacked MECE structure)",
+      "golden_benchmark_answer": "Top-tier candidate response modeled on real IIT Bombay offer holders"
     }
+  ],
+  "fix_before_real_interview": [
+    "High-yield action item 1",
+    "High-yield action item 2",
+    "High-yield action item 3"
   ]
 }
 """
@@ -65,7 +95,7 @@ def evaluate_accenture_interview(
 
     eval_messages = [
         {"role": "system", "content": EVALUATION_SYSTEM_PROMPT},
-        {"role": "user", "content": f"CANDIDATE RESUME:\n{resume_context or 'IIT Bombay Candidate'}\n\nFULL INTERVIEW TRANSCRIPT:\n{transcript_text}\n\nAnalyze and output the complete JSON scorecard."}
+        {"role": "user", "content": f"CANDIDATE RESUME:\n{resume_context or 'IIT Candidate'}\n\nFULL INTERVIEW TRANSCRIPT:\n{transcript_text}\n\nAnalyze and output the complete JSON scorecard."}
     ]
 
     try:
@@ -85,20 +115,59 @@ def evaluate_accenture_interview(
             "session_id": session_id,
             "overall_verdict": "Hire",
             "candidate_level": "Accenture Strategy & Consulting Ready",
-            "readiness_score": 82,
-            "executive_summary": "Demonstrated strong structured problem solving and technical fluency, with room for sharper quantification on resume projects.",
+            "readiness_score": 84,
+            "percentile_estimate": 85,
+            "executive_summary": "Solid problem structuring and technical breadth, with room for sharper metric quantification on resume projects.",
             "dimension_scores": {
-                "accenture_alignment": {"score": 80, "critique": "Clear motivation for management consulting.", "recommendation": "Articulate Accenture-specific tech + strategy synergy more explicitly."},
-                "resume_ownership": {"score": 85, "critique": "Good technical depth.", "recommendation": "Always state the baseline before quoting percentage improvements."},
-                "business_and_digital_thinking": {"score": 80, "critique": "Solid commercial instincts.", "recommendation": "Structure cost buckets before diving into pricing levers."},
-                "structured_problem_solving": {"score": 82, "critique": "MECE issue tree established early.", "recommendation": "Synthesize recommendations into 3 crisp executive takeaways."},
-                "ai_tech_fluency": {"score": 88, "critique": "Clear explanation of RAG vs Fine-tuning.", "recommendation": "Highlight change management when deploying AI for clients."},
-                "executive_presence_under_pressure": {"score": 80, "critique": "Maintained composure under probing.", "recommendation": "Keep initial case structuring under 90 seconds."}
+                "accenture_alignment": {
+                    "score": 85,
+                    "status": "mastered",
+                    "critique": "Clear motivation for management consulting and tech-driven transformation.",
+                    "recommendation": "Articulate Accenture-specific end-to-end delivery model in your pitch."
+                },
+                "resume_ownership": {
+                    "score": 80,
+                    "status": "proficient",
+                    "critique": "Described projects clearly but missed stating the initial baseline before quoting impact.",
+                    "recommendation": "Always state baseline metric before percentage improvements (e.g. from 200ms to 45ms)."
+                },
+                "business_and_digital_thinking": {
+                    "score": 78,
+                    "status": "proficient",
+                    "critique": "Good commercial intuition but leaned heavily on high-level strategy.",
+                    "recommendation": "Break commercial levers into fixed vs variable cost buckets explicitly."
+                },
+                "structured_problem_solving": {
+                    "score": 82,
+                    "status": "proficient",
+                    "critique": "Established logical initial structure for the case.",
+                    "recommendation": "Deliver a crisp 3-bullet executive summary at the conclusion of every case."
+                },
+                "ai_tech_fluency": {
+                    "score": 90,
+                    "status": "mastered",
+                    "critique": "Strong grasp of modern GenAI tools and enterprise RAG architectures.",
+                    "recommendation": "Emphasize change management and user adoption when pitching AI to clients."
+                },
+                "executive_presence_under_pressure": {
+                    "score": 80,
+                    "status": "proficient",
+                    "critique": "Maintained composure under interviewer probing.",
+                    "recommendation": "Pause for 5 seconds to structure complex answers rather than speaking immediately."
+                }
             },
-            "fix_before_real_interview": [
-                "Always lead with the baseline when defending quantitative resume metrics.",
-                "Ensure consulting case issue trees explicitly cover both internal and external revenue drivers.",
-                "Reinforce 'Why Accenture' with specific references to end-to-end digital transformation."
+            "turn_by_turn_rewrites": [
+                {
+                    "turn_number": 1,
+                    "question_context": "Walk me through your key project and state its business impact.",
+                    "what_you_said": "I worked on this project and we improved the net-zero sustainability pipeline.",
+                    "gap_identified": "Lacked specific baseline, methodology, and personal ownership.",
+                    "golden_benchmark_answer": "I spearheaded the sustainability benchmark model for 8 conglomerates, directly engineering the carbon reduction estimation that identified 14% energy savings reviewed by the CSO."
+                }
             ],
-            "timeline_data": []
+            "fix_before_real_interview": [
+                "State baseline numbers before quoting percentage improvements on your resume.",
+                "Structure case recommendations into 3 crisp executive takeaways.",
+                "Tie 'Why Accenture' directly to end-to-end digital transformation."
+            ]
         }

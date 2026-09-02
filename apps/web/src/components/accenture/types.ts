@@ -8,8 +8,17 @@ export type AccenturePracticeMode =
 
 export interface AccentureDimensionScore {
   score: number;
+  status?: "mastered" | "proficient" | "needs_drill";
   critique: string;
   recommendation?: string;
+}
+
+export interface AccentureTurnRewrite {
+  turn_number: number;
+  question_context: string;
+  what_you_said: string;
+  gap_identified: string;
+  golden_benchmark_answer: string;
 }
 
 export interface AccentureTimelineTurn {
@@ -26,8 +35,10 @@ export interface AccentureReadinessReport {
   overall_verdict: string;
   candidate_level: string;
   readiness_score: number;
+  percentile_estimate?: number;
   executive_summary: string;
   dimension_scores: Record<string, AccentureDimensionScore>;
+  turn_by_turn_rewrites?: AccentureTurnRewrite[];
   fix_before_real_interview: string[];
   timeline_data?: AccentureTimelineTurn[];
 }
