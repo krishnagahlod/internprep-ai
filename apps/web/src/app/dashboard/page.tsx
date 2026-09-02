@@ -323,6 +323,13 @@ export default function DashboardPage() {
             <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
           </Button>
+          <Button variant="ghost" className="w-full justify-start text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20 font-semibold" onClick={() => router.push("/interview/accenture")}>
+            <Sparkles className="mr-2.5 h-4 w-4 text-emerald-500" />
+            Accenture Special
+            <Badge className="ml-auto bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-none text-[9px] py-0 px-1 font-mono-tech">
+              NEW
+            </Badge>
+          </Button>
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/dashboard/analytics")}>
             <TrendingUp className="mr-2.5 h-4 w-4" />
             Analytics
@@ -451,6 +458,13 @@ export default function DashboardPage() {
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
             <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20 font-semibold" onClick={() => { router.push("/interview/accenture"); setIsMobileMenuOpen(false); }}>
+            <Sparkles className="mr-2.5 h-4 w-4 text-emerald-500" />
+            Accenture Special
+            <Badge className="ml-auto bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-none text-[9px] py-0 px-1 font-mono-tech">
+              NEW
+            </Badge>
           </Button>
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/dashboard/analytics"); setIsMobileMenuOpen(false); }}>
             <TrendingUp className="mr-2.5 h-4 w-4" />
@@ -633,6 +647,46 @@ export default function DashboardPage() {
               </div>
             </motion.div>
           )}
+
+          {/* Accenture Management Consulting Special Simulator Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-card to-blue-500/15 border border-emerald-500/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm hover:border-emerald-500/60 transition-all cursor-pointer group"
+            onClick={() => router.push("/interview/accenture")}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="h-11 w-11 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-transform">
+                <Briefcase className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-foreground font-mono-tech tracking-wide">
+                    ACCENTURE // STRATEGY & MANAGEMENT CONSULTING
+                  </span>
+                  <Badge className="bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 text-white dark:text-zinc-950 border-none font-mono-tech text-[10px] font-bold">
+                    SPECIAL SIMULATION
+                  </Badge>
+                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted/80 px-2 py-0.5 rounded border border-border">
+                    IIT Bombay Cohort Focus
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed font-sans max-w-2xl">
+                  Practice realistic 20–30 min manager-level interviews calibrated on real IIT Bombay & top-IIT debriefs. Features dynamic case studies, GenAI client strategy, academic domain pushback, and 6-dimension readiness scorecards.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0">
+              <Button
+                size="sm"
+                className="w-full md:w-auto h-9 px-4 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>Launch Accenture Studio</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+            </div>
+          </motion.div>
           
           {/* Bento Box Layout */}
           <motion.div 
