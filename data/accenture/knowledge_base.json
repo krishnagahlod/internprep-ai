@@ -1,12 +1,20 @@
 {
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "target_company": "Accenture Global",
     "target_role": "Management Consulting Associate / Summer Internship",
-    "target_cohort": "IIT Bombay 2028 Cohort & Top IITs",
-    "total_processed_interviews": 2,
-    "iitb_interviews": 1,
-    "last_updated": "2026-09-01"
+    "target_cohort": "IIT Bombay 2028 Batch & Premier IITs (IITD, IITM, IITKGP, IIT ISM)",
+    "total_processed_interviews": 7,
+    "iitb_interviews": 2,
+    "institute_breakdown": {
+      "IIT Bombay": 2,
+      "IIT Delhi": 1,
+      "IIT (ISM) Dhanbad": 1,
+      "IIT Kharagpur": 1,
+      "IIT ISM Dhanbad": 1,
+      "IIT Madras": 1
+    },
+    "last_updated": "2026-09-02"
   },
   "taxonomy": [
     "opening_closing",
@@ -18,15 +26,16 @@
   "interviewer_persona": {
     "title": "Manager / Senior Manager (Accenture Strategy & Consulting)",
     "tone": "Professional, curious, direct, conversational, rigorous",
-    "probing_intensity": 4,
+    "probing_intensity": 3.6,
     "prohibited_behaviors": [
       "Never give generic cheerleader validation like 'Great answer!' or 'Awesome!'",
       "Never read off a static checklist without dynamic follow-ups",
       "Never reveal hidden evaluation scores during the live interview"
     ],
     "required_behaviors": [
-      "Probe unsupported claims and quantitative metrics",
-      "Ask one question at a time and listen attentively to candidate responses",
+      "Probe unsupported claims and quantitative metrics (always verify the baseline)",
+      "Challenge candidates on their academic major relevance (domain pushback)",
+      "Ask one focused question at a time and listen attentively to candidate responses",
       "Offer subtle hints during consulting cases only if candidate gets stuck",
       "Maintain time awareness (20-25 mins pacing)"
     ]
@@ -42,16 +51,30 @@
     {
       "trigger_type": "ai_or_rag_claim",
       "regex_signals": [
-        "(rag|llm|fine-tuning|agent|embeddings|langchain|transformer)"
+        "(rag|llm|fine-tuning|agent|embeddings|langchain|transformer|genai|gpt)"
       ],
-      "interviewer_probing_directive": "Probe the business rationale (Why RAG vs Fine-tuning? How do you explain latency/cost tradeoffs to a non-technical CXO?)."
+      "interviewer_probing_directive": "Probe the business rationale (Why RAG vs Fine-tuning? How do you explain latency/cost tradeoffs to a non-technical CXO? What AI tools do you actively use in your workflow?)."
     },
     {
       "trigger_type": "team_leadership_claim",
       "regex_signals": [
-        "(led a team|headed|managed|spearheaded|core member)"
+        "(led a team|headed|managed|spearheaded|core member|mentor)"
       ],
-      "interviewer_probing_directive": "Probe conflict resolution, alignment under ambiguity, and practical stakeholder pushback."
+      "interviewer_probing_directive": "Probe how work was divided between team members, conflict resolution, and handling stakeholder pushback under ambiguity."
+    },
+    {
+      "trigger_type": "academic_domain_pushback",
+      "regex_signals": [
+        "(environmental|chemical|civil|mechanical|metallurgy|mining|materials|aerospace)"
+      ],
+      "interviewer_probing_directive": "Challenge the candidate on why Accenture should hire them for consulting from their specific engineering major, particularly when consulting for traditional enterprise sectors like oil & gas, mining, or industrial plants."
+    },
+    {
+      "trigger_type": "guesstimate_or_case_trigger",
+      "regex_signals": [
+        "(ev charging|charging booth|petrol pump|footfall|supermarket|food quality|mess|margin|world cup|football)"
+      ],
+      "interviewer_probing_directive": "Test structured MECE issue trees, assumptions, sanity checks on calculations, and crisp 3-point executive takeaways."
     }
   ],
   "question_bank_by_category": {
@@ -66,6 +89,26 @@
         "interviewer_reaction": "Nodded, pivoted directly into fintech internship",
         "source_institute": "IIT Bombay",
         "weight": 1.0,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bIntro & Resume: Standard introduction and a quick skim of m",
+        "question": "\u200bIntro & Resume: Standard introduction and a quick skim of my resume.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bBackground & Tech: Introduction, general background check,",
+        "question": "\u200bBackground & Tech: Introduction, general background check, and questions on basic AI knowledge and tools.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
         "confidence": "high"
       }
     ],
@@ -95,6 +138,88 @@
         "source_institute": "IIT Delhi",
         "weight": 0.85,
         "confidence": "high"
+      },
+      {
+        "topic": "Please explain the research project you had worked on.",
+        "question": "Please explain the research project you had worked on.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [
+          "My Research Project:\nI was asked to elaborate on this and based on my answer, I was asked plenty of follow-up questions. I was even asked to describe whether, if I were sent to a mine (the project I had worked on was related to mining machinery), I would be able to work there as a consultant."
+        ],
+        "interviewer_reaction": "Challenged with intensity 2/5",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "How did you divide and manage the research work between your",
+        "question": "How did you divide and manage the research work between yourself and your teammate?",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 2/5",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Are you building an ML portfolio?",
+        "question": "Are you building an ML portfolio?",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 2/5",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bProject Discussion: A deep dive into my most recent project",
+        "question": "\u200bProject Discussion: A deep dive into my most recent project.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bRound 2: HR & Behavioral",
+        "question": "\u200bRound 2: HR & Behavioral",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bDomain Pushback: Since my degree is in Environmental Engine",
+        "question": "\u200bDomain Pushback: Since my degree is in Environmental Engineering, the interviewer challenged me on why they should hire me, given Accenture handles many oil and gas projects.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bFor the simulation, I highly recommend testing candidates o",
+        "question": "\u200bFor the simulation, I highly recommend testing candidates on the specific challenges of their own academic sector. They need to be able to articulate exactly how consulting frameworks can solve industry-specific problems to pass that domain pushback.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "No questions. I just kept speaking about my resume",
+        "question": "No questions. I just kept speaking about my resume",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 2/5",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "high"
       }
     ],
     "consulting_case": [
@@ -123,6 +248,92 @@
         "source_institute": "IIT Delhi",
         "weight": 0.85,
         "confidence": "high"
+      },
+      {
+        "topic": "Resume, data case, ML basics",
+        "question": "Resume, data case, ML basics",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [
+          "Project related, different for different people"
+        ],
+        "interviewer_reaction": "Challenged with intensity 4/5",
+        "source_institute": "IIT Kharagpur",
+        "weight": 0.85,
+        "confidence": "high"
+      },
+      {
+        "topic": "Profitability",
+        "question": "Profitability",
+        "answer_summary": "Candidate solved structured business case.",
+        "follow_ups": [],
+        "interviewer_reaction": "Tested MECE structure and mental math",
+        "source_institute": "IIT Kharagpur",
+        "weight": 0.85,
+        "confidence": "high"
+      },
+      {
+        "topic": "Round 1: Technical & Case Interview",
+        "question": "Round 1: Technical & Case Interview",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [
+          "Mentioned above in detail whatever was asked to me"
+        ],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bGuesstimate: Estimate the revenue earned if a petrol outlet",
+        "question": "\u200bGuesstimate: Estimate the revenue earned if a petrol outlet started offering EV charging booths.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bRoot Cause Analysis (RCA): Identify the core reasons behind",
+        "question": "\u200bRoot Cause Analysis (RCA): Identify the core reasons behind the degradation of mess food quality.",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Mentioned Above..Market Entry of EV charging stations",
+        "question": "Mentioned Above..Market Entry of EV charging stations",
+        "answer_summary": "Candidate solved structured business case.",
+        "follow_ups": [],
+        "interviewer_reaction": "Tested MECE structure and mental math",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "It was a football case related to India plan for 2036 WC",
+        "question": "It was a football case related to India plan for 2036 WC",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [
+          "More questions related to my interns I had done previously"
+        ],
+        "interviewer_reaction": "Challenged with intensity 4/5",
+        "source_institute": "IIT Madras",
+        "weight": 0.85,
+        "confidence": "high"
+      },
+      {
+        "topic": "It was an unconventional cases related to Football",
+        "question": "It was an unconventional cases related to Football",
+        "answer_summary": "Candidate solved structured business case.",
+        "follow_ups": [],
+        "interviewer_reaction": "Tested MECE structure and mental math",
+        "source_institute": "IIT Madras",
+        "weight": 0.85,
+        "confidence": "high"
       }
     ],
     "ai_genai": [
@@ -138,6 +349,26 @@
         "source_institute": "IIT Bombay",
         "weight": 1.0,
         "confidence": "very_high"
+      },
+      {
+        "topic": "AI & GenAI Tool Knowledge",
+        "question": "Do you have an idea what GenAI is? Conceptual",
+        "answer_summary": "Candidate discussed AI tools and conceptual understanding.",
+        "follow_ups": [],
+        "interviewer_reaction": "Probed on tools and business use cases",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "AI & GenAI Tool Knowledge",
+        "question": "Which tools do you use frequently and for what purpose?",
+        "answer_summary": "Candidate discussed AI tools and conceptual understanding.",
+        "follow_ups": [],
+        "interviewer_reaction": "Probed on tools and business use cases",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
       }
     ],
     "behavioral": [
@@ -162,6 +393,76 @@
         ],
         "interviewer_reaction": "Positive response, ended on time",
         "source_institute": "IIT Delhi",
+        "weight": 0.85,
+        "confidence": "high"
+      },
+      {
+        "topic": "Where do you see yourself in the next few years?",
+        "question": "Where do you see yourself in the next few years?",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 2/5",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Why Consulting & Why Accenture",
+        "question": "What do you know about consulting?",
+        "answer_summary": "Candidate articulated motivation and fit.",
+        "follow_ups": [],
+        "interviewer_reaction": "Assessed communication and structured storytelling",
+        "source_institute": "IIT (ISM) Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Why Consulting & Why Accenture",
+        "question": "Why accenture",
+        "answer_summary": "Candidate articulated motivation and fit.",
+        "follow_ups": [],
+        "interviewer_reaction": "Assessed communication and structured storytelling",
+        "source_institute": "IIT Kharagpur",
+        "weight": 0.85,
+        "confidence": "high"
+      },
+      {
+        "topic": "\u200bFit & Motivation: \"Why Accenture?\"",
+        "question": "\u200bFit & Motivation: \"Why Accenture?\"",
+        "answer_summary": "Discussed in candidate debrief.",
+        "follow_ups": [],
+        "interviewer_reaction": "Challenged with intensity 3/5",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Why Consulting & Why Accenture",
+        "question": "Yes",
+        "answer_summary": "Candidate articulated motivation and fit.",
+        "follow_ups": [],
+        "interviewer_reaction": "Assessed communication and structured storytelling",
+        "source_institute": "IIT ISM Dhanbad",
+        "weight": 0.8,
+        "confidence": "high"
+      },
+      {
+        "topic": "Why Consulting & Why Accenture",
+        "question": "Yes Why Consulting was asked. To which I replied that I wanted to work in a field that gives breadth as well as deep knowledge",
+        "answer_summary": "Candidate articulated motivation and fit.",
+        "follow_ups": [],
+        "interviewer_reaction": "Assessed communication and structured storytelling",
+        "source_institute": "IIT Bombay",
+        "weight": 1.0,
+        "confidence": "high"
+      },
+      {
+        "topic": "Why Consulting & Why Accenture",
+        "question": "Where do you look yourselves in 5 years?",
+        "answer_summary": "Candidate articulated motivation and fit.",
+        "follow_ups": [],
+        "interviewer_reaction": "Assessed communication and structured storytelling",
+        "source_institute": "IIT Madras",
         "weight": 0.85,
         "confidence": "high"
       }
