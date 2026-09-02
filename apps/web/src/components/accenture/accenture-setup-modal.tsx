@@ -2,13 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -206,12 +199,14 @@ export function AccentureSetupModal({
 
   const hasResume = Boolean(resumeText && resumeText.trim().length > 50);
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] bg-card/95 backdrop-blur-2xl border border-border p-6 sm:p-8 rounded-3xl shadow-2xl max-h-[92vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-card border border-border shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-200 my-auto">
         {/* Header */}
-        <DialogHeader className="space-y-1.5 text-left pb-3 border-b border-border/60">
-          <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between pb-3 border-b border-border/60">
+          <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[10px] font-mono-tech uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-bold">
                 ACCENTURE // STRATEGY & CONSULTING
@@ -220,21 +215,21 @@ export function AccentureSetupModal({
                 IIT Bombay 2028 Cohort Calibration
               </Badge>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <h2 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-foreground">
+              Configure Accenture Mock Interview
+            </h2>
+            <p className="text-xs text-muted-foreground font-sans">
+              Calibrate your live mock interview trajectory modeled on manager debriefs at premier IITs.
+            </p>
           </div>
-          <DialogTitle className="text-xl sm:text-2xl font-bold font-display tracking-tight text-foreground">
-            Configure Accenture Mock Interview
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground font-sans">
-            Calibrate your live mock interview trajectory modeled on manager debriefs at premier IITs.
-          </DialogDescription>
-        </DialogHeader>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
         {/* Auth Gate for Non-Registered / Guest Users */}
         {!isAuthenticated ? (
@@ -272,9 +267,9 @@ export function AccentureSetupModal({
             </div>
           </div>
         ) : (
-          <div className="space-y-5 py-3">
+          <div className="space-y-5">
             {/* Step 1: Mode Selection Grid */}
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono-tech uppercase tracking-wider text-muted-foreground font-bold">
                   Step 1: Select Practice Track
@@ -284,7 +279,7 @@ export function AccentureSetupModal({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {MODES.map((mode) => {
                   const Icon = mode.icon;
                   const isSelected = selectedMode === mode.id;
@@ -295,7 +290,7 @@ export function AccentureSetupModal({
                       onClick={() => setSelectedMode(mode.id)}
                       className={`rounded-2xl border p-4 cursor-pointer transition-all flex flex-col justify-between space-y-2.5 ${
                         isSelected
-                          ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40 shadow-xs"
+                          ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40 shadow-sm"
                           : "border-border bg-card/60 hover:border-emerald-500/40 hover:bg-muted/40"
                       }`}
                     >
@@ -337,7 +332,7 @@ export function AccentureSetupModal({
             </div>
 
             {/* Step 2: Mandatory Resume Context */}
-            <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="space-y-2.5 pt-2 border-t border-border/60">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono-tech uppercase tracking-wider text-muted-foreground font-bold flex items-center gap-1.5">
                   <span>Step 2: Candidate Resume Context</span>
@@ -353,7 +348,7 @@ export function AccentureSetupModal({
               {resumes.length > 1 && (
                 <div className="space-y-1">
                   <select
-                    className="w-full p-2 rounded-xl border border-border bg-background text-xs text-foreground font-sans focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+                    className="w-full p-2.5 rounded-xl border border-border bg-background text-xs text-foreground font-sans focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
                     value={selectedResumeId}
                     onChange={(e) => handleResumeSelect(e.target.value)}
                     disabled={uploadingResume}
@@ -377,7 +372,7 @@ export function AccentureSetupModal({
                 onClick={() => fileInputRef.current?.click()}
               >
                 {uploadingResume ? (
-                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-mono-tech text-xs py-1">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-mono-tech text-xs py-1.5">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Parsing resume layout and project metrics...</span>
                   </div>
@@ -401,7 +396,7 @@ export function AccentureSetupModal({
                     </span>
                   </div>
                 ) : (
-                  <div className="py-1 space-y-1">
+                  <div className="py-1.5 space-y-1">
                     <UploadCloud className="h-5 w-5 text-muted-foreground mx-auto mb-0.5" />
                     <span className="text-xs font-bold text-foreground block">
                       Upload PDF Resume
@@ -429,7 +424,7 @@ export function AccentureSetupModal({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-border/60">
+            <div className="flex items-center justify-between pt-3 border-t border-border/60">
               <span className="text-[11px] font-sans text-muted-foreground">
                 {hasResume ? (
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium">
@@ -479,7 +474,7 @@ export function AccentureSetupModal({
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
