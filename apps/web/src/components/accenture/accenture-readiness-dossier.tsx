@@ -20,13 +20,17 @@ import {
   FileCheck,
   MessageSquare,
   Zap,
+  ArrowLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AccentureReadinessReport } from "./types";
+import { AccentureFeedbackCard } from "./accenture-feedback-card";
 
 interface AccentureReadinessDossierProps {
   report: AccentureReadinessReport;
-  onRetake: () => void;
+  onRetake?: () => void;
+  onRestart?: () => void;
+  onReturnToDashboard?: () => void;
 }
 
 const DIMENSION_CONFIG: Record<
@@ -74,8 +78,14 @@ const DIMENSION_CONFIG: Record<
 export function AccentureReadinessDossier({
   report,
   onRetake,
+  onRestart,
+  onReturnToDashboard,
 }: AccentureReadinessDossierProps) {
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null);
+  const handleRestart = onRestart || onRetake || (() => {});
+  const handleDashboard = onReturnToDashboard || (() => {
+    if (typeof window !== "undefined") window.location.href = "/dashboard";
+  });
 
   const score = report.readiness_score || 75;
   const percentile = report.percentile_estimate || Math.min(99, Math.round(score * 0.95 + 10));
@@ -486,10 +496,49 @@ export function AccentureReadinessDossier({
         <div className="pt-3 flex items-center justify-end">
           <Button
             size="sm"
-            onClick={onRetake}
+            onClick={handleRestart}
             className="font-mono-tech text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <span>Practice Another Drill Track</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Candidate Feedback & Celebratory Treat Pledge Section */}
+      <AccentureFeedbackCard
+        sessionId={report.session_id}
+        readinessScore={report.readiness_score}
+        candidateLevel={report.candidate_level}
+      />
+
+      {/* Navigation Footer */}
+      <div className="pt-2 pb-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono-tech">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDashboard}
+          className="w-full sm:w-auto rounded-xl flex items-center gap-1.5 border-border text-muted-foreground hover:text-foreground cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Return to Dashboard</span>
+        </Button>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="w-full sm:w-auto rounded-xl border-border text-foreground hover:bg-muted cursor-pointer"
+          >
+            Print / Save Dossier PDF
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleRestart}
+            className="w-full sm:w-auto font-mono-tech text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 rounded-xl shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <span>Start New Simulation</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
