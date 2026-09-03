@@ -244,6 +244,20 @@ function ResumeBuilderPageContent() {
     return Math.round((count / pointBank.length) * 100);
   }, [pointBank]);
 
+  const availablePivotSections = useMemo(() => {
+    const sourceBullets = pointBank.filter(
+      (b) => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole)
+    );
+    return Array.from(
+      new Set(
+        sourceBullets.map((b) => {
+          const ach = achievements.find((a) => a.id === b.achievement_id);
+          return resolveBulletSectionType(b, ach);
+        })
+      )
+    );
+  }, [pointBank, pivotSourceRole, achievements]);
+
   if (!mounted || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1095,20 +1109,6 @@ function ResumeBuilderPageContent() {
     }
     setIsChatLoading(false);
   };
-
-  const availablePivotSections = useMemo(() => {
-    const sourceBullets = pointBank.filter(
-      (b) => getRoleLabel(b.target_role) === getRoleLabel(pivotSourceRole)
-    );
-    return Array.from(
-      new Set(
-        sourceBullets.map((b) => {
-          const ach = achievements.find((a) => a.id === b.achievement_id);
-          return resolveBulletSectionType(b, ach);
-        })
-      )
-    );
-  }, [pointBank, pivotSourceRole, achievements]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
