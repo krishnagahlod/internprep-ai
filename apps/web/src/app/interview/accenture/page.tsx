@@ -27,6 +27,7 @@ import {
   PanelRightOpen,
   PanelRightClose,
   ExternalLink,
+  FastForward,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,12 +44,12 @@ interface Message {
   content: string;
 }
 
-const FRAMEWORK_CHIPS = [
-  "Let me structure this with a 3-pillar MECE framework...",
-  "May I clarify if this margin decline is industry-wide or company-specific?",
-  "Let me break down the revenue tree into Price × Volume.",
-  "Let me state the project baseline metric first before quoting percentage impact.",
-  "From a GenAI ROI perspective, RAG offers lower hallucination risk for client data.",
+const CASE_FRAMEWORK_HINTS = [
+  "Structure with 3-pillar MECE framework",
+  "Clarify: Is this decline industry-wide or company-specific?",
+  "Revenue tree: Price × Volume / Product Mix",
+  "Cost breakdown: Fixed overhead vs Variable COGS",
+  "Market sizing: Population × Penetration × Frequency",
 ];
 
 function AccentureInterviewEngine() {
@@ -63,6 +64,11 @@ function AccentureInterviewEngine() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentPhase, setCurrentPhase] = useState("introduction");
   const activePhases = ACCENTURE_PHASES_MAP[practiceMode] || ACCENTURE_PHASES_MAP.full_simulation;
+  const currentPhaseIndex = activePhases.findIndex((p) => p.id === currentPhase);
+  const nextPhase =
+    currentPhaseIndex >= 0 && currentPhaseIndex + 1 < activePhases.length
+      ? activePhases[currentPhaseIndex + 1]
+      : null;
 
   // Input & Dictation States
   const [inputValue, setInputValue] = useState("");
@@ -226,8 +232,7 @@ function AccentureInterviewEngine() {
     }
   };
 
-  const handleSendMessage = async () => {
-    const textToSend = (inputValue + (interimTranscript ? ` ${interimTranscript}` : "")).trim();
+  const executeChatTurn = async (textToSend: string, targetPhase?: string) => {
     if (!textToSend || isTyping) return;
 
     if (isListening) {
@@ -243,6 +248,10 @@ function AccentureInterviewEngine() {
     setInputValue("");
     setInterimTranscript("");
     setIsTyping(true);
+
+    if (targetPhase) {
+      setCurrentPhase(targetPhase);
+    }
 
     let streamedText = "";
     let hasSpokenForThisTurn = false;
@@ -264,7 +273,8 @@ function AccentureInterviewEngine() {
         body: JSON.stringify({
           session_id: sessionId || "temp_accenture_id",
           messages: newMessages,
-          current_phase: currentPhase,
+          current_phase: targetPhase || currentPhase,
+          target_phase: targetPhase || undefined,
           practice_mode: practiceMode,
           time_elapsed_secs: elapsedSeconds,
           resume_context: resumeText,
@@ -301,21 +311,38 @@ function AccentureInterviewEngine() {
         },
       });
     } catch {
-      const errorMsg = "Understood. Let's look at how you would quantify that from a business and client value perspective.";
+      const fallbackMsg = targetPhase
+        ? `Let's transition over to ${activePhases.find((p) => p.id === targetPhase)?.label.replace(/^[0-9]+\.\s*/, "") || targetPhase}. How would you approach this problem?`
+        : "Understood. Let's look at how you would quantify that from a business and client value perspective.";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: errorMsg,
+          content: fallbackMsg,
         },
       ]);
-      playSpeechIfReady(errorMsg);
+      playSpeechIfReady(fallbackMsg);
     } finally {
       setIsTyping(false);
       if (streamedText) {
         playSpeechIfReady(streamedText);
       }
     }
+  };
+
+  const handleSendMessage = () => {
+    const textToSend = (inputValue + (interimTranscript ? ` ${interimTranscript}` : "")).trim();
+    if (!textToSend || isTyping) return;
+    executeChatTurn(textToSend);
+  };
+
+  const handleJumpToSection = (targetPhaseId: string) => {
+    if (isTyping || targetPhaseId === currentPhase) return;
+    const targetPhaseObj = activePhases.find((p) => p.id === targetPhaseId);
+    if (!targetPhaseObj) return;
+
+    const transitionText = `[Candidate requested to jump directly to the ${targetPhaseObj.label} section.]`;
+    executeChatTurn(transitionText, targetPhaseId);
   };
 
   const handleEndInterview = async () => {
@@ -561,24 +588,59 @@ function AccentureInterviewEngine() {
         </div>
       </header>
 
-      {/* Stepper Progression Ribbon */}
-      <div className="border-b border-border bg-muted/30 px-4 py-2 flex items-center gap-2 overflow-x-auto custom-scrollbar shrink-0">
-        {activePhases.map((phase, idx) => {
-          const isActive = currentPhase === phase.id;
-          return (
-            <div
-              key={phase.id}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono-tech shrink-0 transition-colors ${
-                isActive
-                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30"
-                  : "text-muted-foreground opacity-70"
-              }`}
-            >
-              <span className="text-[9px] opacity-70">{idx + 1}.</span>
-              <span>{phase.label.replace(/^[0-9]+\.\s*/, "")}</span>
-            </div>
-          );
-        })}
+      {/* Stepper Progression Ribbon & Interactive Section Jumping */}
+      <div className="border-b border-border bg-muted/30 px-4 py-2 flex items-center justify-between gap-3 overflow-x-auto custom-scrollbar shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono-tech text-muted-foreground uppercase font-bold mr-1 hidden sm:inline">
+            Stages:
+          </span>
+          {activePhases.map((phase, idx) => {
+            const isActive = currentPhase === phase.id;
+            const currentIndex = activePhases.findIndex((p) => p.id === currentPhase);
+            const isPast = idx < currentIndex;
+
+            return (
+              <button
+                key={phase.id}
+                type="button"
+                disabled={isTyping}
+                onClick={() => handleJumpToSection(phase.id)}
+                title={isActive ? "Current Active Stage" : `Click to jump to ${phase.label} (Previous context preserved)`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono-tech shrink-0 transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30 shadow-xs ring-1 ring-emerald-500/20"
+                    : isPast
+                    ? "text-foreground bg-muted/40 hover:bg-muted border border-border/60 hover:border-emerald-500/30"
+                    : "text-muted-foreground hover:text-foreground bg-card/60 hover:bg-card border border-border/40 hover:border-emerald-500/30"
+                } ${isTyping ? "opacity-60 cursor-not-allowed" : ""}`}
+              >
+                <span className={`text-[9px] ${isActive ? "text-emerald-500 font-bold" : "opacity-70"}`}>
+                  {idx + 1}.
+                </span>
+                <span>{phase.label.replace(/^[0-9]+\.\s*/, "")}</span>
+                {!isActive && (
+                  <span className="text-[9px] text-muted-foreground/60 hover:text-emerald-500 transition-colors">⚡</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Quick Skip to Next Section */}
+        {nextPhase && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={isTyping}
+            onClick={() => handleJumpToSection(nextPhase.id)}
+            className="h-7 px-2.5 rounded-lg text-[11px] font-mono-tech text-muted-foreground hover:text-foreground hover:bg-muted border border-border/60 shrink-0 flex items-center gap-1.5 cursor-pointer ml-auto"
+            title={`Skip ongoing section and move to ${nextPhase.label}`}
+          >
+            <span className="hidden sm:inline">Skip to Next:</span>
+            <span>{nextPhase.label.replace(/^[0-9]+\.\s*/, "")}</span>
+            <FastForward className="h-3 w-3 text-emerald-500" />
+          </Button>
+        )}
       </div>
 
       {/* Main Studio Area */}
@@ -641,6 +703,22 @@ function AccentureInterviewEngine() {
           <div className="flex-1 overflow-y-auto py-4 space-y-4 custom-scrollbar">
             {messages.map((msg, index) => {
               const isAssistant = msg.role === "assistant";
+              const isTransition = msg.content.startsWith("[Candidate requested to jump");
+
+              if (isTransition) {
+                const sectionName = msg.content
+                  .replace("[Candidate requested to jump directly to the ", "")
+                  .replace(" section.]", "");
+                return (
+                  <div key={index} className="my-2.5 flex items-center justify-center animate-in fade-in duration-300">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[11px] font-mono-tech shadow-xs">
+                      <Sparkles className="h-3 w-3" />
+                      <span>Section Shift ➔ {sectionName}</span>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <motion.div
                   key={index}
@@ -685,22 +763,24 @@ function AccentureInterviewEngine() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Framework Response Chips */}
-          <div className="py-2 flex items-center gap-1.5 overflow-x-auto custom-scrollbar shrink-0">
-            <span className="text-[10px] font-mono-tech text-muted-foreground shrink-0 font-bold uppercase">
-              Starters:
-            </span>
-            {FRAMEWORK_CHIPS.map((chip, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setInputValue(chip)}
-                className="text-[10px] font-mono-tech px-2.5 py-1 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border shrink-0 transition-colors cursor-pointer"
-              >
-                {chip.length > 35 ? `${chip.slice(0, 35)}...` : chip}
-              </button>
-            ))}
-          </div>
+          {/* Consulting Case Framework Hints (Only active during Case questions) */}
+          {currentPhase === "consulting_case" && (
+            <div className="py-1.5 flex items-center gap-1.5 overflow-x-auto custom-scrollbar shrink-0 animate-in fade-in duration-200">
+              <span className="text-[10px] font-mono-tech text-emerald-600 dark:text-emerald-400 shrink-0 font-bold uppercase flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Case Framework Hints:
+              </span>
+              {CASE_FRAMEWORK_HINTS.map((hint, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setInputValue((prev) => (prev ? `${prev} ${hint}` : hint))}
+                  className="text-[10px] font-mono-tech px-2.5 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 shrink-0 transition-colors cursor-pointer"
+                >
+                  {hint}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Real-Time Live Dictation Capsule (Appears above input during STT) */}
           <LiveDictationCapsule

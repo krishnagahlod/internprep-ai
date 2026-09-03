@@ -25,7 +25,8 @@ def build_accenture_system_prompt(
     current_phase: str = "introduction",
     time_elapsed_secs: int = 0,
     resume_context: Optional[str] = None,
-    candidate_last_message: Optional[str] = None
+    candidate_last_message: Optional[str] = None,
+    transition_instruction: Optional[str] = None
 ) -> str:
     """Constructs the dynamic, state-aware prompt for the Accenture Manager interviewer."""
     persona_prompt = get_interviewer_persona_prompt()
@@ -53,6 +54,10 @@ def build_accenture_system_prompt(
         sample_questions = [f"• \"{s.get('question')}\"" for s in historical_samples[:3]]
         samples_prompt = f"\nHISTORICAL ACCENTURE PATTERNS FOR THIS SECTION:\n" + "\n".join(sample_questions)
 
+    transition_prompt = ""
+    if transition_instruction:
+        transition_prompt = f"\nSECTION TRANSITION DIRECTIVE:\n{transition_instruction}\n"
+
     return f"""
 {persona_prompt}
 
@@ -67,6 +72,7 @@ CANDIDATE RESUME CONTEXT:
 {resume_context or "IIT Bombay Candidate (Engineering & Analytical background, relevant tech/consulting projects)." }
 {trigger_prompt}
 {samples_prompt}
+{transition_prompt}
 
 INTERVIEW RULES:
 1. Speak as an experienced Manager in Accenture Strategy & Consulting.
@@ -74,5 +80,7 @@ INTERVIEW RULES:
 3. If the candidate makes an unquantified claim or cites a % metric, challenge them to provide the baseline or isolate their personal contribution.
 4. If this is a consulting case or AI strategy question, provide additional numbers/context ONLY if the candidate asks the right clarifying question.
 5. Do NOT say 'Great answer!', 'Awesome!', or provide meta-commentary about the interview.
-6. When satisfied with the candidate's depth on the current topic, transition naturally to the next phase in: [{' → '.join(active_phases)}].
+6. If the interview has jumped or moved to a new section, seamlessly acknowledge the pivot in ONE brief clause, preserve full continuity of what was discussed earlier, and immediately ask your opening or focal question for {current_phase.upper()}. Never repeat questions from earlier sections.
+7. When satisfied with the candidate's depth on the current topic, transition naturally to the next phase in: [{' → '.join(active_phases)}].
 """
+

@@ -626,6 +626,7 @@ class AccentureChatStreamRequest(BaseModel):
     session_id: str
     messages: List[Dict[str, str]]
     current_phase: str = "introduction"
+    target_phase: Optional[str] = None
     practice_mode: str = "full_simulation"
     time_elapsed_secs: int = 0
     resume_context: Optional[str] = None
@@ -704,15 +705,19 @@ async def stream_accenture_chat(
     from services.cerebras_client import cerebras_client
 
     active_phases = PHASE_MAP.get(body.practice_mode, PHASE_MAP["full_simulation"])
-    current_phase_idx = active_phases.index(body.current_phase) if body.current_phase in active_phases else 0
+    
+    is_jump = False
+    if body.target_phase and body.target_phase in active_phases:
+        next_phase = body.target_phase
+        is_jump = True
+    else:
+        next_phase = body.current_phase if body.current_phase in active_phases else active_phases[0]
 
     candidate_last_msg = body.messages[-1].get("content", "") if body.messages else ""
 
-    # Natural phase pacing
-    turns_in_phase = len(body.messages) // 2
-    next_phase = body.current_phase
-    if turns_in_phase >= 2 and current_phase_idx + 1 < len(active_phases):
-        next_phase = active_phases[current_phase_idx + 1]
+    transition_instruction = None
+    if is_jump:
+        transition_instruction = f"The candidate has requested to jump ahead directly to the {next_phase.upper()} section. Seamlessly acknowledge this pivot in one concise professional clause, maintain all previous conversation context, and immediately pose your opening question for {next_phase.upper()}."
 
     sys_prompt = build_accenture_system_prompt(
         session_id=body.session_id,
@@ -720,7 +725,8 @@ async def stream_accenture_chat(
         current_phase=next_phase,
         time_elapsed_secs=body.time_elapsed_secs,
         resume_context=body.resume_context,
-        candidate_last_message=candidate_last_msg
+        candidate_last_message=candidate_last_msg,
+        transition_instruction=transition_instruction
     )
 
     llm_messages = [{"role": "system", "content": sys_prompt}]
