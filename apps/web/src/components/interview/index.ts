@@ -6,3 +6,4 @@ export * from "./interview-input-controls";
 export * from "./interview-setup-modal";
 export * from "./interview-whiteboard-pane";
 export * from "./interview-source-pane";
+export * from "./presentation-placeholder";

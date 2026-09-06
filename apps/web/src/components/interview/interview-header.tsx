@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock, Volume2, VolumeX, Mic, PenTool, BookOpen, Bot } from "lucide-react";
+import { ArrowLeft, Clock, Volume2, VolumeX, Mic, PenTool, BookOpen, Bot, Monitor, MonitorOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,6 +23,12 @@ interface InterviewHeaderProps {
   onToggleDrawer?: () => void;
   onToggleTts: () => void;
   onEndInterview: () => void;
+  // Presentation mode props
+  isPresentationActive?: boolean;
+  isPresentationSupported?: boolean;
+  isPresentationDetecting?: boolean;
+  isPresentationMockMode?: boolean;
+  onTogglePresentation?: () => void;
 }
 
 export function InterviewHeader({
@@ -39,6 +45,11 @@ export function InterviewHeader({
   onToggleDrawer,
   onToggleTts,
   onEndInterview,
+  isPresentationActive = false,
+  isPresentationSupported = false,
+  isPresentationDetecting = false,
+  isPresentationMockMode = false,
+  onTogglePresentation,
 }: InterviewHeaderProps) {
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -126,6 +137,45 @@ export function InterviewHeader({
                 <PenTool className="h-3.5 w-3.5 text-emerald-500" />
                 <span>Whiteboard</span>
               </>
+            )}
+          </Button>
+        )}
+
+        {/* External Display Presentation Button */}
+        {onTogglePresentation && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={
+              isPresentationActive
+                ? "Return workspace from external display"
+                : "Present workspace on external display"
+            }
+            onClick={onTogglePresentation}
+            disabled={isPresentationDetecting}
+            className={`h-8 w-8 rounded-lg cursor-pointer transition-all ${
+              isPresentationActive
+                ? "text-emerald-500 bg-emerald-500/15 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
+                : isPresentationMockMode
+                ? "text-amber-500 bg-amber-500/10 border border-amber-500/20"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            }`}
+            title={
+              isPresentationDetecting
+                ? "Detecting displays..."
+                : isPresentationActive
+                ? "Return Workspace (click to restore)"
+                : isPresentationMockMode
+                ? "Present Workspace (Mock Mode)"
+                : "Present Workspace on External Display"
+            }
+          >
+            {isPresentationDetecting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isPresentationActive ? (
+              <MonitorOff className="h-4 w-4" />
+            ) : (
+              <Monitor className="h-4 w-4" />
             )}
           </Button>
         )}

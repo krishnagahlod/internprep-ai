@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
@@ -8,8 +8,9 @@ import { PaywallModal } from "@/components/paywall-modal";
 import { fetchEventSourceStream } from "@/lib/sse-client";
 import { trackInterviewStarted, trackInterviewTurnCompleted } from "@/lib/analytics";
 import { ttsEngine } from "@/lib/tts-engine";
+import { usePresentation } from "@/hooks/use-presentation";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, BookOpen, PenTool } from "lucide-react";
+import { FileText, BookOpen, PenTool, AlertTriangle, X } from "lucide-react";
 import {
   Message,
   RightPanelState,
@@ -22,6 +23,7 @@ import {
   InterviewSetupModal,
   InterviewWhiteboardPane,
   InterviewSourcePane,
+  PresentationPlaceholder,
 } from "@/components/interview";
 
 function InterviewEngine() {
@@ -80,6 +82,14 @@ function InterviewEngine() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // External Display Presentation Mode
+  const presentation = usePresentation({
+    panelState: rightPanelState === "source" ? "source" : "whiteboard",
+    caseContext,
+    caseSource,
+    pageNumber,
+  });
 
   // TTS Speaker state listener
   useEffect(() => {
@@ -554,7 +564,13 @@ function InterviewEngine() {
         ttsEnabled={ttsEnabled}
         isSpeaking={isSpeaking}
         rightPanelState={rightPanelState}
-        onPanelStateChange={setRightPanelState}
+        onPanelStateChange={(state) => {
+          setRightPanelState(state);
+          // Sync to external window if presenting
+          if (presentation.status === "active") {
+            presentation.sendPanelSwitch(state as "whiteboard" | "source");
+          }
+        }}
         pageNumber={pageNumber}
         onToggleTts={() => {
           if (ttsEnabled) {
@@ -563,6 +579,17 @@ function InterviewEngine() {
           setTtsEnabled(!ttsEnabled);
         }}
         onEndInterview={handleEndSession}
+        isPresentationActive={presentation.status === "active"}
+        isPresentationSupported={presentation.isSupported}
+        isPresentationDetecting={presentation.status === "detecting"}
+        isPresentationMockMode={presentation.isMockMode}
+        onTogglePresentation={async () => {
+          if (presentation.status === "active") {
+            presentation.stopPresentation();
+          } else {
+            await presentation.startPresentation();
+          }
+        }}
       />
 
       {/* Phase Progression Stepper with Interactive Section Jumping */}
@@ -657,14 +684,19 @@ function InterviewEngine() {
           className="hidden lg:block w-1.5 hover:w-2 bg-border/40 hover:bg-emerald-500/60 cursor-col-resize transition-all z-20"
         />
 
-        {/* Right Column: Whiteboard or Source or Resume */}
+        {/* Right Column: Whiteboard or Source or Resume or Presented */}
         <div
           style={{ width: `${100 - chatWidth}%` }}
           className={`h-full flex flex-col bg-background ${
             mobileView !== "chat" ? "w-full" : "hidden lg:flex"
           }`}
         >
-          {rightPanelState === "source" || mobileView === "source" ? (
+          {presentation.status === "active" ? (
+            <PresentationPlaceholder
+              onReturn={() => presentation.stopPresentation()}
+              isMockMode={presentation.isMockMode}
+            />
+          ) : rightPanelState === "source" || mobileView === "source" ? (
             <InterviewSourcePane
               caseContext={caseContext}
               caseSource={caseSource}
@@ -689,6 +721,34 @@ function InterviewEngine() {
           )}
         </div>
       </div>
+
+      {/* Presentation Error Toast */}
+      <AnimatePresence>
+        {presentation.error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: 20, x: "-50%" }}
+            className="fixed bottom-6 left-1/2 z-50 flex items-start gap-3 max-w-md px-4 py-3 rounded-xl bg-card border border-red-500/20 shadow-lg backdrop-blur-md"
+          >
+            <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-mono-tech font-bold text-foreground mb-0.5">
+                Presentation Error
+              </p>
+              <p className="text-[11px] font-sans text-muted-foreground leading-relaxed">
+                {presentation.error.message}
+              </p>
+            </div>
+            <button
+              onClick={() => presentation.clearError()}
+              className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
