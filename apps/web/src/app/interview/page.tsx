@@ -9,7 +9,7 @@ import { fetchEventSourceStream } from "@/lib/sse-client";
 import { trackInterviewStarted, trackInterviewTurnCompleted } from "@/lib/analytics";
 import { ttsEngine } from "@/lib/tts-engine";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, X, Edit3, BookOpen, PenTool } from "lucide-react";
+import { FileText, BookOpen, PenTool } from "lucide-react";
 import {
   Message,
   RightPanelState,
@@ -49,9 +49,11 @@ function InterviewEngine() {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [rightPanelState, setRightPanelState] = useState<RightPanelState>("whiteboard");
+  const [sessionDomain, setSessionDomain] = useState<string>("");
+  const [sessionCompany, setSessionCompany] = useState<string>("");
   const [chatWidth, setChatWidth] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
   const [sessionLoadError, setSessionLoadError] = useState<string | null>(null);
@@ -75,11 +77,6 @@ function InterviewEngine() {
     resetAt?: string;
     featureKey?: string;
   }>({});
-
-  // Slide-over Notes & Resume Drawer States
-  const [showDrawer, setShowDrawer] = useState(false);
-  const [drawerTab, setDrawerTab] = useState<"notes" | "resume">("notes");
-  const [notesText, setNotesText] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -116,11 +113,23 @@ function InterviewEngine() {
             if (session.case_state?.page_number) {
               setPageNumber(session.case_state.page_number);
             }
+            if (session.case_state?.domain) {
+              setSessionDomain(session.case_state.domain);
+            }
+            if (session.case_state?.company) {
+              setSessionCompany(session.case_state.company);
+            }
 
-            if (sessionMessages && sessionMessages.length > 0) {
-              setMessages(sessionMessages);
-            } else {
-              setMessages(session.messages || []);
+            const loadedMessages = (sessionMessages && sessionMessages.length > 0)
+              ? sessionMessages
+              : (session.messages || []);
+            setMessages(loadedMessages);
+
+            // Auto-speak opening turn by default
+            const lastAssistant = [...loadedMessages].reverse().find((m: any) => m.role === "assistant");
+            if (lastAssistant?.content) {
+              ttsEngine.unlockAudio();
+              ttsEngine.speak(lastAssistant.content);
             }
 
             setCurrentSessionId(session.id);
@@ -387,12 +396,12 @@ function InterviewEngine() {
           messages: newMessages,
           current_phase: targetPhase || currentPhase,
           target_phase: targetPhase || undefined,
-          scratchpad: notesText,
+          scratchpad: "",
           case_context: caseContext,
           case_source: caseSource,
           interview_type: interviewMode,
-          domain: "",
-          company: targetCompany || "",
+          domain: sessionDomain || (interviewMode === "case" ? "Consulting" : "General"),
+          company: sessionCompany || targetCompany || "",
           resume_context: interviewMode === "domain" ? caseContext : undefined,
           user_id: user?.id || (isGuest ? "guest" : undefined),
         }),
@@ -546,9 +555,7 @@ function InterviewEngine() {
         isSpeaking={isSpeaking}
         rightPanelState={rightPanelState}
         onPanelStateChange={setRightPanelState}
-        hasResume={Boolean(caseContext && interviewMode === "domain") || Boolean(user)}
         pageNumber={pageNumber}
-        onToggleDrawer={() => setShowDrawer(!showDrawer)}
         onToggleTts={() => {
           if (ttsEnabled) {
             ttsEngine.stop();
@@ -683,87 +690,6 @@ function InterviewEngine() {
         </div>
       </div>
 
-      {/* Slide-Over Drawer for Quick Notes & Resume Reference */}
-      <AnimatePresence>
-        {showDrawer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs"
-          >
-            <motion.div
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="w-full max-w-md bg-card border-l border-border shadow-2xl h-full flex flex-col"
-            >
-              {/* Drawer Header */}
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setDrawerTab("notes")}
-                    className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all cursor-pointer ${
-                      drawerTab === "notes"
-                        ? "bg-card text-foreground font-bold shadow-xs border border-border"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Scratchpad Notes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDrawerTab("resume")}
-                    className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all cursor-pointer ${
-                      drawerTab === "resume"
-                        ? "bg-card text-foreground font-bold shadow-xs border border-border"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Resume Reference
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowDrawer(false)}
-                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                  aria-label="Close drawer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Drawer Body */}
-              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-                {drawerTab === "notes" ? (
-                  <div className="h-full flex flex-col space-y-2">
-                    <p className="text-[11px] font-mono-tech text-muted-foreground">
-                      Take private notes, write scratch calculations, or structure frameworks during your live interview:
-                    </p>
-                    <textarea
-                      value={notesText}
-                      onChange={(e) => setNotesText(e.target.value)}
-                      placeholder="Type your personal calculations, framework branches, or observations here..."
-                      className="flex-1 w-full p-3 rounded-xl bg-background border border-border text-xs font-mono-tech resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none custom-scrollbar"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-[11px] font-mono-tech text-muted-foreground">
-                      Active Resume & Candidate Profile:
-                    </p>
-                    <div className="p-4 rounded-xl border border-border bg-background text-xs font-sans leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                      {caseContext || "No resume text linked to this session."}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -145,6 +145,11 @@ app.include_router(placement_analysis.router)
 app.include_router(billing.router)
 app.include_router(admin.router)
 
+# Mount Casebooks PDF storage as static files for direct document viewing
+casebooks_dir = os.path.join(os.path.dirname(__file__), "data", "casebooks")
+if os.path.exists(casebooks_dir):
+    app.mount("/casebooks", StaticFiles(directory=casebooks_dir), name="casebooks")
+
 # --- Rate Limiter & Unified Error Handlers Setup ---
 from dependencies import limiter
 from slowapi.errors import RateLimitExceeded

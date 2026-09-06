@@ -148,7 +148,7 @@ class CerebrasClient:
                 "Content-Type": "application/json"
             }
             
-            models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini"]
+            models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
             for model_candidate in models_to_try:
                 payload = {
                     "model": model_candidate,
@@ -463,7 +463,7 @@ class CerebrasClient:
                     "Authorization": f"Bearer {key}",
                     "Content-Type": "application/json"
                 }
-                models_to_try = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "groq/compound", "groq/compound-mini"]
+                models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
                 for model_candidate in models_to_try:
                     payload = {
                         "model": model_candidate,

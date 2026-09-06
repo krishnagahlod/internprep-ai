@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock, Volume2, VolumeX, Mic, PenTool, BookOpen, FileText, Bot, Edit3 } from "lucide-react";
+import { ArrowLeft, Clock, Volume2, VolumeX, Mic, PenTool, BookOpen, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -73,58 +73,7 @@ export function InterviewHeader({
         </Badge>
       </div>
 
-      {/* Center: Desktop Workspace Panel Switcher */}
-      {onPanelStateChange && (
-        <div className="hidden md:flex items-center gap-1 p-1 bg-muted/60 border border-border rounded-xl shrink-0">
-          <button
-            type="button"
-            onClick={() => onPanelStateChange("whiteboard")}
-            className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all flex items-center gap-1.5 cursor-pointer ${
-              rightPanelState === "whiteboard"
-                ? "bg-card text-foreground font-bold shadow-xs border border-border/80"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <PenTool className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Whiteboard</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={() => onPanelStateChange("source")}
-            className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all flex items-center gap-1.5 cursor-pointer ${
-              rightPanelState === "source"
-                ? "bg-card text-foreground font-bold shadow-xs border border-border/80"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <BookOpen className="h-3.5 w-3.5 text-blue-500" />
-            <span>Case Document</span>
-            {pageNumber ? (
-              <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
-                p.{pageNumber}
-              </span>
-            ) : null}
-          </button>
-
-          {hasResume && (
-            <button
-              type="button"
-              onClick={() => onPanelStateChange("resume")}
-              className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all flex items-center gap-1.5 cursor-pointer ${
-                rightPanelState === "resume"
-                  ? "bg-card text-foreground font-bold shadow-xs border border-border/80"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5 text-purple-500" />
-              <span>Resume</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Center/Right: Timer, Audio Controls, Actions */}
+      {/* Right Controls: Timer, Whiteboard/Document Toggle, Audio Controls, Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Active Audio Recording Indicator */}
         {isListening && (
@@ -149,17 +98,35 @@ export function InterviewHeader({
           <span>{formatTime(elapsedSeconds)}</span>
         </div>
 
-        {/* Notes/Scratchpad Drawer Toggle */}
-        {onToggleDrawer && (
+        {/* Right Panel Workspace Toggle (Whiteboard <-> Case Document) */}
+        {onPanelStateChange && (
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={onToggleDrawer}
-            className="h-8 px-2.5 text-xs font-mono-tech text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-lg cursor-pointer"
-            aria-label="Toggle notes drawer"
+            onClick={() =>
+              onPanelStateChange(
+                rightPanelState === "whiteboard" ? "source" : "whiteboard"
+              )
+            }
+            className="h-8 px-2.5 text-xs font-mono-tech flex items-center gap-1.5 border-border rounded-lg cursor-pointer bg-muted/40 hover:bg-muted"
+            aria-label="Toggle Whiteboard or Case Document view"
           >
-            <Edit3 className="h-3.5 w-3.5 text-amber-500" />
-            <span className="hidden lg:inline">Notes</span>
+            {rightPanelState === "whiteboard" ? (
+              <>
+                <BookOpen className="h-3.5 w-3.5 text-blue-500" />
+                <span>Case Document</span>
+                {pageNumber ? (
+                  <span className="text-[10px] px-1 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold">
+                    p.{pageNumber}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <PenTool className="h-3.5 w-3.5 text-emerald-500" />
+                <span>Whiteboard</span>
+              </>
+            )}
           </Button>
         )}
 

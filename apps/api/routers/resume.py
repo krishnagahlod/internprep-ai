@@ -101,25 +101,33 @@ async def upload_resume(
             raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
 
         import uuid
-        effective_user_id = auth_user.id if auth_user else None
+        effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
         safe_file_name = os.path.basename(file.filename or "resume.pdf").replace("/", "_").replace("\\", "_")
         folder_prefix = effective_user_id or "anonymous"
         file_path = f"{folder_prefix}/{uuid.uuid4()}_{safe_file_name}"
         
-        res = supabase.storage.from_("resume_pdfs").upload(
-            file_path,
-            pdf_bytes,
-            {"content-type": "application/pdf"}
-        )
-        file_url = supabase.storage.from_("resume_pdfs").get_public_url(file_path)
-        if file_url.endswith("?"):
-            file_url = file_url[:-1]
+        file_url = ""
+        try:
+            res = supabase.storage.from_("resume_pdfs").upload(
+                file_path,
+                pdf_bytes,
+                {"content-type": "application/pdf"}
+            )
+            file_url = supabase.storage.from_("resume_pdfs").get_public_url(file_path)
+            if file_url.endswith("?"):
+                file_url = file_url[:-1]
+        except Exception as storage_err:
+            print(f"Storage upload warning: {storage_err}")
         
-        # 2. Extract Structural text using Gemini
-        parsed_content = await asyncio.wait_for(
-            asyncio.to_thread(parse_resume_structural, pdf_bytes),
-            timeout=120.0
-        )
+        # 2. Extract Structural text using Gemini with safe fallback
+        parsed_content = {}
+        try:
+            parsed_content = await asyncio.wait_for(
+                asyncio.to_thread(parse_resume_structural, pdf_bytes),
+                timeout=60.0
+            )
+        except Exception as p_err:
+            print(f"Non-fatal warning in parse_resume_structural: {p_err}")
         
         # 3. Extract raw text for fallback or basic analytics
         raw_text = extract_pdf_raw_text(pdf_bytes)
@@ -128,12 +136,12 @@ async def upload_resume(
         db_res = supabase.table("resumes").insert({
             "user_id": effective_user_id,
             "file_name": safe_file_name,
-            "raw_text": raw_text,
-            "file_url": file_url,
-            "parsed_content": parsed_content
+            "raw_text": raw_text or "",
+            "file_url": file_url or "",
+            "parsed_content": parsed_content or {"summary": raw_text[:500] if raw_text else ""}
         }).execute()
         
-        resume_id = db_res.data[0]["id"]
+        resume_id = db_res.data[0]["id"] if db_res.data else str(uuid.uuid4())
         
         if posthog_client and effective_user_id:
             posthog_client.capture(

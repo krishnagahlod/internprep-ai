@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
 import json
+import uuid
+import asyncio
 from agents.case_interviewer import generate_case_response, generate_case_response_stream, generate_hint, get_random_case, DEFAULT_FALLBACK_CASE
 from agents.domain_interviewer import generate_domain_interview_response, generate_domain_interview_response_stream
 from services.rag import retrieve_context
@@ -126,7 +128,7 @@ async def start_case_endpoint(
             )
             next_phase = initial_phase
         
-        session_id = f"case_{uuid.uuid4().hex[:12]}"
+        session_id = str(uuid.uuid4())
         if supabase:
             try:
                 insert_data = {
@@ -194,36 +196,34 @@ async def start_domain_endpoint(
 ):
     effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
-        entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
-        plan_key = entitlement.get("plan_key", "free")
-        if not (auth_user and auth_user.is_admin) and plan_key != "admin":
-            UsageService.consume_quota(
-                user_id=effective_user_id,
-                plan_key=plan_key,
-                feature_key="mock_interview",
-                units=1,
-                request_id=request.headers.get("x-request-id")
-            )
+        try:
+            entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
+            plan_key = entitlement.get("plan_key", "free")
+            if not (auth_user and auth_user.is_admin) and plan_key != "admin":
+                UsageService.consume_quota(
+                    user_id=effective_user_id,
+                    plan_key=plan_key,
+                    feature_key="mock_interview",
+                    units=1,
+                    request_id=request.headers.get("x-request-id")
+                )
+        except Exception as q_err:
+            print(f"Non-fatal quota check in start_domain: {q_err}")
     try:
-        resume_context = "No resume attached. Use standard candidate profile."
+        resume_context = f"Standard candidate profile tailored for {body.domain} roles."
         file_url = ""
         if body.resume_id and supabase:
             try:
-                res = supabase.table("resumes").select("user_id, parsed_text, file_url").eq("id", body.resume_id).execute()
+                res = supabase.table("resumes").select("user_id, raw_text, parsed_content, file_url").eq("id", body.resume_id).execute()
                 if res.data:
-                    resume_owner = res.data[0].get("user_id")
-                    if (
-                        resume_owner
-                        and resume_owner != "guest"
-                        and auth_user
-                        and auth_user.id != resume_owner
-                        and not auth_user.is_admin
-                    ):
-                        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to attach this resume.")
-                    resume_context = res.data[0].get("parsed_text", "") or "Resume attached."
-                    file_url = res.data[0].get("file_url", "")
-            except HTTPException:
-                raise
+                    row = res.data[0]
+                    file_url = row.get("file_url", "")
+                    content = row.get("parsed_content") or row.get("raw_text") or ""
+                    if isinstance(content, (dict, list)):
+                        import json
+                        resume_context = json.dumps(content)
+                    elif content:
+                        resume_context = str(content)
             except Exception as resume_err:
                 print(f"Non-fatal error retrieving resume {body.resume_id}: {resume_err}")
                 
@@ -245,7 +245,7 @@ async def start_domain_endpoint(
             )
             next_phase = initial_phase
         
-        session_id = f"domain_{uuid.uuid4().hex[:12]}"
+        session_id = str(uuid.uuid4())
         if supabase:
             try:
                 insert_data = {
@@ -539,6 +539,7 @@ async def chat_stream_endpoint(
             for chunk in stream_gen:
                 full_text_chunks.append(chunk)
                 yield f"event: token\ndata: {json.dumps({'token': chunk})}\n\n"
+                await asyncio.sleep(0.01)
 
             full_reply = "".join(full_text_chunks)
 

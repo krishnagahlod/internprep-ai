@@ -15,12 +15,12 @@ export function InterviewSourcePane({
   caseSource,
   pageNumber = 1,
 }: InterviewSourcePaneProps) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const [viewMode, setViewMode] = useState<"pdf" | "transcript">(caseSource ? "pdf" : "transcript");
   const [showExcerpt, setShowExcerpt] = useState(false);
 
+  // Serve same-origin from /casebooks/ to prevent iframe security & mixed-content blocking
   const pdfUrl = caseSource
-    ? `${API_URL}/casebooks/${encodeURIComponent(caseSource)}#page=${pageNumber}`
+    ? `/casebooks/${encodeURIComponent(caseSource)}#page=${pageNumber}`
     : null;
 
   return (

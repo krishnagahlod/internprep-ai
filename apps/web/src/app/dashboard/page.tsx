@@ -20,6 +20,13 @@ import { QuotaBadge } from "@/components/quota-badge"
 import { toast } from "sonner"
 
 const DOMAIN_COMPANY_SUGGESTIONS: Record<string, Array<{ name: string; isSpecial?: boolean; studioUrl?: string }>> = {
+  Software: [
+    { name: "Google" },
+    { name: "Microsoft" },
+    { name: "Amazon" },
+    { name: "Uber" },
+    { name: "Oracle" },
+  ],
   Consult: [
     { name: "Accenture", isSpecial: true, studioUrl: "/interview/accenture" },
     { name: "McKinsey & Company" },
@@ -27,26 +34,25 @@ const DOMAIN_COMPANY_SUGGESTIONS: Record<string, Array<{ name: string; isSpecial
     { name: "Bain & Company" },
     { name: "Strategy& (PwC)" },
   ],
-  Software: [
-    { name: "Google" },
-    { name: "Microsoft" },
-    { name: "Amazon" },
-    { name: "Uber" },
-  ],
   Finance: [
     { name: "Goldman Sachs" },
     { name: "Morgan Stanley" },
+    { name: "Deutsche Bank" },
     { name: "J.P. Morgan" },
+    { name: "Blackstone" },
   ],
-  Analytics: [
-    { name: "Tiger Analytics" },
-    { name: "Fractal Analytics" },
-    { name: "EXL Service" },
-  ],
-  FMCG: [
+  Product: [
+    { name: "Flipkart" },
+    { name: "Meesho" },
     { name: "Hindustan Unilever (HUL)" },
     { name: "Procter & Gamble (P&G)" },
     { name: "ITC" },
+  ],
+  Analytics: [
+    { name: "American Express" },
+    { name: "Tiger Analytics" },
+    { name: "Fractal Analytics" },
+    { name: "EXL Service" },
   ],
 };
 
@@ -112,9 +118,17 @@ export default function DashboardPage() {
     }
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
       const response = await fetch(`${API_URL}/resume/upload`, {
         method: "POST",
+        headers,
         body: formData,
       })
       
@@ -261,11 +275,16 @@ export default function DashboardPage() {
                 <select 
                   className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 text-xs text-foreground cursor-pointer"
                   value={selectedDomain}
-                  onChange={(e) => setSelectedDomain(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedDomain(e.target.value);
+                    setTargetCompanyName("");
+                  }}
                 >
-                  {["Analytics", "Consult", "Finance", "FMCG", "Software"].map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
+                  <option value="Software">Software (SWE & Systems)</option>
+                  <option value="Consult">Consult (Strategy & Ops)</option>
+                  <option value="Finance">Finance (IB & Quant)</option>
+                  <option value="Product">Product & FMCG Operations</option>
+                  <option value="Analytics">Analytics & Data Science</option>
                 </select>
               </div>
 
@@ -285,7 +304,7 @@ export default function DashboardPage() {
                   )}
                 </div>
                 <Input 
-                  placeholder="e.g. McKinsey, Google, Goldman Sachs" 
+                  placeholder="e.g. McKinsey, Google, Goldman Sachs, HUL" 
                   value={targetCompanyName}
                   onChange={(e) => setTargetCompanyName(e.target.value)}
                   className="rounded-lg h-9 text-xs border-border bg-background"
@@ -351,17 +370,30 @@ export default function DashboardPage() {
               </div>
               
               <div>
-                <label className="font-semibold mb-1.5 block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">Select Resume</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-semibold block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">
+                    Select Resume (Compulsory)
+                  </label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono-tech font-bold">
+                    Required for Resume Q&A
+                  </span>
+                </div>
                 <select 
                   className="w-full p-2.5 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/40 text-xs text-foreground mb-2.5 cursor-pointer"
                   value={selectedResumeId}
                   onChange={(e) => setSelectedResumeId(e.target.value)}
                   disabled={uploadingResume}
                 >
-                  {resumes.length === 0 && <option value="">No resumes found...</option>}
-                  {resumes.map(r => (
-                    <option key={r.id} value={r.id}>{r.file_name || 'Resume'}</option>
-                  ))}
+                  {resumes.length === 0 ? (
+                    <option value="">No resumes found — please upload your PDF resume below</option>
+                  ) : (
+                    <>
+                      <option value="">-- Choose an uploaded resume --</option>
+                      {resumes.map(r => (
+                        <option key={r.id} value={r.id}>{r.file_name || 'Resume'}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
                 
                 <div 
@@ -371,7 +403,7 @@ export default function DashboardPage() {
                   {uploadingResume ? (
                     <div className="flex items-center gap-2 text-primary font-mono-tech text-xs">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Parsing layout geometry...</span>
+                      <span>Parsing layout & extracting bullet points...</span>
                     </div>
                   ) : (
                     <>
@@ -391,7 +423,11 @@ export default function DashboardPage() {
               className="w-full h-10 text-xs font-semibold font-mono-tech bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs transition-all"
               disabled={uploadingResume || !selectedResumeId}
             >
-              {uploadingResume ? "Initializing Session..." : "Launch Domain Session →"}
+              {uploadingResume
+                ? "Initializing Session..."
+                : !selectedResumeId
+                ? "Upload PDF Resume to Continue →"
+                : "Launch Domain Session →"}
             </Button>
           </div>
         </div>
@@ -770,7 +806,7 @@ export default function DashboardPage() {
                   Full Interview Simulator
                 </h2>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-6 font-sans">
-                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across Software, Consulting, Finance, Analytics, and FMCG.
+                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across Software, Consulting, Finance, Product (inc. FMCG), and Analytics.
                 </p>
               </div>
 
