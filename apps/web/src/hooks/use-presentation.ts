@@ -168,55 +168,15 @@ export function usePresentation(options: UsePresentationOptions = {}): UsePresen
     setStatus("detecting");
 
     try {
-      let windowFeatures: string;
+      // ============================================================
+      // CRITICAL: Open the window IMMEDIATELY and SYNCHRONOUSLY from
+      // the user's click event. If we await getScreenDetails() first,
+      // Chrome loses the "user activation" context and blocks the popup.
+      // We open about:blank first, then reposition + navigate after.
+      // ============================================================
+      const popup = window.open("about:blank", "internprep-presentation");
 
-      if (isMockMode) {
-        // Mock mode: open a window on the same screen, offset right
-        const mockLeft = Math.round(window.screen.availWidth * 0.55);
-        const mockTop = 50;
-        const mockWidth = Math.round(window.screen.availWidth * 0.42);
-        const mockHeight = Math.round(window.screen.availHeight * 0.85);
-        windowFeatures = `left=${mockLeft},top=${mockTop},width=${mockWidth},height=${mockHeight}`;
-      } else {
-        // Real mode: use Window Management API
-        const screenDetails = await (window as any).getScreenDetails();
-        const screens: any[] = screenDetails.screens || [];
-
-        // Find an external (non-primary) screen
-        const externalScreen = screens.find((s: any) => !s.isPrimary);
-
-        if (!externalScreen) {
-          setError({
-            code: "no-display",
-            message: "No external display detected. Connect an extended display and try again.",
-          });
-          setStatus("error");
-          return;
-        }
-
-        // Position the window using the external display's actual geometry
-        const left = externalScreen.availLeft ?? externalScreen.left ?? 0;
-        const top = externalScreen.availTop ?? externalScreen.top ?? 0;
-        const width = externalScreen.availWidth ?? externalScreen.width ?? 1920;
-        const height = externalScreen.availHeight ?? externalScreen.height ?? 1080;
-        windowFeatures = `left=${left},top=${top},width=${width},height=${height}`;
-      }
-
-      // Open the presentation window — MUST be synchronous from click handler
-      const params = new URLSearchParams({
-        panel: panelState,
-        caseSource: caseSource,
-        pageNumber: String(pageNumber),
-        t: String(Date.now()),
-      });
-      // caseContext can be very long — only pass it if under 1500 chars
-      if (caseContext && caseContext.length < 1500) {
-        params.set("caseContext", caseContext);
-      }
-      const presentationUrl = `/interview/present?${params.toString()}`;
-      const newWindow = window.open(presentationUrl, "internprep-presentation", windowFeatures);
-
-      if (!newWindow) {
+      if (!popup) {
         setError({
           code: "popup-blocked",
           message: "The presentation window was blocked by your browser. Please allow popups for this site and try again.",
@@ -225,24 +185,87 @@ export function usePresentation(options: UsePresentationOptions = {}): UsePresen
         return;
       }
 
-      presentationWindowRef.current = newWindow;
+      // Build the presentation URL with query params
+      const params = new URLSearchParams({
+        panel: panelState,
+        caseSource: caseSource,
+        pageNumber: String(pageNumber),
+        t: String(Date.now()),
+      });
+      if (caseContext && caseContext.length < 1500) {
+        params.set("caseContext", caseContext);
+      }
+      const presentationUrl = `/interview/present?${params.toString()}`;
+
+      if (isMockMode) {
+        // Mock mode: position on the same screen, offset right
+        const mockLeft = Math.round(window.screen.availWidth * 0.55);
+        const mockTop = 50;
+        const mockWidth = Math.round(window.screen.availWidth * 0.42);
+        const mockHeight = Math.round(window.screen.availHeight * 0.85);
+        popup.moveTo(mockLeft, mockTop);
+        popup.resizeTo(mockWidth, mockHeight);
+      } else {
+        // Real mode: use Window Management API (async, but window is already open)
+        try {
+          const screenDetails = await (window as any).getScreenDetails();
+          const screens: any[] = screenDetails.screens || [];
+
+          // Find an external (non-primary) screen
+          const externalScreen = screens.find((s: any) => !s.isPrimary);
+
+          if (!externalScreen) {
+            popup.close();
+            setError({
+              code: "no-display",
+              message: "No external display detected. Connect an extended display and try again.",
+            });
+            setStatus("error");
+            return;
+          }
+
+          // Position the window using the external display's actual geometry
+          const left = externalScreen.availLeft ?? externalScreen.left ?? 0;
+          const top = externalScreen.availTop ?? externalScreen.top ?? 0;
+          const width = externalScreen.availWidth ?? externalScreen.width ?? 1920;
+          const height = externalScreen.availHeight ?? externalScreen.height ?? 1080;
+          popup.moveTo(left, top);
+          popup.resizeTo(width, height);
+        } catch (apiErr: any) {
+          // If getScreenDetails fails (permission denied, etc.), keep the popup
+          // on the current screen as a fallback rather than losing it entirely
+          if (apiErr?.name === "NotAllowedError") {
+            popup.close();
+            setError({
+              code: "permission-denied",
+              message: "Multi-screen permission was denied. Please grant the permission and try again.",
+            });
+            setStatus("error");
+            return;
+          }
+          // For other errors, just leave it on the current screen
+          console.warn("[Presentation] Could not detect external display, using current screen:", apiErr);
+        }
+      }
+
+      // Navigate the already-open window to the presentation page
+      popup.location.href = presentationUrl;
+
+      presentationWindowRef.current = popup;
       setStatus("active");
 
       // Start polling to detect if the user manually closes the window
       startPolling();
     } catch (err: any) {
-      // Handle permission denial
-      if (err?.name === "NotAllowedError") {
-        setError({
-          code: "permission-denied",
-          message: "Multi-screen permission was denied. Please grant the permission and try again.",
-        });
-      } else {
-        setError({
-          code: "unknown",
-          message: err?.message || "An unexpected error occurred while starting presentation.",
-        });
+      // Generic safety net — close any popup that may have been opened
+      if (presentationWindowRef.current && !presentationWindowRef.current.closed) {
+        presentationWindowRef.current.close();
+        presentationWindowRef.current = null;
       }
+      setError({
+        code: "unknown",
+        message: err?.message || "An unexpected error occurred while starting presentation.",
+      });
       setStatus("error");
     }
   }, [status, isSupported, isMockMode, startPolling]);
