@@ -19,6 +19,37 @@ import { Badge } from "@/components/ui/badge"
 import { QuotaBadge } from "@/components/quota-badge"
 import { toast } from "sonner"
 
+const DOMAIN_COMPANY_SUGGESTIONS: Record<string, Array<{ name: string; isSpecial?: boolean; studioUrl?: string }>> = {
+  Consult: [
+    { name: "Accenture", isSpecial: true, studioUrl: "/interview/accenture" },
+    { name: "McKinsey & Company" },
+    { name: "Boston Consulting Group (BCG)" },
+    { name: "Bain & Company" },
+    { name: "Strategy& (PwC)" },
+  ],
+  Software: [
+    { name: "Google" },
+    { name: "Microsoft" },
+    { name: "Amazon" },
+    { name: "Uber" },
+  ],
+  Finance: [
+    { name: "Goldman Sachs" },
+    { name: "Morgan Stanley" },
+    { name: "J.P. Morgan" },
+  ],
+  Analytics: [
+    { name: "Tiger Analytics" },
+    { name: "Fractal Analytics" },
+    { name: "EXL Service" },
+  ],
+  FMCG: [
+    { name: "Hindustan Unilever (HUL)" },
+    { name: "Procter & Gamble (P&G)" },
+    { name: "ITC" },
+  ],
+};
+
 export default function DashboardPage() {
   const { isGuest, user, clearState, setUser } = useAuthStore()
   const router = useRouter()
@@ -140,12 +171,16 @@ export default function DashboardPage() {
         const data = await response.json()
         router.push(`/interview?id=${data.session_id}`)
       } else {
-        setUploadError("Failed to start session.")
+        const errJson = await response.json().catch(() => ({}))
+        const msg = typeof errJson.detail === 'string' ? errJson.detail : "Failed to start session."
+        setUploadError(msg)
+        toast.error(msg)
         setUploadingResume(false)
       }
     } catch (err) {
       console.error(err)
       setUploadError("Connection error.")
+      toast.error("Network error. Please check your connection.")
       setUploadingResume(false)
     }
   }
@@ -228,20 +263,91 @@ export default function DashboardPage() {
                   value={selectedDomain}
                   onChange={(e) => setSelectedDomain(e.target.value)}
                 >
-                  {["Analytics", "Consult", "Core", "Finance", "FMCG", "Quant", "Software"].map(d => (
+                  {["Analytics", "Consult", "Finance", "FMCG", "Software"].map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="font-semibold mb-1.5 block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">Target Company (Optional)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-semibold block text-foreground uppercase tracking-wider font-mono-tech text-[11px]">
+                    Target Company (Optional)
+                  </label>
+                  {targetCompanyName && (
+                    <button
+                      type="button"
+                      onClick={() => setTargetCompanyName("")}
+                      className="text-[10px] text-muted-foreground hover:text-foreground font-mono-tech cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <Input 
                   placeholder="e.g. McKinsey, Google, Goldman Sachs" 
                   value={targetCompanyName}
                   onChange={(e) => setTargetCompanyName(e.target.value)}
                   className="rounded-lg h-9 text-xs border-border bg-background"
                 />
+
+                {/* Company Selectable Quick Pills */}
+                {DOMAIN_COMPANY_SUGGESTIONS[selectedDomain] && (
+                  <div className="mt-2 space-y-1.5">
+                    <span className="text-[10px] font-mono-tech text-muted-foreground block">
+                      Quick Select Target Firm:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {DOMAIN_COMPANY_SUGGESTIONS[selectedDomain].map((comp) => {
+                        const isSelected = targetCompanyName.toLowerCase().includes(comp.name.toLowerCase()) || (comp.name === "Accenture" && targetCompanyName.toLowerCase() === "accenture");
+                        return (
+                          <button
+                            key={comp.name}
+                            type="button"
+                            onClick={() => setTargetCompanyName(comp.name)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-mono-tech transition-all flex items-center gap-1 cursor-pointer ${
+                              isSelected
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 font-bold shadow-xs"
+                                : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border"
+                            }`}
+                          >
+                            <span>{comp.name}</span>
+                            {comp.isSpecial && (
+                              <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold">
+                                Studio
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* If Accenture is selected, offer option to launch specialized studio */}
+                {targetCompanyName.toLowerCase().includes("accenture") && (
+                  <div className="mt-2.5 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                    <div className="text-[11px] text-foreground leading-tight">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400 block font-mono-tech">
+                        Accenture Strategy & Consulting Studio
+                      </span>
+                      <span className="text-muted-foreground text-[10px]">
+                        6-dimension IITB cohort scorecard & dynamic GenAI case drill.
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        setShowDomainModal(false);
+                        router.push("/interview/accenture");
+                      }}
+                      className="h-7 px-2.5 text-[10px] font-mono-tech font-bold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 rounded-lg shrink-0 cursor-pointer shadow-xs"
+                    >
+                      Launch Studio →
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -322,13 +428,6 @@ export default function DashboardPage() {
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/interview")}>
             <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
-          </Button>
-          <Button variant="ghost" className="w-full justify-start text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20 font-semibold" onClick={() => router.push("/interview/accenture")}>
-            <Sparkles className="mr-2.5 h-4 w-4 text-emerald-500" />
-            Accenture Special
-            <Badge className="ml-auto bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-none text-[9px] py-0 px-1 font-mono-tech">
-              NEW
-            </Badge>
           </Button>
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/dashboard/analytics")}>
             <TrendingUp className="mr-2.5 h-4 w-4" />
@@ -458,13 +557,6 @@ export default function DashboardPage() {
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/interview"); setIsMobileMenuOpen(false); }}>
             <Briefcase className="mr-2.5 h-4 w-4" />
             Interviews
-          </Button>
-          <Button variant="ghost" className="w-full justify-start text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20 font-semibold" onClick={() => { router.push("/interview/accenture"); setIsMobileMenuOpen(false); }}>
-            <Sparkles className="mr-2.5 h-4 w-4 text-emerald-500" />
-            Accenture Special
-            <Badge className="ml-auto bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-none text-[9px] py-0 px-1 font-mono-tech">
-              NEW
-            </Badge>
           </Button>
           <Button variant="ghost" className="w-full justify-start text-xs text-muted-foreground" onClick={() => { router.push("/dashboard/analytics"); setIsMobileMenuOpen(false); }}>
             <TrendingUp className="mr-2.5 h-4 w-4" />
@@ -648,45 +740,7 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
-          {/* Accenture Management Consulting Special Simulator Banner */}
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-card to-blue-500/15 border border-emerald-500/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm hover:border-emerald-500/60 transition-all cursor-pointer group"
-            onClick={() => router.push("/interview/accenture")}
-          >
-            <div className="flex items-start gap-3.5">
-              <div className="h-11 w-11 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-xs group-hover:scale-105 transition-transform">
-                <Briefcase className="h-5 w-5" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-foreground font-mono-tech tracking-wide">
-                    ACCENTURE // STRATEGY & MANAGEMENT CONSULTING
-                  </span>
-                  <Badge className="bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 text-white dark:text-zinc-950 border-none font-mono-tech text-[10px] font-bold">
-                    SPECIAL SIMULATION
-                  </Badge>
-                  <span className="text-[10px] font-mono-tech text-muted-foreground bg-muted/80 px-2 py-0.5 rounded border border-border">
-                    IIT Bombay Cohort Focus
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed font-sans max-w-2xl">
-                  Practice realistic 20–30 min manager-level interviews calibrated on real IIT Bombay & top-IIT debriefs. Features dynamic case studies, GenAI client strategy, academic domain pushback, and 6-dimension readiness scorecards.
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto shrink-0 pt-2 md:pt-0">
-              <Button
-                size="sm"
-                className="w-full md:w-auto h-9 px-4 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Launch Accenture Studio</span>
-                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-            </div>
-          </motion.div>
           
           {/* Bento Box Layout */}
           <motion.div 
@@ -716,7 +770,7 @@ export default function DashboardPage() {
                   Full Interview Simulator
                 </h2>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-6 font-sans">
-                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across Software, Consulting, Finance, and Quant.
+                  Tailored technical and behavioral interviews. Upload your resume and practice for specific roles across Software, Consulting, Finance, Analytics, and FMCG.
                 </p>
               </div>
 
@@ -724,7 +778,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-mono-tech text-foreground font-semibold flex items-center gap-1 group-hover:underline">
                   Configure Session <ArrowRight className="h-3.5 w-3.5 ml-1" />
                 </span>
-                <span className="text-[11px] font-mono-tech text-muted-foreground">7 Tracks Active</span>
+                <span className="text-[11px] font-mono-tech text-muted-foreground">5 Tracks Active</span>
               </div>
             </motion.div>
 

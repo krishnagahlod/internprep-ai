@@ -1,14 +1,16 @@
-"use client";
-
 import React from "react";
 import { Mic, Send, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LiveDictationCapsule } from "@/components/accenture/live-dictation-capsule";
 
 interface InterviewInputControlsProps {
   inputValue: string;
   setInputValue: (val: string) => void;
   isTyping: boolean;
   isListening: boolean;
+  interimTranscript?: string;
+  onClearTranscript?: () => void;
+  onStopListening?: () => void;
   onSendMessage: () => void;
   onToggleListening: () => void;
   quickReplies?: string[];
@@ -26,6 +28,9 @@ export function InterviewInputControls({
   setInputValue,
   isTyping,
   isListening,
+  interimTranscript = "",
+  onClearTranscript,
+  onStopListening,
   onSendMessage,
   onToggleListening,
   quickReplies = DEFAULT_QUICK_REPLIES,
@@ -59,6 +64,18 @@ export function InterviewInputControls({
           </button>
         ))}
       </div>
+
+      {/* Real-Time Live Dictation Capsule */}
+      {(isListening || Boolean(interimTranscript)) && (
+        <LiveDictationCapsule
+          isListening={isListening}
+          interimTranscript={interimTranscript}
+          confirmedText={inputValue}
+          onSend={onSendMessage}
+          onClear={onClearTranscript || (() => setInputValue(""))}
+          onStop={onStopListening || onToggleListening}
+        />
+      )}
 
       {/* Input Row */}
       <div className="flex items-end gap-2">

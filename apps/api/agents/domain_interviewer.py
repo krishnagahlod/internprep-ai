@@ -153,23 +153,33 @@ def generate_domain_interview_response(
     resume_context: str,
     domain: str,
     company: str,
-    question_bank: str = None
+    question_bank: str = None,
+    target_phase: str = None
 ) -> Tuple[str, str]:
     """
     Returns (assistant_message, new_phase)
     """
-    if len(history) > 1 and check_phase_advance(history, current_phase):
-        current_phase = get_next_phase(current_phase)
+    new_phase = target_phase if target_phase and target_phase in PHASES else current_phase
+    if not target_phase and len(history) > 1 and check_phase_advance(history, current_phase):
+        new_phase = get_next_phase(current_phase)
         
-    if not question_bank and current_phase == "technical":
+    if not question_bank and new_phase == "technical":
         question_bank = get_domain_questions(domain, company)
     elif not question_bank:
         question_bank = "Not needed for this phase."
 
-    system_prompt = get_phase_instructions(current_phase, question_bank, resume_context, domain, company)
+    system_prompt = get_phase_instructions(new_phase, question_bank, resume_context, domain, company)
+    if target_phase and target_phase != current_phase:
+        system_prompt += f"\n\nTRANSITION DIRECTIVE: The candidate requested to navigate directly to the '{new_phase.upper()}' section. Acknowledge this transition naturally in 1 concise sentence and immediately prompt them with a relevant question for this stage."
     
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history)
+    messages.extend([m for m in history if m.get("role") in ["user", "assistant"]])
+    if not any(m.get("role") == "user" for m in messages):
+        company_txt = f" at {company}" if company else ""
+        messages.append({
+            "role": "user",
+            "content": f"Hello! I am ready to begin my {domain} interview{company_txt}."
+        })
     
     try:
         response_text = cerebras_client.generate_chat_completion(
@@ -178,10 +188,11 @@ def generate_domain_interview_response(
             temperature=0.7,
             max_tokens=250
         )
-        return response_text, current_phase
+        return response_text, new_phase
     except Exception as e:
         print(f"Generation error: {e}")
-        return "I'm having trouble connecting right now. Could you repeat that?", current_phase
+        company_txt = f" at {company}" if company else ""
+        return f"Welcome! I'll be conducting your {domain} interview{company_txt} today. Could you briefly introduce yourself and share what brings you to this role?", new_phase
 
 def generate_domain_interview_response_stream(
     history: List[Dict[str, str]], 
@@ -189,23 +200,33 @@ def generate_domain_interview_response_stream(
     resume_context: str,
     domain: str,
     company: str,
-    question_bank: str = None
+    question_bank: str = None,
+    target_phase: str = None
 ):
     """
     Returns (stream_generator, new_phase)
     """
-    if len(history) > 1 and check_phase_advance(history, current_phase):
-        current_phase = get_next_phase(current_phase)
+    new_phase = target_phase if target_phase and target_phase in PHASES else current_phase
+    if not target_phase and len(history) > 1 and check_phase_advance(history, current_phase):
+        new_phase = get_next_phase(current_phase)
         
-    if not question_bank and current_phase == "technical":
+    if not question_bank and new_phase == "technical":
         question_bank = get_domain_questions(domain, company)
     elif not question_bank:
         question_bank = "Not needed for this phase."
 
-    system_prompt = get_phase_instructions(current_phase, question_bank, resume_context, domain, company)
+    system_prompt = get_phase_instructions(new_phase, question_bank, resume_context, domain, company)
+    if target_phase and target_phase != current_phase:
+        system_prompt += f"\n\nTRANSITION DIRECTIVE: The candidate requested to navigate directly to the '{new_phase.upper()}' section. Acknowledge this transition naturally in 1 concise sentence and immediately prompt them with a relevant question for this stage."
     
     messages = [{"role": "system", "content": system_prompt}]
-    messages.extend(history)
+    messages.extend([m for m in history if m.get("role") in ["user", "assistant"]])
+    if not any(m.get("role") == "user" for m in messages):
+        company_txt = f" at {company}" if company else ""
+        messages.append({
+            "role": "user",
+            "content": f"Hello! I am ready to begin my {domain} interview{company_txt}."
+        })
     
     stream_generator = cerebras_client.stream_chat_completion(
         messages=messages,
@@ -213,4 +234,4 @@ def generate_domain_interview_response_stream(
         max_tokens=350,
         model=MODEL
     )
-    return stream_generator, current_phase
+    return stream_generator, new_phase

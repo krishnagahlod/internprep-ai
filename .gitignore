@@ -52,3 +52,4 @@ data/private/
 *.session.json
 *.har
 cookies.txt
+emergent-security-prompts*.pdf

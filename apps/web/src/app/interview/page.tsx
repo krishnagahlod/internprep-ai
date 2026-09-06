@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { PaywallModal } from "@/components/paywall-modal";
 import { fetchEventSourceStream } from "@/lib/sse-client";
 import { trackInterviewStarted, trackInterviewTurnCompleted } from "@/lib/analytics";
+import { ttsEngine } from "@/lib/tts-engine";
+import { motion, AnimatePresence } from "framer-motion";
+import { FileText, X, Edit3, BookOpen, PenTool } from "lucide-react";
 import {
   Message,
   RightPanelState,
@@ -40,9 +43,10 @@ function InterviewEngine() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [caseContext, setCaseContext] = useState<string>("");
-  const [caseSource, setCaseSource] = useState<string>("");
-  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [caseSource, setCaseSource] = useState<string>("CCG Casebook.pdf");
+  const [pageNumber, setPageNumber] = useState<number>(91);
   const [inputValue, setInputValue] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
@@ -72,8 +76,24 @@ function InterviewEngine() {
     featureKey?: string;
   }>({});
 
+  // Slide-over Notes & Resume Drawer States
+  const [showDrawer, setShowDrawer] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<"notes" | "resume">("notes");
+  const [notesText, setNotesText] = useState("");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // TTS Speaker state listener
+  useEffect(() => {
+    const unsubscribe = ttsEngine.onSpeakingChange((speaking) => {
+      setIsSpeaking(speaking);
+    });
+    return () => {
+      unsubscribe();
+      ttsEngine.stop();
+    };
+  }, []);
 
   // Resume Session logic
   useEffect(() => {
@@ -93,6 +113,9 @@ function InterviewEngine() {
 
             setCaseContext(session.case_state?.case_context || session.case_state?.resume_context || "");
             setCaseSource(session.case_state?.case_source || "");
+            if (session.case_state?.page_number) {
+              setPageNumber(session.case_state.page_number);
+            }
 
             if (sessionMessages && sessionMessages.length > 0) {
               setMessages(sessionMessages);
@@ -116,7 +139,7 @@ function InterviewEngine() {
       }
     };
     resumeSession();
-  }, [sessionIdParam]);
+  }, [sessionIdParam, setCurrentSessionId, setCurrentPhase]);
 
   // Drag to resize handler
   useEffect(() => {
@@ -149,6 +172,68 @@ function InterviewEngine() {
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
+  // Initialize Speech Recognition
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onresult = (event: any) => {
+          let currentInterim = "";
+          let finalChunk = "";
+
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalChunk += transcript;
+            } else {
+              currentInterim += transcript;
+            }
+          }
+
+          setInterimTranscript(currentInterim);
+
+          if (finalChunk) {
+            setInputValue((prev) => (prev ? `${prev.trim()} ${finalChunk.trim()}` : finalChunk.trim()));
+            setInterimTranscript("");
+          }
+        };
+
+        recognition.onerror = () => {
+          setIsListening(false);
+          setInterimTranscript("");
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+          setInterimTranscript("");
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      setInterimTranscript("");
+    } else {
+      ttsEngine.stop();
+      try {
+        recognitionRef.current?.start();
+        setIsListening(true);
+      } catch {
+        // Safe start fallback
+      }
+    }
+  };
+
   // Start Case logic
   const handleStartCase = async () => {
     if (isGuest && guestInterviewCount >= 1) {
@@ -157,6 +242,7 @@ function InterviewEngine() {
       return;
     }
 
+    ttsEngine.unlockAudio();
     setShowSetupModal(false);
     setIsTyping(true);
     try {
@@ -195,6 +281,9 @@ function InterviewEngine() {
           company: targetCompany || undefined,
           sessionId: data.session_id,
         });
+        if (data.initial_message && ttsEnabled) {
+          ttsEngine.speak(data.initial_message);
+        }
       } else {
         const errorData = await response.json().catch(() => ({}));
         if (response.status === 403 || errorData.detail?.upgrade_required) {
@@ -214,76 +303,71 @@ function InterviewEngine() {
           setShowSetupModal(true);
           return;
         }
-        setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin?" }]);
+        const fallbackProblem =
+          "Our client is ElectraVolt, a Tier-1 European automotive supplier evaluating whether to enter the commercial EV battery pack manufacturing market in India over the next 3 years. Their CEO wants to know: 1) What is the addressable market size and projected margin profile? 2) What are the primary cost bottlenecks and regulatory entry barriers? 3) Should they build a greenfield facility or pursue a strategic joint venture with an established domestic player?";
+        setCaseContext(`PROBLEM STATEMENT: ${fallbackProblem}`);
+        setCaseSource("CCG Casebook.pdf");
+        setPageNumber(91);
+        setMessages([
+          {
+            role: "assistant",
+            content: `Welcome! I'll be your case interviewer today. We are evaluating a strategic challenge for **ElectraVolt**, a Tier-1 European automotive supplier looking at entering the commercial EV battery manufacturing market in India.\n\n**Problem Statement**: ${fallbackProblem}\n\nWhenever you're ready, feel free to ask any initial clarifying questions, or take a moment to structure your thoughts.`,
+          },
+        ]);
+        setCurrentPhase("introduction");
+        setIsTimerRunning(true);
       }
     } catch (e) {
-      setMessages([{ role: "assistant", content: "Hello! I'll be your interviewer today. Are you ready to begin the case?" }]);
+      const fallbackProblem =
+        "Our client is ElectraVolt, a Tier-1 European automotive supplier evaluating whether to enter the commercial EV battery pack manufacturing market in India over the next 3 years. Their CEO wants to know: 1) What is the addressable market size and projected margin profile? 2) What are the primary cost bottlenecks and regulatory entry barriers? 3) Should they build a greenfield facility or pursue a strategic joint venture with an established domestic player?";
+      setCaseContext(`PROBLEM STATEMENT: ${fallbackProblem}`);
+      setCaseSource("CCG Casebook.pdf");
+      setPageNumber(91);
+      setMessages([
+        {
+          role: "assistant",
+          content: `Welcome! I'll be your case interviewer today. We are evaluating a strategic challenge for **ElectraVolt**, a Tier-1 European automotive supplier looking at entering the commercial EV battery manufacturing market in India.\n\n**Problem Statement**: ${fallbackProblem}\n\nWhenever you're ready, feel free to ask any initial clarifying questions, or take a moment to structure your thoughts.`,
+        },
+      ]);
+      setCurrentPhase("introduction");
+      setIsTimerRunning(true);
     } finally {
       setIsTyping(false);
     }
   };
 
-  // Initialize Speech Recognition
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = "en-US";
+  const handleSendMessage = async (overrideContent?: string, targetPhase?: string) => {
+    const rawContent = overrideContent || (inputValue + (interimTranscript ? ` ${interimTranscript}` : "")).trim();
+    if (!rawContent || isPaywallLocked) return;
 
-        recognition.onresult = (event: any) => {
-          let finalTranscript = "";
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-          if (finalTranscript) {
-            setInputValue((prev) => (prev ? `${prev} ${finalTranscript}` : finalTranscript));
-          }
-        };
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
-        recognitionRef.current = recognition;
-      }
-    }
-  }, []);
-
-  const toggleListening = () => {
+    ttsEngine.stop();
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
-    } else {
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-      recognitionRef.current?.start();
-      setIsListening(true);
+      setInterimTranscript("");
     }
-  };
 
-  const speakResponse = (text: string) => {
-    if (!ttsEnabled || typeof window === "undefined" || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const cleanText = text.replace(/[*_#`]/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.05;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isPaywallLocked) return;
-
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-
-    const userMessageContent = inputValue;
+    const userMessageContent = rawContent;
     const newMessages = [...messages, { role: "user" as const, content: userMessageContent }];
     setMessages(newMessages);
     setInputValue("");
+    setInterimTranscript("");
     setIsTyping(true);
+
+    if (targetPhase) {
+      setCurrentPhase(targetPhase);
+    }
+
+    let streamedText = "";
+    let hasInsertedAssistant = false;
+    let hasSpoken = false;
+
+    const playSpeechIfReady = (text: string) => {
+      if (!hasSpoken && text.trim() && ttsEnabled) {
+        hasSpoken = true;
+        ttsEngine.speak(text.trim());
+      }
+    };
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -294,8 +378,6 @@ function InterviewEngine() {
       }
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      let streamedText = "";
-      let hasInsertedAssistant = false;
 
       await fetchEventSourceStream(`${API_URL}/interview/chat/stream`, {
         method: "POST",
@@ -303,13 +385,14 @@ function InterviewEngine() {
         body: JSON.stringify({
           session_id: currentSessionId || "temp_session_id",
           messages: newMessages,
-          current_phase: currentPhase,
-          scratchpad: "",
+          current_phase: targetPhase || currentPhase,
+          target_phase: targetPhase || undefined,
+          scratchpad: notesText,
           case_context: caseContext,
           case_source: caseSource,
           interview_type: interviewMode,
           domain: "",
-          company: "",
+          company: targetCompany || "",
           resume_context: interviewMode === "domain" ? caseContext : undefined,
           user_id: user?.id || (isGuest ? "guest" : undefined),
         }),
@@ -347,7 +430,7 @@ function InterviewEngine() {
             setCurrentPhase(data.new_phase);
           }
           if (streamedText && ttsEnabled) {
-            speakResponse(streamedText);
+            playSpeechIfReady(streamedText);
           }
           trackInterviewTurnCompleted({
             sessionId: currentSessionId || "temp_session_id",
@@ -369,10 +452,28 @@ function InterviewEngine() {
       });
     } finally {
       setIsTyping(false);
+      if (streamedText && ttsEnabled) {
+        playSpeechIfReady(streamedText);
+      }
     }
   };
 
+  const handleJumpToSection = (targetPhaseId: string) => {
+    if (isTyping || targetPhaseId === currentPhase) return;
+    const targetPhaseObj = activePhases.find((p) => p.id === targetPhaseId);
+    if (!targetPhaseObj) return;
+
+    const transitionText = `[Candidate requested to transition directly to the ${targetPhaseObj.label} section.]`;
+    handleSendMessage(transitionText, targetPhaseId);
+  };
+
   const handleEndSession = async () => {
+    ttsEngine.stop();
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      setInterimTranscript("");
+    }
     if (!currentSessionId) {
       router.push("/feedback");
       return;
@@ -442,12 +543,28 @@ function InterviewEngine() {
         elapsedSeconds={elapsedSeconds}
         isListening={isListening}
         ttsEnabled={ttsEnabled}
-        onToggleTts={() => setTtsEnabled(!ttsEnabled)}
+        isSpeaking={isSpeaking}
+        rightPanelState={rightPanelState}
+        onPanelStateChange={setRightPanelState}
+        hasResume={Boolean(caseContext && interviewMode === "domain") || Boolean(user)}
+        pageNumber={pageNumber}
+        onToggleDrawer={() => setShowDrawer(!showDrawer)}
+        onToggleTts={() => {
+          if (ttsEnabled) {
+            ttsEngine.stop();
+          }
+          setTtsEnabled(!ttsEnabled);
+        }}
         onEndInterview={handleEndSession}
       />
 
-      {/* Phase Progression Stepper */}
-      <InterviewPhaseTracker phases={activePhases} currentPhase={currentPhase} />
+      {/* Phase Progression Stepper with Interactive Section Jumping */}
+      <InterviewPhaseTracker
+        phases={activePhases}
+        currentPhase={currentPhase}
+        onPhaseSelect={handleJumpToSection}
+        disabled={isTyping}
+      />
 
       {/* Mobile Segmented View Switcher */}
       <div className="lg:hidden flex items-center justify-around border-b border-border bg-card/80 p-1.5 shrink-0">
@@ -464,33 +581,37 @@ function InterviewEngine() {
         </button>
         <button
           type="button"
-          onClick={() => setMobileView("canvas")}
+          onClick={() => {
+            setRightPanelState("whiteboard");
+            setMobileView("canvas");
+          }}
           className={`flex-1 py-1 text-xs font-mono-tech font-bold rounded-lg transition-all ${
-            mobileView === "canvas"
+            mobileView === "canvas" && rightPanelState === "whiteboard"
               ? "bg-card text-foreground shadow-xs border border-border"
               : "text-muted-foreground"
           }`}
         >
           Whiteboard Canvas
         </button>
-        {caseContext && (
-          <button
-            type="button"
-            onClick={() => setMobileView("source")}
-            className={`flex-1 py-1 text-xs font-mono-tech font-bold rounded-lg transition-all ${
-              mobileView === "source"
-                ? "bg-card text-foreground shadow-xs border border-border"
-                : "text-muted-foreground"
-            }`}
-          >
-            Case Source
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setRightPanelState("source");
+            setMobileView("source");
+          }}
+          className={`flex-1 py-1 text-xs font-mono-tech font-bold rounded-lg transition-all ${
+            mobileView === "source" || rightPanelState === "source"
+              ? "bg-card text-foreground shadow-xs border border-border"
+              : "text-muted-foreground"
+          }`}
+        >
+          Case Document {pageNumber ? `(p.${pageNumber})` : ""}
+        </button>
       </div>
 
       {/* Main Workspace (Dual-Column on Desktop) */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Column: Chat Feed */}
+        {/* Left Column: Chat Feed & Dictation Controls */}
         <div
           style={{ width: `${chatWidth}%` }}
           className={`h-full flex flex-col border-r border-border bg-background transition-all ${
@@ -508,7 +629,17 @@ function InterviewEngine() {
             setInputValue={setInputValue}
             isTyping={isTyping}
             isListening={isListening}
-            onSendMessage={handleSendMessage}
+            interimTranscript={interimTranscript}
+            onClearTranscript={() => {
+              setInputValue("");
+              setInterimTranscript("");
+            }}
+            onStopListening={() => {
+              recognitionRef.current?.stop();
+              setIsListening(false);
+              setInterimTranscript("");
+            }}
+            onSendMessage={() => handleSendMessage()}
             onToggleListening={toggleListening}
           />
         </div>
@@ -519,24 +650,120 @@ function InterviewEngine() {
           className="hidden lg:block w-1.5 hover:w-2 bg-border/40 hover:bg-emerald-500/60 cursor-col-resize transition-all z-20"
         />
 
-        {/* Right Column: Whiteboard or Source */}
+        {/* Right Column: Whiteboard or Source or Resume */}
         <div
           style={{ width: `${100 - chatWidth}%` }}
           className={`h-full flex flex-col bg-background ${
             mobileView !== "chat" ? "w-full" : "hidden lg:flex"
           }`}
         >
-          {mobileView === "source" || rightPanelState === "source" ? (
+          {rightPanelState === "source" || mobileView === "source" ? (
             <InterviewSourcePane
               caseContext={caseContext}
               caseSource={caseSource}
               pageNumber={pageNumber}
             />
+          ) : rightPanelState === "resume" ? (
+            <div className="h-full flex flex-col bg-card/40 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-500" />
+                  <h4 className="text-xs font-mono-tech font-bold uppercase tracking-wider text-foreground">
+                    Candidate Resume Profile
+                  </h4>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 text-xs font-sans leading-relaxed text-foreground whitespace-pre-wrap shadow-xs">
+                {caseContext || "No resume text attached to this session."}
+              </div>
+            </div>
           ) : (
             <InterviewWhiteboardPane />
           )}
         </div>
       </div>
+
+      {/* Slide-Over Drawer for Quick Notes & Resume Reference */}
+      <AnimatePresence>
+        {showDrawer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="w-full max-w-md bg-card border-l border-border shadow-2xl h-full flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setDrawerTab("notes")}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all cursor-pointer ${
+                      drawerTab === "notes"
+                        ? "bg-card text-foreground font-bold shadow-xs border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Scratchpad Notes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerTab("resume")}
+                    className={`px-3 py-1 rounded-lg text-xs font-mono-tech transition-all cursor-pointer ${
+                      drawerTab === "resume"
+                        ? "bg-card text-foreground font-bold shadow-xs border border-border"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Resume Reference
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDrawer(false)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  aria-label="Close drawer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Drawer Body */}
+              <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+                {drawerTab === "notes" ? (
+                  <div className="h-full flex flex-col space-y-2">
+                    <p className="text-[11px] font-mono-tech text-muted-foreground">
+                      Take private notes, write scratch calculations, or structure frameworks during your live interview:
+                    </p>
+                    <textarea
+                      value={notesText}
+                      onChange={(e) => setNotesText(e.target.value)}
+                      placeholder="Type your personal calculations, framework branches, or observations here..."
+                      className="flex-1 w-full p-3 rounded-xl bg-background border border-border text-xs font-mono-tech resize-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:outline-none custom-scrollbar"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-mono-tech text-muted-foreground">
+                      Active Resume & Candidate Profile:
+                    </p>
+                    <div className="p-4 rounded-xl border border-border bg-background text-xs font-sans leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                      {caseContext || "No resume text linked to this session."}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

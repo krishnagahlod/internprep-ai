@@ -3,7 +3,7 @@ export type Message = {
   content: string;
 };
 
-export type RightPanelState = "whiteboard" | "source";
+export type RightPanelState = "whiteboard" | "source" | "resume";
 
 export type InterviewMode = "case" | "domain";
 

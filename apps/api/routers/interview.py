@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 import os
 import json
-from agents.case_interviewer import generate_case_response, generate_case_response_stream, generate_hint, get_random_case
+from agents.case_interviewer import generate_case_response, generate_case_response_stream, generate_hint, get_random_case, DEFAULT_FALLBACK_CASE
 from agents.domain_interviewer import generate_domain_interview_response, generate_domain_interview_response_stream
 from services.rag import retrieve_context
 from supabase import create_client
@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
     company: Optional[str] = None
     resume_context: Optional[str] = None
     user_id: Optional[str] = None
+    target_phase: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -97,7 +98,7 @@ async def start_case_endpoint(
     try:
         random_case_dict = get_random_case(body.case_type)
         if not random_case_dict:
-            raise HTTPException(status_code=404, detail="No cases found for the given criteria.")
+            random_case_dict = DEFAULT_FALLBACK_CASE
             
         solution_transcript = random_case_dict.get("solution_transcript", "")
         problem_statement = random_case_dict.get("problem_statement", "")
@@ -108,43 +109,66 @@ async def start_case_endpoint(
         initial_phase = "introduction"
         
         # Generate opening message
-        bot_reply, next_phase = generate_case_response(
-            history=[],
-            current_phase=initial_phase,
-            context=full_context,
-            scratchpad=""
-        )
+        try:
+            bot_reply, next_phase = generate_case_response(
+                history=[],
+                current_phase=initial_phase,
+                context=full_context,
+                scratchpad=""
+            )
+        except Exception as gen_err:
+            print(f"Non-fatal error generating opening case response: {gen_err}")
+            title = random_case_dict.get("title", "Strategic Market Evaluation")
+            bot_reply = (
+                f"Welcome! Today we will be working through a case concerning **{title}**.\n\n"
+                f"**Client Problem**: {problem_statement}\n\n"
+                f"Whenever you're ready, feel free to ask any initial clarifying questions, or take a moment to structure your thoughts."
+            )
+            next_phase = initial_phase
         
-        session_id = "temp_session_id"
+        session_id = f"case_{uuid.uuid4().hex[:12]}"
         if supabase:
-            insert_data = {
-                "interview_type": "case",
-                "status": "in_progress",
-                "case_state": {"current_phase": next_phase, "case_id": random_case_dict.get("id")}
-            }
-            if effective_user_id:
-                insert_data["user_id"] = effective_user_id
-                
-            res = supabase.table("interview_sessions").insert(insert_data).execute()
-            if res.data:
-                session_id = res.data[0]["id"]
-                supabase.table("session_messages").insert({
-                    "session_id": session_id,
-                    "role": "assistant",
-                    "content": bot_reply,
-                    "phase": initial_phase
-                }).execute()
+            try:
+                insert_data = {
+                    "id": session_id,
+                    "interview_type": "case",
+                    "status": "in_progress",
+                    "case_state": {
+                        "current_phase": next_phase,
+                        "case_id": random_case_dict.get("id"),
+                        "case_source": case_source,
+                        "page_number": page_number,
+                        "case_context": full_context
+                    }
+                }
+                if effective_user_id and effective_user_id != "guest":
+                    insert_data["user_id"] = effective_user_id
+                    
+                res = supabase.table("interview_sessions").insert(insert_data).execute()
+                if res.data:
+                    session_id = res.data[0]["id"]
+                    supabase.table("session_messages").insert({
+                        "session_id": session_id,
+                        "role": "assistant",
+                        "content": bot_reply,
+                        "phase": initial_phase
+                    }).execute()
+            except Exception as db_err:
+                print(f"Non-fatal database error inserting case session: {db_err}")
         
         if posthog_client and effective_user_id:
-            posthog_client.capture(
-                distinct_id=effective_user_id, 
-                event='interview_started', 
-                properties={
-                    'interview_type': 'case',
-                    'case_source': case_source,
-                    'session_id': session_id,
-                }
-            )
+            try:
+                posthog_client.capture(
+                    distinct_id=effective_user_id, 
+                    event='interview_started', 
+                    properties={
+                        'interview_type': 'case',
+                        'case_source': case_source,
+                        'session_id': session_id,
+                    }
+                )
+            except Exception:
+                pass
             
         return StartCaseResponse(
             session_id=session_id,
@@ -184,54 +208,87 @@ async def start_domain_endpoint(
         resume_context = "No resume attached. Use standard candidate profile."
         file_url = ""
         if body.resume_id and supabase:
-            res = supabase.table("resumes").select("user_id, parsed_text, file_url").eq("id", body.resume_id).execute()
-            if res.data:
-                resume_owner = res.data[0].get("user_id")
-                if resume_owner and (not auth_user or (auth_user.id != resume_owner and not auth_user.is_admin)):
-                    raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to attach this resume.")
-                resume_context = res.data[0].get("parsed_text", "")
-                file_url = res.data[0].get("file_url", "")
+            try:
+                res = supabase.table("resumes").select("user_id, parsed_text, file_url").eq("id", body.resume_id).execute()
+                if res.data:
+                    resume_owner = res.data[0].get("user_id")
+                    if (
+                        resume_owner
+                        and resume_owner != "guest"
+                        and auth_user
+                        and auth_user.id != resume_owner
+                        and not auth_user.is_admin
+                    ):
+                        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to attach this resume.")
+                    resume_context = res.data[0].get("parsed_text", "") or "Resume attached."
+                    file_url = res.data[0].get("file_url", "")
+            except HTTPException:
+                raise
+            except Exception as resume_err:
+                print(f"Non-fatal error retrieving resume {body.resume_id}: {resume_err}")
                 
         initial_phase = "introduction"
-        bot_reply, next_phase = generate_domain_interview_response(
-            history=[],
-            current_phase=initial_phase,
-            resume_context=resume_context,
-            domain=body.domain,
-            company=body.company
-        )
+        try:
+            bot_reply, next_phase = generate_domain_interview_response(
+                history=[],
+                current_phase=initial_phase,
+                resume_context=resume_context,
+                domain=body.domain,
+                company=body.company
+            )
+        except Exception as gen_err:
+            print(f"Non-fatal error generating domain interview response: {gen_err}")
+            company_str = f" at {body.company}" if body.company else ""
+            bot_reply = (
+                f"Welcome! I will be your interviewer today for the {body.domain} track{company_str}. "
+                f"To start off, could you please give me a brief introduction of your background and walk me through what drew you to this role?"
+            )
+            next_phase = initial_phase
         
-        session_id = "temp_session_id"
+        session_id = f"domain_{uuid.uuid4().hex[:12]}"
         if supabase:
-            insert_data = {
-                "interview_type": "domain",
-                "status": "in_progress",
-                "case_state": {"current_phase": next_phase, "domain": body.domain, "company": body.company, "resume_context": resume_context, "case_source": file_url}
-            }
-            if effective_user_id:
-                insert_data["user_id"] = effective_user_id
-                
-            res = supabase.table("interview_sessions").insert(insert_data).execute()
-            if res.data:
-                session_id = res.data[0]["id"]
-                supabase.table("session_messages").insert({
-                    "session_id": session_id,
-                    "role": "assistant",
-                    "content": bot_reply,
-                    "phase": initial_phase
-                }).execute()
+            try:
+                insert_data = {
+                    "id": session_id,
+                    "interview_type": "domain",
+                    "status": "in_progress",
+                    "case_state": {
+                        "current_phase": next_phase,
+                        "domain": body.domain,
+                        "company": body.company,
+                        "resume_context": resume_context,
+                        "case_source": file_url
+                    }
+                }
+                if effective_user_id and effective_user_id != "guest":
+                    insert_data["user_id"] = effective_user_id
+                    
+                res = supabase.table("interview_sessions").insert(insert_data).execute()
+                if res.data:
+                    session_id = res.data[0]["id"]
+                    supabase.table("session_messages").insert({
+                        "session_id": session_id,
+                        "role": "assistant",
+                        "content": bot_reply,
+                        "phase": initial_phase
+                    }).execute()
+            except Exception as db_err:
+                print(f"Non-fatal database error saving domain session: {db_err}")
         
         if posthog_client and effective_user_id:
-            posthog_client.capture(
-                distinct_id=effective_user_id, 
-                event='interview_started', 
-                properties={
-                    'interview_type': 'domain',
-                    'domain': body.domain,
-                    'company': body.company,
-                    'session_id': session_id,
-                }
-            )
+            try:
+                posthog_client.capture(
+                    distinct_id=effective_user_id, 
+                    event='interview_started', 
+                    properties={
+                        'interview_type': 'domain',
+                        'domain': body.domain,
+                        'company': body.company,
+                        'session_id': session_id,
+                    }
+                )
+            except Exception:
+                pass
             
         return StartDomainResponse(
             session_id=session_id,
@@ -241,6 +298,8 @@ async def start_domain_endpoint(
             company=body.company,
             resume_context=resume_context
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error starting domain interview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -325,14 +384,16 @@ async def chat_endpoint(
                 current_phase=body.current_phase,
                 resume_context=body.resume_context or "No resume provided.",
                 domain=body.domain or "General",
-                company=body.company
+                company=body.company,
+                target_phase=body.target_phase
             )
         else:
             bot_reply, new_phase = generate_case_response(
                 history=history,
                 current_phase=body.current_phase,
                 context=combined_context,
-                scratchpad=body.scratchpad
+                scratchpad=body.scratchpad,
+                target_phase=body.target_phase
             )
         
         if supabase and body.session_id != "temp_session_id":
@@ -458,14 +519,16 @@ async def chat_stream_endpoint(
             current_phase=body.current_phase,
             resume_context=body.resume_context or "No resume provided.",
             domain=body.domain or "General",
-            company=body.company
+            company=body.company,
+            target_phase=body.target_phase
         )
     else:
         stream_gen, new_phase = generate_case_response_stream(
             history=history,
             current_phase=body.current_phase,
             context=combined_context,
-            scratchpad=body.scratchpad
+            scratchpad=body.scratchpad,
+            target_phase=body.target_phase
         )
 
     async def sse_event_stream():
@@ -594,7 +657,7 @@ async def get_session_endpoint(
         
         # Verify ownership
         owner_id = session.get("user_id")
-        if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+        if owner_id and owner_id != "guest" and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
             raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to view this session.")
 
         # Fetch messages

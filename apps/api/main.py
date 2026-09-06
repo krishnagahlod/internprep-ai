@@ -67,9 +67,11 @@ class CORSStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         response = await super().get_response(path, scope)
         response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Content-Disposition"] = "inline"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        response.headers.pop("X-Frame-Options", None)
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'self' http://localhost:3000 https://internprep.ai http://127.0.0.1:3000"
         return response
 
 casebooks_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "data/casebooks"))
@@ -105,7 +107,11 @@ async def security_headers_and_correlation_middleware(request: Request, call_nex
     # Attach Comprehensive Security Headers
     response.headers["X-Correlation-ID"] = correlation_id
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    if not request.url.path.startswith("/casebooks"):
+        response.headers["X-Frame-Options"] = "DENY"
+    else:
+        response.headers.pop("X-Frame-Options", None)
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'self' http://localhost:3000 https://internprep.ai http://127.0.0.1:3000"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
