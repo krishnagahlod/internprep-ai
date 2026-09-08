@@ -12,6 +12,8 @@ interface PlacementLockGateProps {
   verificationError: string;
   verifying: boolean;
   onUnlock: () => void;
+  currentUserEmail?: string | null;
+  onCheckWhitelist?: () => Promise<void> | void;
 }
 
 export function PlacementLockGate({
@@ -20,6 +22,8 @@ export function PlacementLockGate({
   verificationError,
   verifying,
   onUnlock,
+  currentUserEmail,
+  onCheckWhitelist,
 }: PlacementLockGateProps) {
   return (
     <div className="min-h-screen bg-background relative flex flex-col justify-between selection:bg-primary/20">
@@ -56,6 +60,33 @@ export function PlacementLockGate({
           </p>
 
           <div className="space-y-4 text-left">
+            {currentUserEmail && (
+              <div className="p-3.5 rounded-2xl bg-primary/5 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono-tech text-muted-foreground uppercase tracking-wider">
+                    Signed in as
+                  </span>
+                  <Badge variant="outline" className="text-[10px] font-mono-tech bg-primary/10 text-primary border-primary/30">
+                    Account Active
+                  </Badge>
+                </div>
+                <div className="text-xs font-semibold text-foreground font-mono-tech truncate">
+                  {currentUserEmail}
+                </div>
+                {onCheckWhitelist && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onCheckWhitelist()}
+                    className="w-full text-xs font-mono-tech h-8 mt-1 border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    Auto-Check Whitelist Clearance
+                  </Button>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="text-xs font-semibold text-foreground mb-1.5 block">
                 Admin Master Key or Authorized Invite Passcode

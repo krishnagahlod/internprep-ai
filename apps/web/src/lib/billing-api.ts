@@ -20,6 +20,7 @@ export interface UserEntitlement {
   expires_at?: string | null;
   is_iitb: boolean;
   is_admin: boolean;
+  has_placement_access?: boolean;
   limits: PlanLimitInfo;
   feature_limits: PlanLimitInfo;
 }
@@ -40,6 +41,7 @@ export interface EntitlementResponse {
   email: string;
   is_iitb: boolean;
   is_admin: boolean;
+  has_placement_access?: boolean;
   current_session_id: string;
   entitlement: UserEntitlement;
   usage: Record<string, UserUsageItem>;
@@ -286,4 +288,30 @@ export function openRazorpayCheckout(
     };
     document.body.appendChild(script);
   });
+}
+
+/**
+ * Checks placement intelligence whitelist and access clearance from the server
+ */
+export async function fetchPlacementAccessStatus(email?: string): Promise<{
+  has_access: boolean;
+  email?: string;
+  role?: string;
+  is_admin?: boolean;
+  is_iitb?: boolean;
+  is_whitelisted?: boolean;
+}> {
+  try {
+    const headers = await getAuthHeaders();
+    const queryParam = email ? `?email=${encodeURIComponent(email)}` : '';
+    const res = await fetch(`${API_URL}/placement-analysis/access-status${queryParam}`, {
+      headers,
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('Failed to fetch placement access status:', err);
+  }
+  return { has_access: false };
 }

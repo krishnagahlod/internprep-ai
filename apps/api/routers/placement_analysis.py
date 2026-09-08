@@ -33,34 +33,167 @@ def get_dataset() -> Dict[str, Any]:
     return _DATASET_CACHE
 
 
+WHITELIST_RECORD_ID = "00000000-0000-0000-0000-000000000001"
+
+
 def get_access_store() -> Dict[str, Any]:
     global _ACCESS_CACHE
-    if _ACCESS_CACHE is None:
-        if os.path.exists(ACCESS_PATH):
-            try:
-                with open(ACCESS_PATH, "r", encoding="utf-8") as f:
-                    _ACCESS_CACHE = json.load(f)
-            except Exception:
-                _ACCESS_CACHE = {"whitelisted_emails": [], "invite_codes": ["IITB-VIP-2026", "IITB-CAMPUS-PASS"], "verified_log": []}
-        else:
-            _ACCESS_CACHE = {
-                "whitelisted_emails": [
-                    {"email": "krishnagahlod@gmail.com", "role": "admin", "granted_at": "2026-08-20", "notes": "Platform Owner"},
-                    {"email": "creator@internprep.ai", "role": "admin", "granted_at": "2026-08-20", "notes": "System Administrator"}
-                ],
-                "invite_codes": ["IITB-VIP-2026", "IITB-CAMPUS-PASS"],
-                "verified_log": []
-            }
-            save_access_store(_ACCESS_CACHE)
+    if _ACCESS_CACHE is not None:
+        return _ACCESS_CACHE
+
+    from services.db import get_supabase
+    supabase = get_supabase()
+    db_store = None
+
+    if supabase:
+        try:
+            res = supabase.table("plans").select("description").eq("id", WHITELIST_RECORD_ID).execute()
+            if res.data and len(res.data) > 0 and res.data[0].get("description"):
+                db_store = json.loads(res.data[0]["description"])
+        except Exception as e:
+            print(f"[PlacementAccess] Error reading whitelist from Supabase DB: {e}")
+
+    # Fallback / merge with local JSON file
+    file_store = None
+    if os.path.exists(ACCESS_PATH):
+        try:
+            with open(ACCESS_PATH, "r", encoding="utf-8") as f:
+                file_store = json.load(f)
+        except Exception as e:
+            print(f"[PlacementAccess] Error reading whitelist from local file: {e}")
+
+    if db_store:
+        _ACCESS_CACHE = db_store
+        # Merge any file store emails if not present in DB
+        if file_store:
+            existing_emails = {u.get("email", "").lower().strip() for u in _ACCESS_CACHE.get("whitelisted_emails", []) if u.get("email")}
+            file_emails = file_store.get("whitelisted_emails", [])
+            merged = False
+            for u in file_emails:
+                em = u.get("email", "").lower().strip()
+                if em and em not in existing_emails:
+                    _ACCESS_CACHE.setdefault("whitelisted_emails", []).append(u)
+                    existing_emails.add(em)
+                    merged = True
+            if merged:
+                save_access_store(_ACCESS_CACHE)
+    elif file_store:
+        _ACCESS_CACHE = file_store
+        save_access_store(_ACCESS_CACHE)
+    else:
+        _ACCESS_CACHE = {
+            "whitelisted_emails": [
+                {"email": "krishnagahlod@gmail.com", "role": "admin", "granted_at": "2026-08-20", "notes": "Platform Owner"},
+                {"email": "creator@internprep.ai", "role": "admin", "granted_at": "2026-08-20", "notes": "System Administrator"}
+            ],
+            "invite_codes": ["IITB-VIP-2026", "IITB-CAMPUS-PASS"],
+            "verified_log": []
+        }
+        save_access_store(_ACCESS_CACHE)
+
     return _ACCESS_CACHE
 
 
 def save_access_store(data: Dict[str, Any]):
     global _ACCESS_CACHE
     _ACCESS_CACHE = data
-    os.makedirs(os.path.dirname(ACCESS_PATH), exist_ok=True)
-    with open(ACCESS_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+
+    # 1. Save to local file
+    try:
+        os.makedirs(os.path.dirname(ACCESS_PATH), exist_ok=True)
+        with open(ACCESS_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"[PlacementAccess] Failed to save to local file: {e}")
+
+    # 2. Persist to Supabase DB for zero-data-loss durability
+    from services.db import get_supabase
+    supabase = get_supabase()
+    if supabase:
+        try:
+            supabase.table("plans").upsert({
+                "id": WHITELIST_RECORD_ID,
+                "product": "placement_analysis",
+                "slug": "whitelist_sync",
+                "display_name": "Placement Whitelist Sync Store",
+                "description": json.dumps(data),
+                "is_active": False
+            }, on_conflict="id").execute()
+        except Exception as e:
+            print(f"[PlacementAccess] Failed to save to Supabase DB: {e}")
+
+
+def is_placement_whitelisted(email: str) -> bool:
+    if not email:
+        return False
+    clean = email.strip().lower()
+    if clean in [e.lower() for e in ADMIN_EMAILS]:
+        return True
+    store = get_access_store()
+    for u in store.get("whitelisted_emails", []):
+        if u.get("email", "").strip().lower() == clean:
+            return True
+    from services.db import get_supabase
+    supabase = get_supabase()
+    if supabase:
+        try:
+            res = supabase.table("entitlements").select("id").eq("product", "placement_analysis").eq("status", "active").ilike("metadata->>email", clean).execute()
+            if res.data and len(res.data) > 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def sync_placement_user_to_supabase(email: str, is_granted: bool, details: dict = None):
+    """
+    Syncs candidate placement whitelist status to Supabase Auth metadata and entitlements table.
+    """
+    if not email:
+        return
+    clean = email.strip().lower()
+    from services.db import get_supabase
+    supabase = get_supabase()
+    if not supabase:
+        return
+    try:
+        from datetime import timezone
+        auth_resp = supabase.auth.admin.list_users()
+        users = auth_resp if isinstance(auth_resp, list) else getattr(auth_resp, 'users', [])
+        matching_user = next((u for u in users if getattr(u, 'email', '').lower() == clean), None)
+        if matching_user:
+            uid = matching_user.id
+            meta = getattr(matching_user, 'user_metadata', {}) or {}
+            meta["has_placement_access"] = is_granted
+            supabase.auth.admin.update_user_by_id(uid, {"user_metadata": meta})
+
+            now_str = datetime.now(timezone.utc).isoformat()
+            if is_granted:
+                existing = supabase.table("entitlements").select("id").eq("user_id", uid).eq("product", "placement_analysis").execute()
+                ent_payload = {
+                    "user_id": uid,
+                    "product": "placement_analysis",
+                    "plan_key": "placement_whitelisted",
+                    "status": "active",
+                    "source": "admin_grant",
+                    "metadata": {
+                        "email": clean,
+                        **(details or {})
+                    },
+                    "updated_at": now_str
+                }
+                if existing.data and len(existing.data) > 0:
+                    supabase.table("entitlements").update(ent_payload).eq("id", existing.data[0]["id"]).execute()
+                else:
+                    ent_payload["created_at"] = now_str
+                    supabase.table("entitlements").insert(ent_payload).execute()
+            else:
+                supabase.table("entitlements").update({
+                    "status": "revoked",
+                    "updated_at": now_str
+                }).eq("user_id", uid).eq("product", "placement_analysis").execute()
+    except Exception as e:
+        print(f"[PlacementAccess] Failed to sync with Supabase user {email}: {e}")
 
 
 class VerifyIITBEmailRequest(BaseModel):
@@ -174,6 +307,57 @@ def send_otp_via_email(to_email: str, otp_code: str) -> bool:
     except Exception as e:
         print(f"[SMTP Warning] Failed to send email to {to_email}: {e}")
         return False
+
+
+@router.get("/access-status")
+async def get_placement_access_status(
+    email: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Checks whether a user (identified by token or email) is authorized
+    to view and use Placement Intelligence Studio.
+    """
+    clean_email = (email or "").strip().lower()
+
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1].strip()
+        from services.db import get_supabase
+        supabase = get_supabase()
+        if supabase:
+            try:
+                user_resp = supabase.auth.get_user(token)
+                if user_resp and user_resp.user and user_resp.user.email:
+                    clean_email = user_resp.user.email.strip().lower()
+            except Exception:
+                pass
+
+    if not clean_email:
+        return {
+            "has_access": False,
+            "email": "",
+            "role": None,
+            "is_admin": False,
+            "is_iitb": False,
+            "is_whitelisted": False,
+            "reason": "No email provided"
+        }
+
+    is_admin = is_admin_authorized(clean_email) or clean_email in [e.lower() for e in ADMIN_EMAILS]
+    is_iitb = clean_email.endswith("@iitb.ac.in") or clean_email.endswith(".iitb.ac.in")
+    whitelisted = is_placement_whitelisted(clean_email)
+
+    has_access = is_admin or is_iitb or whitelisted
+    role = "admin" if is_admin else ("iitb_student" if is_iitb else ("authorized_candidate" if whitelisted else None))
+
+    return {
+        "has_access": has_access,
+        "email": clean_email,
+        "role": role,
+        "is_admin": is_admin,
+        "is_iitb": is_iitb,
+        "is_whitelisted": whitelisted
+    }
 
 
 @router.post("/verify-iitb-email")
@@ -325,6 +509,13 @@ async def grant_user_access(request: Request, body: GrantAccessRequest):
     store["whitelisted_emails"] = users
     save_access_store(store)
     
+    # Sync with Supabase Auth & Entitlements
+    sync_placement_user_to_supabase(
+        email=email_clean,
+        is_granted=True,
+        details={"role": body.role, "notes": body.notes, "granted_by": body.admin_email_or_key}
+    )
+    
     return {
         "status": "success",
         "message": f"Access successfully granted to {email_clean}.",
@@ -346,6 +537,9 @@ async def revoke_user_access(request: Request, body: RevokeAccessRequest):
     updated_users = [u for u in users if u.get("email", "").lower() != email_clean]
     store["whitelisted_emails"] = updated_users
     save_access_store(store)
+    
+    # Sync with Supabase Auth & Entitlements
+    sync_placement_user_to_supabase(email=email_clean, is_granted=False)
     
     return {
         "status": "success",

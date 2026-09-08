@@ -1073,7 +1073,7 @@ async def grant_placement_access(
     """
     Admin explicitly whitelists an email for direct Placement Analysis access.
     """
-    from routers.placement_analysis import get_access_store, save_access_store, ADMIN_EMAILS
+    from routers.placement_analysis import get_access_store, save_access_store, sync_placement_user_to_supabase, ADMIN_EMAILS
     store = get_access_store()
     
     clean_email = body.email.lower().strip()
@@ -1095,6 +1095,9 @@ async def grant_placement_access(
     }
     store["whitelisted_emails"].append(new_entry)
     save_access_store(store)
+
+    # Sync with Supabase Auth & Entitlements table
+    sync_placement_user_to_supabase(email=clean_email, is_granted=True, details=new_entry)
 
     _record_audit_log(
         admin_email=admin.email,
@@ -1118,7 +1121,7 @@ async def revoke_placement_access(
     """
     Admin revokes Placement Analysis access for a specific email.
     """
-    from routers.placement_analysis import get_access_store, save_access_store, ADMIN_EMAILS
+    from routers.placement_analysis import get_access_store, save_access_store, sync_placement_user_to_supabase, ADMIN_EMAILS
     clean_email = body.email.lower().strip()
 
     if clean_email in ADMIN_EMAILS:
@@ -1131,6 +1134,9 @@ async def revoke_placement_access(
         if u.get("email", "").lower() != clean_email
     ]
     save_access_store(store)
+
+    # Sync with Supabase Auth & Entitlements table
+    sync_placement_user_to_supabase(email=clean_email, is_granted=False)
 
     _record_audit_log(
         admin_email=admin.email,

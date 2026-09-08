@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { QuotaBadge } from "@/components/quota-badge"
 import { toast } from "sonner"
+import { fetchPlacementAccessStatus } from "@/lib/billing-api"
 
 const DOMAIN_COMPANY_SUGGESTIONS: Record<string, Array<{ name: string; isSpecial?: boolean; studioUrl?: string }>> = {
   Software: [
@@ -76,7 +77,31 @@ export default function DashboardPage() {
   const [uploadingResume, setUploadingResume] = useState(false)
   const [uploadError, setUploadError] = useState("")
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [hasPlacementAccess, setHasPlacementAccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const checkPlacementClearance = async () => {
+      if (isAdmin) {
+        setHasPlacementAccess(true)
+        return
+      }
+      if (user?.email) {
+        try {
+          const res = await fetchPlacementAccessStatus(user.email)
+          if (res?.has_access) {
+            setHasPlacementAccess(true)
+            localStorage.setItem("iitb_placement_verified", "true")
+          } else {
+            setHasPlacementAccess(false)
+          }
+        } catch (err) {
+          console.error("Failed to check placement clearance:", err)
+        }
+      }
+    }
+    checkPlacementClearance()
+  }, [user?.email, isAdmin])
 
   const fetchResumes = async () => {
     if (user) {
@@ -478,6 +503,31 @@ export default function DashboardPage() {
             Subscriptions & Quotas
           </Button>
 
+          {(hasPlacementAccess || isAdmin) && (
+            <div className="pt-2 space-y-1">
+              <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-3 py-1 flex items-center gap-1.5">
+                <Building2 className="h-3 w-3" /> Exclusive Intelligence
+              </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
+                onClick={() => {
+                  localStorage.setItem("iitb_placement_verified", "true")
+                  if (isAdmin) {
+                    localStorage.setItem("iitb_placement_admin", "true")
+                  }
+                  router.push("/placement-analysis")
+                }}
+              >
+                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
+                Placement Intelligence
+                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
+                  VIP
+                </Badge>
+              </Button>
+            </div>
+          )}
+
           {isAdmin && (
             <div className="pt-2 space-y-1">
               <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
@@ -490,21 +540,6 @@ export default function DashboardPage() {
               >
                 <Crown className="mr-2.5 h-4 w-4 text-purple-500" />
                 Admin Console
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
-                onClick={() => {
-                  localStorage.setItem("iitb_placement_verified", "true")
-                  localStorage.setItem("iitb_placement_admin", "true")
-                  router.push("/placement-analysis")
-                }}
-              >
-                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
-                Placement Intelligence
-                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
-                  VIP
-                </Badge>
               </Button>
             </div>
           )}
@@ -607,6 +642,32 @@ export default function DashboardPage() {
             Subscriptions & Quotas
           </Button>
 
+          {(hasPlacementAccess || isAdmin) && (
+            <div className="pt-2 space-y-1">
+              <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 px-3 py-1 flex items-center gap-1.5">
+                <Building2 className="h-3 w-3" /> Exclusive Intelligence
+              </div>
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
+                onClick={() => {
+                  localStorage.setItem("iitb_placement_verified", "true")
+                  if (isAdmin) {
+                    localStorage.setItem("iitb_placement_admin", "true")
+                  }
+                  router.push("/placement-analysis")
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
+                Placement Intelligence
+                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
+                  VIP
+                </Badge>
+              </Button>
+            </div>
+          )}
+
           {isAdmin && (
             <div className="pt-2 space-y-1">
               <div className="text-[10px] font-mono-tech font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 px-3 py-1 flex items-center gap-1.5">
@@ -619,22 +680,6 @@ export default function DashboardPage() {
               >
                 <Crown className="mr-2.5 h-4 w-4 text-purple-500" />
                 Admin Console
-              </Button>
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/20"
-                onClick={() => {
-                  localStorage.setItem("iitb_placement_verified", "true")
-                  localStorage.setItem("iitb_placement_admin", "true")
-                  router.push("/placement-analysis")
-                  setIsMobileMenuOpen(false)
-                }}
-              >
-                <Building2 className="mr-2.5 h-4 w-4 text-amber-500" />
-                Placement Intelligence
-                <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-300 border-none text-[9px] py-0 px-1">
-                  VIP
-                </Badge>
               </Button>
             </div>
           )}
@@ -785,6 +830,53 @@ export default function DashboardPage() {
             animate="visible"
             className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"
           >
+            {/* Placement Intelligence Card (Visible to Whitelisted & Admins) */}
+            {(hasPlacementAccess || isAdmin) && (
+              <motion.div 
+                variants={itemVariants} 
+                className="md:col-span-2 lg:col-span-4 rounded-xl p-6 flex flex-col md:flex-row md:items-center justify-between group cursor-pointer bg-gradient-to-r from-amber-500/10 via-card to-amber-500/5 border border-amber-500/30 hover:border-amber-500/60 shadow-xs transition-all"
+                onClick={() => {
+                  localStorage.setItem("iitb_placement_verified", "true")
+                  if (isAdmin) {
+                    localStorage.setItem("iitb_placement_admin", "true")
+                  }
+                  router.push("/placement-analysis")
+                }}
+              >
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-9 w-9 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <span className="text-[10px] font-mono-tech font-bold text-amber-700 dark:text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded border border-amber-500/30 uppercase tracking-wider">
+                      WHITELIST ACCESS • VIP
+                    </span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                    Placement Intelligence &amp; JAF Vault
+                  </h2>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-sans">
+                    Access verified placement archives, Job Announcement Form (JAF) telemetry, historical compensation benchmarks, and Day-1 shortlist patterns.
+                  </p>
+                </div>
+                <div className="mt-4 md:mt-0 shrink-0 flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-500 text-white font-mono-tech text-xs shadow-xs"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      localStorage.setItem("iitb_placement_verified", "true")
+                      if (isAdmin) {
+                        localStorage.setItem("iitb_placement_admin", "true")
+                      }
+                      router.push("/placement-analysis")
+                    }}
+                  >
+                    Enter Vault <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                  </Button>
+                </div>
+              </motion.div>
+            )}
             
             {/* Full Interview Simulator Card (Spans 2 cols) */}
             <motion.div 

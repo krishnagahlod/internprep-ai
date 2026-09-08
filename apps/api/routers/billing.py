@@ -71,6 +71,7 @@ async def get_user_entitlement(
         "is_iitb": user.is_iitb,
         "is_admin": user.is_admin,
         "current_session_id": user.session_id,
+        "has_placement_access": entitlement.get("has_placement_access", False),
         "entitlement": entitlement,
         "usage": usage_summary,
         "active_sessions_count": len(sessions)

@@ -194,37 +194,70 @@ export default function PlacementAnalysisPage() {
     saveCrmItems(updated);
   };
 
-  // Check IITB verification from user profile / localStorage
-  useEffect(() => {
-    const checkAuth = () => {
-      if (user?.email) {
-        const email = user.email.toLowerCase();
-        if (
-          email === "krishnagahlod@gmail.com" ||
-          email === "creator@internprep.ai" ||
-          email.includes("admin")
-        ) {
-          setIsIITBVerified(true);
-          setIsAdmin(true);
-          return;
-        }
-      }
+  // Check IITB verification from user profile / localStorage / server whitelist
+  const checkAuth = async () => {
+    if (user?.email) {
+      const email = user.email.toLowerCase();
+      const isSuperAdmin =
+        email === "krishnagahlod@gmail.com" ||
+        email === "creator@internprep.ai" ||
+        email.includes("admin");
 
-      const savedAdmin = localStorage.getItem("iitb_placement_admin");
-      const savedVerification = localStorage.getItem("iitb_placement_verified");
-      if (savedAdmin === "true") {
+      if (isSuperAdmin) {
         setIsIITBVerified(true);
         setIsAdmin(true);
-        return;
-      }
-      if (savedVerification === "true") {
-        setIsIITBVerified(true);
+        localStorage.setItem("iitb_placement_verified", "true");
+        localStorage.setItem("iitb_placement_admin", "true");
         return;
       }
 
-      setIsIITBVerified(false);
-    };
+      // Check server access status for this logged-in candidate
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(
+          `${API_URL}/placement-analysis/access-status?email=${encodeURIComponent(user.email)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.has_access) {
+            setIsIITBVerified(true);
+            localStorage.setItem("iitb_placement_verified", "true");
+            if (data.is_admin) {
+              setIsAdmin(true);
+              localStorage.setItem("iitb_placement_admin", "true");
+            }
+            return;
+          } else {
+            // Not whitelisted - clear any stale local state
+            localStorage.removeItem("iitb_placement_verified");
+            localStorage.removeItem("iitb_placement_admin");
+            setIsIITBVerified(false);
+            setIsAdmin(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to query placement clearance:", err);
+      }
+    }
 
+    // Fallback for offline or local preview
+    const savedAdmin = localStorage.getItem("iitb_placement_admin");
+    const savedVerification = localStorage.getItem("iitb_placement_verified");
+    if (savedAdmin === "true") {
+      setIsIITBVerified(true);
+      setIsAdmin(true);
+      return;
+    }
+    if (savedVerification === "true") {
+      setIsIITBVerified(true);
+      return;
+    }
+
+    setIsIITBVerified(false);
+  };
+
+  useEffect(() => {
     checkAuth();
   }, [user]);
 
@@ -877,6 +910,8 @@ export default function PlacementAnalysisPage() {
         verifying={verifying}
         verificationError={verificationError}
         onUnlock={handleRedeemInviteOrAdmin}
+        currentUserEmail={user?.email}
+        onCheckWhitelist={checkAuth}
       />
     );
   }

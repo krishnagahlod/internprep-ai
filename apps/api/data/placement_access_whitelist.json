@@ -16,11 +16,5 @@
   "invite_codes": [
     "IITB-CAMPUS-PASS",
     "IITB-VIP-2026"
-  ],
-  "verified_log": [
-    {
-      "email": "210050012@iitb.ac.in",
-      "verified_at": "2026-08-20T10:48:51.822088"
-    }
   ]
 }

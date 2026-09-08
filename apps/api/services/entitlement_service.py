@@ -152,6 +152,34 @@ def is_admin_email(email: Optional[str]) -> bool:
     # Strictly check exact configured admin email list (no wildcards or substrings)
     return email_clean == "krishnagahlod@gmail.com" or email_clean in admin_emails
 
+def check_placement_access(user_email: Optional[str], user_id: Optional[str] = None) -> bool:
+    """Resolves whether user is authorized for Placement Intelligence Studio."""
+    if not user_email and not user_id:
+        return False
+    if is_admin_email(user_email):
+        return True
+    if is_iitb_email(user_email):
+        return True
+    if user_email:
+        clean = user_email.strip().lower()
+        try:
+            from routers.placement_analysis import is_placement_whitelisted
+            if is_placement_whitelisted(clean):
+                return True
+        except Exception:
+            pass
+    if user_id:
+        supabase = get_supabase()
+        if supabase:
+            try:
+                res = supabase.table("entitlements").select("id").eq("user_id", user_id).eq("product", "placement_analysis").eq("status", "active").execute()
+                if res.data and len(res.data) > 0:
+                    return True
+            except Exception:
+                pass
+    return False
+
+
 class EntitlementService:
     @staticmethod
     def get_active_entitlement(user_id: str, user_email: Optional[str] = None) -> Dict[str, Any]:
@@ -161,6 +189,7 @@ class EntitlementService:
         """
         now = datetime.now(timezone.utc)
         supabase = get_supabase()
+        has_placement = check_placement_access(user_email=user_email, user_id=user_id)
 
         # 1. Admin Email Check
         if is_admin_email(user_email):
@@ -176,6 +205,7 @@ class EntitlementService:
                 "expires_at": None,
                 "is_iitb": is_iitb_email(user_email),
                 "is_admin": True,
+                "has_placement_access": True,
                 "limits": limits,
                 "feature_limits": limits
             }
@@ -189,6 +219,7 @@ class EntitlementService:
                 limits = DEFAULT_FEATURE_LIMITS.get(pk, DEFAULT_FEATURE_LIMITS["free"])
                 mem_ent["limits"] = limits
                 mem_ent["feature_limits"] = limits
+                mem_ent["has_placement_access"] = has_placement
                 return mem_ent
 
         # 3. Query Supabase entitlements table
@@ -234,6 +265,7 @@ class EntitlementService:
                             "external_reference": ent.get("external_reference"),
                             "is_iitb": is_iitb_email(user_email),
                             "is_admin": False,
+                            "has_placement_access": has_placement,
                             "limits": limits,
                             "feature_limits": limits
                         }
@@ -269,6 +301,7 @@ class EntitlementService:
                 "expires_at": None,
                 "is_iitb": True,
                 "is_admin": False,
+                "has_placement_access": True,
                 "limits": limits,
                 "feature_limits": limits
             }
@@ -286,6 +319,7 @@ class EntitlementService:
             "expires_at": None,
             "is_iitb": False,
             "is_admin": False,
+            "has_placement_access": has_placement,
             "limits": limits,
             "feature_limits": limits
         }
