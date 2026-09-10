@@ -15,7 +15,7 @@ interface PlacementTableViewProps {
   selectedSector: string;
   comparedSlugs: string[];
   crmItems: Array<{ slug: string }>;
-  onSelectCompany: (slug: string) => void;
+  onSelectCompany: (slug: string, tab?: "roles" | "keywords" | "resumematch" | "selection" | "roadmap" | "shortlists") => void;
   onToggleCRM: (company: Company) => void;
   onToggleCompare: (slug: string) => void;
   formatINRAmount: (amount: number) => string;

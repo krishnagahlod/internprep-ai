@@ -95,8 +95,16 @@ export default function PlacementAnalysisPage() {
   const [selectedCompanySlug, setSelectedCompanySlug] = useState<string | null>(null);
   const [companyDetails, setCompanyDetails] = useState<any | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "keywords" | "resumematch" | "selection" | "roadmap">("roles");
+  const [activeDossierTab, setActiveDossierTab] = useState<"roles" | "keywords" | "resumematch" | "selection" | "roadmap" | "shortlists">("roles");
   const [selectedRoleIndex, setSelectedRoleIndex] = useState(0);
+
+  const handleOpenCompanyDossier = (
+    slug: string,
+    tab: "roles" | "keywords" | "resumematch" | "selection" | "roadmap" | "shortlists" = "roles"
+  ) => {
+    setActiveDossierTab(tab);
+    setSelectedCompanySlug(slug);
+  };
 
   // Comparison State
   const [comparedSlugs, setComparedSlugs] = useState<string[]>([]);
@@ -1139,7 +1147,7 @@ export default function PlacementAnalysisPage() {
                     selectedSector={selectedSector}
                     isCompared={comparedSlugs.includes(comp.slug)}
                     isBookmarked={crmItems.some((x) => x.slug === comp.slug)}
-                    onSelectCompany={setSelectedCompanySlug}
+                    onSelectCompany={handleOpenCompanyDossier}
                     onToggleCRM={handleToggleCRM}
                     onToggleCompare={handleToggleCompare}
                     formatINRAmount={formatINRAmount}
@@ -1152,7 +1160,7 @@ export default function PlacementAnalysisPage() {
                 selectedSector={selectedSector}
                 comparedSlugs={comparedSlugs}
                 crmItems={crmItems}
-                onSelectCompany={setSelectedCompanySlug}
+                onSelectCompany={handleOpenCompanyDossier}
                 onToggleCRM={handleToggleCRM}
                 onToggleCompare={handleToggleCompare}
                 formatINRAmount={formatINRAmount}
@@ -1172,7 +1180,7 @@ export default function PlacementAnalysisPage() {
             setEditingNotesSlug={setEditingNotesSlug}
             tempNotes={tempNotes}
             setTempNotes={setTempNotes}
-            onSelectCompany={setSelectedCompanySlug}
+            onSelectCompany={handleOpenCompanyDossier}
             onUpdateMilestone={handleUpdateCRMMilestone}
             onSaveNotes={handleSaveCRMNotes}
             onDeleteCRMItem={handleDeleteCRMItem}
@@ -1186,7 +1194,7 @@ export default function PlacementAnalysisPage() {
           <PlacementAnalyticsView
             macroAnalytics={macroAnalytics}
             loadingMacro={loadingMacro}
-            onSelectCompany={setSelectedCompanySlug}
+            onSelectCompany={handleOpenCompanyDossier}
             formatINRAmount={formatINRAmount}
           />
         )}
@@ -1206,7 +1214,7 @@ export default function PlacementAnalysisPage() {
         onClose={() => setShowCompareModal(false)}
         loading={loadingComparison}
         comparisonData={comparisonData}
-        onSelectCompany={setSelectedCompanySlug}
+        onSelectCompany={handleOpenCompanyDossier}
         formatINRAmount={formatINRAmount}
       />
 

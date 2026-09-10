@@ -19,3 +19,6 @@ posthog
 json-repair
 PyJWT==2.8.0
 razorpay
+httpx
+numpy
+pypdf

@@ -14,12 +14,55 @@ router = APIRouter(prefix="/placement-analysis", tags=["Placement Analysis & Com
 # Load precomputed structured placement intelligence dataset
 DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_intelligence.json"))
 ACCESS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_access_whitelist.json"))
+SHORTLISTS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_interview_shortlists.json"))
 
 _DATASET_CACHE: Optional[Dict[str, Any]] = None
 _ACCESS_CACHE: Optional[Dict[str, Any]] = None
+_SHORTLISTS_CACHE: Optional[Dict[str, Any]] = None
 
 ADMIN_EMAILS = {"krishnagahlod@gmail.com", "creator@internprep.ai", "admin@internprep.ai", "admin@iitb.ac.in"}
 DEFAULT_MASTER_KEY = "IITB_ADMIN_2026"
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+
+
+def _calc_median(lst: List[float]) -> int:
+    """Calculates median with fallback to pure-Python interpolation if numpy is unavailable."""
+    if not lst:
+        return 0
+    if np is not None:
+        try:
+            return int(round(float(np.median(lst))))
+        except Exception:
+            pass
+    s = sorted(lst)
+    n = len(s)
+    mid = n // 2
+    if n % 2 == 1:
+        return int(round(s[mid]))
+    return int(round((s[mid - 1] + s[mid]) / 2.0))
+
+
+def _calc_percentile(lst: List[float], p: float) -> int:
+    """Calculates p-th percentile matching np.percentile linear interpolation."""
+    if not lst:
+        return 0
+    if np is not None:
+        try:
+            return int(round(float(np.percentile(lst, p))))
+        except Exception:
+            pass
+    s = sorted(lst)
+    k = (len(s) - 1) * (p / 100.0)
+    f = int(k)
+    c = f + 1
+    if c >= len(s):
+        return int(round(s[-1]))
+    d = k - f
+    return int(round(s[f] + d * (s[c] - s[f])))
 
 
 def get_dataset() -> Dict[str, Any]:
@@ -31,6 +74,20 @@ def get_dataset() -> Dict[str, Any]:
         else:
             _DATASET_CACHE = {"companies": [], "roles": [], "stats": {}}
     return _DATASET_CACHE
+
+
+def get_shortlists_dataset() -> Dict[str, Any]:
+    global _SHORTLISTS_CACHE
+    if _SHORTLISTS_CACHE is None:
+        if os.path.exists(SHORTLISTS_PATH):
+            try:
+                with open(SHORTLISTS_PATH, "r", encoding="utf-8") as f:
+                    _SHORTLISTS_CACHE = json.load(f)
+            except Exception:
+                _SHORTLISTS_CACHE = {}
+        else:
+            _SHORTLISTS_CACHE = {}
+    return _SHORTLISTS_CACHE
 
 
 WHITELIST_RECORD_ID = "00000000-0000-0000-0000-000000000001"
@@ -947,6 +1004,8 @@ async def get_company_details(request: Request, id_or_slug: str):
     if "locations" in company and isinstance(company["locations"], list):
         company["locations"] = list(dict.fromkeys(l.strip() for l in company["locations"] if l and l.strip()))
 
+    interview_shortlists = resolve_interview_shortlist(company, target_slug)
+
     return {
         "company": company,
         "roles_count": len(company_roles),
@@ -954,7 +1013,77 @@ async def get_company_details(request: Request, id_or_slug: str):
         "roles_by_session": roles_by_session,
         "unique_skills": all_skills[:15],
         "selection_blueprint": blueprint,
-        "hiring_funnel_intelligence": company.get("hiring_funnel_intelligence")
+        "hiring_funnel_intelligence": company.get("hiring_funnel_intelligence"),
+        "interview_shortlists": interview_shortlists
+    }
+
+
+def resolve_interview_shortlist(company: Optional[Dict[str, Any]], target_slug: str) -> Optional[Dict[str, Any]]:
+    """Robust lookup for authentic interview shortlists using slug, aliases, and clean names."""
+    if company and company.get("interview_shortlists"):
+        return company["interview_shortlists"]
+    shortlists_db = get_shortlists_dataset()
+    slug_to_lookup = company["slug"] if company else target_slug
+
+    from scripts.extract_interview_shortlists import RECRUITER_SLUG_OVERRIDES
+    if slug_to_lookup in shortlists_db:
+        return shortlists_db[slug_to_lookup]
+    if target_slug in shortlists_db:
+        return shortlists_db[target_slug]
+    for orig, ovr in RECRUITER_SLUG_OVERRIDES.items():
+        if (ovr == slug_to_lookup or ovr == target_slug) and orig in shortlists_db:
+            return shortlists_db[orig]
+        if (orig == slug_to_lookup or orig == target_slug) and ovr in shortlists_db:
+            return shortlists_db[ovr]
+    # Clean alphanumeric lookup
+    clean_target = re.sub(r'[^a-z0-9]', '', slug_to_lookup)
+    for k, v in shortlists_db.items():
+        clean_k = re.sub(r'[^a-z0-9]', '', k)
+        if clean_k == clean_target:
+            return v
+    if company and company.get("name"):
+        clean_name = re.sub(r'[^a-z0-9]', '', company["name"].lower())
+        if len(clean_name) > 3:
+            for k, v in shortlists_db.items():
+                clean_k = re.sub(r'[^a-z0-9]', '', k)
+                clean_vn = re.sub(r'[^a-z0-9]', '', v.get("company_name", "").lower())
+                if clean_name == clean_k or clean_name == clean_vn:
+                    return v
+    return None
+
+
+@router.get("/company/{id_or_slug}/interview-shortlists")
+@limiter.limit("60/minute")
+async def get_company_interview_shortlists(request: Request, id_or_slug: str):
+    """
+    Returns authentic branch-wise interview shortlist roster including student names,
+    roll numbers, branches, degrees, and specific interview roles.
+    Strictly filters for interview shortlists only.
+    """
+    data = get_dataset()
+    companies = data.get("companies", [])
+    target_slug = id_or_slug.lower().strip()
+    company = next((c for c in companies if c["slug"] == target_slug or c["id"] == id_or_slug or c["name"].lower() == target_slug), None)
+    
+    slug_to_lookup = company["slug"] if company else target_slug
+    shortlist_data = resolve_interview_shortlist(company, target_slug)
+    
+    if not shortlist_data:
+        return {
+            "status": "success",
+            "company_name": company["name"] if company else id_or_slug,
+            "slug": slug_to_lookup,
+            "total_shortlisted": 0,
+            "branches": [],
+            "degrees_breakdown": {},
+            "roles_breakdown": {},
+            "all_candidates": [],
+            "message": "No public interview shortlists published on the placement portal for this recruiter."
+        }
+        
+    return {
+        "status": "success",
+        **shortlist_data
     }
 
 
@@ -1255,6 +1384,29 @@ async def launch_tailored_mock_interview(request: Request, body: LaunchMockInter
     }
 
 
+def _calc_median(data: List[float]) -> int:
+    if not data:
+        return 0
+    s = sorted(data)
+    n = len(s)
+    mid = n // 2
+    return int(round(s[mid])) if n % 2 == 1 else int(round((s[mid - 1] + s[mid]) / 2.0))
+
+
+def _calc_percentile(data: List[float], p: float) -> int:
+    if not data:
+        return 0
+    s = sorted(data)
+    n = len(s)
+    if n == 1:
+        return int(round(s[0]))
+    idx = (n - 1) * (p / 100.0)
+    floor_idx = int(idx)
+    ceil_idx = min(floor_idx + 1, n - 1)
+    weight = idx - floor_idx
+    return int(round(s[floor_idx] * (1.0 - weight) + s[ceil_idx] * weight))
+
+
 @router.get("/analytics/macro-trends")
 @limiter.limit("60/minute")
 async def get_macro_placement_trends(request: Request):
@@ -1292,15 +1444,14 @@ async def get_macro_placement_trends(request: Request):
             sector_analytics[sec]["international_count"] += 1
 
     sector_benchmarks = []
-    import numpy as np
     for sec, d in sector_analytics.items():
         ctcs = d["ctc_list"]
         inhands = d["inhand_list"]
-        median_ctc = int(np.median(ctcs)) if ctcs else 0
-        p75_ctc = int(np.percentile(ctcs, 75)) if ctcs else 0
-        p90_ctc = int(np.percentile(ctcs, 90)) if ctcs else 0
+        median_ctc = _calc_median(ctcs)
+        p75_ctc = _calc_percentile(ctcs, 75)
+        p90_ctc = _calc_percentile(ctcs, 90)
         highest_ctc = int(max(ctcs)) if ctcs else 0
-        median_inhand = int(np.median(inhands)) if inhands else int(median_ctc * 0.70)
+        median_inhand = _calc_median(inhands) if inhands else int(median_ctc * 0.70)
         
         # Estimate Base vs Bonus vs ESOP split ratio
         base_pct = round((median_inhand / median_ctc * 100)) if median_ctc > 0 else 70
@@ -1400,12 +1551,15 @@ async def get_macro_placement_trends(request: Request):
         except Exception:
             pass
 
+    valid_ctcs = [c["median_ctc_inr"] for c in companies if c.get("median_ctc_inr", 0) > 0]
+    median_campus_ctc = _calc_median(valid_ctcs)
+
     return {
         "status": "success",
         "overview": {
             "total_companies": len(companies),
             "total_roles": len(roles),
-            "median_campus_ctc": int(np.median([c["median_ctc_inr"] for c in companies if c.get("median_ctc_inr", 0) > 0])),
+            "median_campus_ctc": median_campus_ctc,
             "highest_campus_ctc": max([c["highest_ctc_inr"] for c in companies]) if companies else 0,
             "total_international_roles": sum(c["count"] for c in country_distribution.values())
         },

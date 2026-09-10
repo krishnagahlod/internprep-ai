@@ -111,7 +111,13 @@ function InterviewEngine() {
         setIsTyping(true);
         try {
           const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-          const response = await fetch(`${API_URL}/interview/session/${sessionIdParam}`);
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          const headers: Record<string, string> = {};
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+          const response = await fetch(`${API_URL}/interview/session/${sessionIdParam}`, { headers });
 
           if (response.ok) {
             const data = await response.json();
@@ -501,9 +507,15 @@ function InterviewEngine() {
     setIsTyping(true);
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
       await fetch(`${API_URL}/interview/end_session`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ session_id: currentSessionId }),
       });
       router.push(`/feedback?session_id=${currentSessionId}`);

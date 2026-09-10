@@ -32,6 +32,9 @@ interface ATSIngestionFormProps {
   scanProgress: number;
   error: string | null;
   onRunATS: () => void;
+  userResumes?: any[];
+  selectedResumeId?: string;
+  onSelectResume?: (id: string) => void;
 }
 
 export function ATSIngestionForm({
@@ -51,6 +54,9 @@ export function ATSIngestionForm({
   scanProgress,
   error,
   onRunATS,
+  userResumes = [],
+  selectedResumeId = "",
+  onSelectResume,
 }: ATSIngestionFormProps) {
   return (
     <div className="rounded-3xl p-6 md:p-8 border border-border bg-card shadow-xs space-y-6">
@@ -181,11 +187,53 @@ export function ATSIngestionForm({
         )}
       </div>
 
+      {/* Optional Saved Resumes Selector for Authenticated Candidates */}
+      {userResumes && userResumes.length > 0 && (
+        <div className="pt-2 border-t border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono-tech">
+              Select From Your Saved Resumes
+            </span>
+            <span className="text-[11px] font-mono-tech text-emerald-600 dark:text-emerald-400">
+              {userResumes.length} saved in account
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {userResumes.map((res) => {
+              const isSelected = selectedResumeId === res.id && !file;
+              return (
+                <button
+                  key={res.id}
+                  type="button"
+                  onClick={() => onSelectResume?.(res.id)}
+                  disabled={isScanning}
+                  className={`p-3 rounded-xl border text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-primary/10 border-primary text-foreground ring-1 ring-primary/30 shadow-2xs"
+                      : "bg-muted/20 border-border text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate font-mono-tech text-foreground">
+                      {res.file_name || "Resume PDF"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Uploaded {new Date(res.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 100% PDF-First Resume Dropzone */}
       <div className="pt-2 border-t border-border space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono-tech">
-            Upload Resume PDF
+            {userResumes && userResumes.length > 0 ? "Or Upload a New Resume PDF" : "Upload Resume PDF"}
           </span>
           <span className="text-[11px] font-mono-tech text-primary flex items-center gap-1">
             <ShieldCheck className="h-3.5 w-3.5" /> PyMuPDF Geometry & Font Inspector
@@ -244,7 +292,7 @@ export function ATSIngestionForm({
       <Button
         className="w-full h-11 text-xs font-bold font-mono-tech bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs transition-all rounded-xl cursor-pointer"
         onClick={onRunATS}
-        disabled={!file || isScanning}
+        disabled={(!file && !selectedResumeId) || isScanning}
       >
         {isScanning
           ? "Running Neural Parser & Placement Auditor..."

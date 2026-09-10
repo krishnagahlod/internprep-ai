@@ -11,10 +11,14 @@
       "role": "admin",
       "granted_at": "2026-08-20",
       "notes": "System Administrator"
+    },
+    {
+      "email": "dhruvam.vaghasiya.techfest@gmail.com",
+      "role": "authorized_user",
+      "notes": "Granted by Admin for Dhruvam Vaghasiya",
+      "granted_at": "2026-09-08T11:30:54.581254+00:00",
+      "granted_by": "krishnagahlod@gmail.com"
     }
   ],
-  "invite_codes": [
-    "IITB-CAMPUS-PASS",
-    "IITB-VIP-2026"
-  ]
+  "invite_codes": []
 }

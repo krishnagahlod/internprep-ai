@@ -25,7 +25,7 @@ interface PlacementCompanyCardProps {
   selectedSector: string;
   isCompared: boolean;
   isBookmarked: boolean;
-  onSelectCompany: (slug: string) => void;
+  onSelectCompany: (slug: string, tab?: "roles" | "keywords" | "resumematch" | "selection" | "roadmap" | "shortlists") => void;
   onToggleCRM: (company: Company) => void;
   onToggleCompare: (slug: string) => void;
   formatINRAmount: (amount: number) => string;
@@ -188,12 +188,20 @@ export function PlacementCompanyCard({
 
           {comp.hiring_funnel_intelligence && (
             <div className="pt-1.5 border-t border-border/40 flex items-center justify-between text-[10px]">
-              <span className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
-                <Users className="h-3 w-3" />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectCompany(comp.slug, "shortlists");
+                }}
+                className="text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 hover:underline cursor-pointer group/sl"
+                title="Click to view shortlisted student names and roll numbers"
+              >
+                <Users className="h-3 w-3 group-hover/sl:scale-110 transition-transform" />
                 {comp.hiring_funnel_intelligence.conversion_funnel?.interview_shortlisted_count > 0
                   ? `${comp.hiring_funnel_intelligence.conversion_funnel.interview_shortlisted_count} Shortlisted for Interviews`
                   : `${comp.hiring_funnel_intelligence.conversion_funnel?.oa_shortlisted_count || 0} Test Shortlists`}
-              </span>
+              </button>
               {comp.hiring_funnel_intelligence.has_walkins && (
                 <span className="text-amber-600 dark:text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded text-[9px] font-mono-tech">
                   Day Walk-ins

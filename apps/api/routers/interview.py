@@ -84,7 +84,7 @@ async def start_case_endpoint(
     body: StartCaseRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else None
+    effective_user_id = (auth_user.id if auth_user else None) or (body.user_id if body.user_id and body.user_id != "guest" else None)
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -194,7 +194,7 @@ async def start_domain_endpoint(
     body: StartDomainRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else None
+    effective_user_id = (auth_user.id if auth_user else None) or (body.user_id if body.user_id and body.user_id != "guest" else None)
     if effective_user_id:
         try:
             entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
@@ -624,7 +624,7 @@ async def end_session_endpoint(
             sess_res = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
             if sess_res.data and sess_res.data[0].get("user_id"):
                 owner_id = sess_res.data[0].get("user_id")
-                if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                if owner_id and owner_id != "guest" and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
                     raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to close this session.")
 
             import datetime

@@ -1,22 +1,24 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { useAuthStore } from "@/stores/auth-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Terminal, ArrowLeft, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react"
+import { Terminal, ArrowLeft, CheckCircle2 } from "lucide-react"
 
-export default function LoginPage() {
+function LoginContent() {
   const [isLoginView, setIsLoginView] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectUrl = searchParams.get("redirect") || "/dashboard"
   const supabase = createClient()
   const { setUser } = useAuthStore()
 
@@ -32,7 +34,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${location.origin}/auth/callback`,
+            emailRedirectTo: `${location.origin}/auth/callback?redirect=${encodeURIComponent(redirectUrl)}`,
           },
         })
         data = res.data
@@ -51,13 +53,13 @@ export default function LoginPage() {
       if (action === "signup") {
         if (data.session) {
           setUser(data.user)
-          router.push("/dashboard")
+          router.push(redirectUrl)
         } else {
           alert("Check your email for the confirmation link! (Please check spam folder)")
         }
       } else {
         setUser(data.user)
-        router.push("/dashboard")
+        router.push(redirectUrl)
       }
     } catch (err: any) {
       setError(err.message || "An error occurred during authentication")
@@ -73,7 +75,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${location.origin}/auth/callback`,
+          redirectTo: `${location.origin}/auth/callback?redirect=${encodeURIComponent(redirectUrl)}`,
         },
       })
       if (error) throw error
@@ -99,110 +101,109 @@ export default function LoginPage() {
         <ArrowLeft className="w-3.5 h-3.5 mr-1.5" /> Home
       </Button>
 
-      <div className="w-full max-w-4xl grid md:grid-cols-2 bg-card border border-border shadow-xl rounded-xl overflow-hidden relative z-10 my-8">
-        
-        {/* Left Side: Branding */}
-        <div className="hidden md:flex flex-col justify-between p-8 lg:p-10 bg-muted/40 border-r border-border">
-          <div className="space-y-6">
+      {/* Grid Pattern Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-40 pointer-events-none" />
+
+      {/* Radial Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
+        <div className="border border-border bg-card rounded-xl shadow-lg overflow-hidden backdrop-blur-sm">
+          
+          {/* Header Bar */}
+          <div className="bg-muted px-4 py-3 border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <Terminal className="h-4 w-4" />
-              </div>
-              <span className="text-sm font-bold font-mono-tech text-foreground">InternPrep.ai</span>
+              <Terminal className="h-4 w-4 text-primary" />
+              <span className="text-xs font-mono-tech font-bold tracking-wider text-foreground">
+                AUTH_GATEWAY // IITB
+              </span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 animate-pulse" />
+              <span className="text-[10px] font-mono-tech text-muted-foreground">ONLINE</span>
+            </div>
+          </div>
 
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground leading-snug">
-                The Interview Intelligence Engine for Day 1 Rounds.
+          <div className="p-6">
+            <div className="text-center mb-6">
+              <h1 className="text-xl font-bold tracking-tight text-foreground font-display">
+                {isLoginView ? "Sign In to CaseForge" : "Create Account"}
               </h1>
-              <p className="text-xs text-muted-foreground mt-2 leading-relaxed font-sans">
-                Calibrated to McKinsey, BCG, and FAANG partner rubrics. Practice case interviews, ATS scans, and Google XYZ bullet rewrites.
-              </p>
-            </div>
-
-            <div className="space-y-2 text-xs font-mono-tech text-muted-foreground pt-4 border-t border-border">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Instant IIT Bombay @iitb.ac.in partner verification</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Cerebras Llama-3.3 70B &lt; 150ms latency engine</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Permanent non-expiring credit balance</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-[11px] font-mono-tech text-muted-foreground">
-            SECURE ENCRYPTED TLS 256-BIT AUTH
-          </div>
-        </div>
-
-        {/* Right Side: Auth Form */}
-        <div className="p-6 sm:p-8 flex flex-col justify-center">
-          <div className="max-w-sm w-full mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-foreground">
-                {isLoginView ? 'Sign in to your account' : 'Create an account'}
-              </h2>
               <p className="text-xs text-muted-foreground mt-1 font-sans">
-                {isLoginView ? 'Enter your credentials to access your candidate workspace.' : 'Sign up to begin your placement calibration.'}
+                {isLoginView 
+                  ? "Access your saved interview sessions, rubrics & resume audits" 
+                  : "Start preparing with AI placement-calibrated interview simulations"}
               </p>
             </div>
 
-            {/* Toggle Switch */}
-            <div className="flex p-1 bg-muted rounded-lg border border-border font-mono-tech text-xs min-h-[40px] sm:min-h-0">
+            {/* Segmented Switcher */}
+            <div className="grid grid-cols-2 p-1 bg-muted rounded-lg border border-border mb-5 font-mono-tech text-xs">
               <button
-                className={`flex-1 py-1.5 rounded-md transition-all ${isLoginView ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setIsLoginView(true)}
+                type="button"
+                className={`py-1.5 rounded-md font-medium transition-all ${
+                  isLoginView 
+                    ? "bg-card text-foreground shadow-xs font-bold" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => { setIsLoginView(true); setError(null); }}
               >
                 Sign In
               </button>
               <button
-                className={`flex-1 py-1.5 rounded-md transition-all ${!isLoginView ? 'bg-card text-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setIsLoginView(false)}
+                type="button"
+                className={`py-1.5 rounded-md font-medium transition-all ${
+                  !isLoginView 
+                    ? "bg-card text-foreground shadow-xs font-bold" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => { setIsLoginView(false); setError(null); }}
               >
                 Register
               </button>
             </div>
 
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono-tech">
+                {error}
+              </div>
+            )}
+
             <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label htmlFor="email" className="text-[11px] font-mono-tech uppercase text-muted-foreground">Email address</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="student@iitb.ac.in" 
-                    className="h-10 sm:h-9 rounded-md text-base sm:text-xs bg-background border-border"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="password" className="text-[11px] font-mono-tech uppercase text-muted-foreground">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    placeholder="••••••••"
-                    className="h-10 sm:h-9 rounded-md text-base sm:text-xs bg-background border-border"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                {error && (
-                  <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs font-mono-tech text-center">
-                    {error}
-                  </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-mono-tech text-foreground">Email</Label>
+                <Input 
+                  type="email" 
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-md border-border bg-background text-xs h-9 text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-mono-tech text-foreground">Password</Label>
+                <Input 
+                  type="password" 
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && email && password && !isLoading) {
+                      handleAuth(isLoginView ? "login" : "signup");
+                    }
+                  }}
+                  className="rounded-md border-border bg-background text-xs h-9 text-foreground placeholder:text-muted-foreground"
+                />
+                {!isLoginView && (
+                  <p className="text-[10px] text-muted-foreground font-mono-tech">
+                    Minimum 6 characters.
+                  </p>
                 )}
               </div>
               
               <div className="space-y-2 pt-1">
                 <Button 
-                  className="w-full h-10 sm:h-9 rounded-md text-xs font-semibold font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-xs" 
+                  className="w-full h-9 rounded-md text-xs font-semibold font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-xs" 
                   onClick={() => handleAuth(isLoginView ? "login" : "signup")}
                   disabled={isLoading || !email || !password}
                 >
@@ -220,7 +221,7 @@ export default function LoginPage() {
                 
                 <Button 
                   variant="outline" 
-                  className="w-full h-10 sm:h-9 rounded-md text-xs font-mono-tech border-border bg-background hover:bg-muted" 
+                  className="w-full h-9 rounded-md text-xs font-mono-tech border-border bg-background hover:bg-muted" 
                   onClick={handleGoogleLogin}
                   disabled={isLoading}
                 >
@@ -239,7 +240,7 @@ export default function LoginPage() {
                     onClick={() => {
                       const { setGuestMode } = useAuthStore.getState()
                       setGuestMode()
-                      router.push("/dashboard")
+                      router.push(redirectUrl)
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground font-mono-tech underline underline-offset-4 transition-colors py-1.5 px-2"
                   >
@@ -252,5 +253,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center font-mono-tech text-xs text-muted-foreground">
+        INITIALIZING AUTH GATEWAY...
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }

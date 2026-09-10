@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   CheckCircle2,
@@ -44,14 +45,22 @@ function FeedbackContent() {
 
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const response = await fetch(`${API_URL}/feedback/${sessionId}`);
+        const supabase = createClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_URL}/feedback/${sessionId}`, { headers });
         if (response.ok) {
           const data = await response.json();
           setFeedback(data.feedback);
         } else {
           setError("Evaluating interview... Compiling Recruiter Rubric.");
           setTimeout(async () => {
-            const retryResp = await fetch(`${API_URL}/feedback/${sessionId}`);
+            const retryResp = await fetch(`${API_URL}/feedback/${sessionId}`, { headers });
             if (retryResp.ok) {
               const data = await retryResp.json();
               setFeedback(data.feedback);

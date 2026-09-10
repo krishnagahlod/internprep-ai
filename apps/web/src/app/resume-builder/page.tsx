@@ -189,7 +189,7 @@ function ResumeBuilderPageContent() {
 
   useEffect(() => {
     if (mounted && !user) {
-      router.push("/login");
+      router.push("/login?redirect=/resume-builder");
     }
   }, [mounted, user, router]);
 

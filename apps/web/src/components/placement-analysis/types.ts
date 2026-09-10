@@ -126,6 +126,37 @@ export interface Company {
   ai_overview: string;
   difficulty_score?: number;
   difficulty_tier?: string;
+  interview_shortlists?: CompanyInterviewShortlist | null;
+}
+
+export interface ShortlistedCandidate {
+  name: string;
+  roll_number: string;
+  branch: string;
+  degree: string;
+  cluster: string;
+  role: string;
+  round?: string;
+  date: string;
+}
+
+export interface BranchShortlistGroup {
+  branch: string;
+  count: number;
+  candidates: ShortlistedCandidate[];
+}
+
+export interface CompanyInterviewShortlist {
+  company_name: string;
+  slug: string;
+  total_shortlisted: number;
+  total_candidates?: number;
+  branches_count?: number;
+  branches: BranchShortlistGroup[];
+  degrees_breakdown?: Record<string, number>;
+  roles_breakdown?: Record<string, number>;
+  all_candidates: ShortlistedCandidate[];
+  message?: string;
 }
 
 export interface HiringFunnelIntelligence {

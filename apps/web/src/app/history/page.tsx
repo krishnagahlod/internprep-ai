@@ -22,104 +22,6 @@ const DOMAINS = [
   { id: "product", label: "Product" },
 ];
 
-const DEMO_RESUME_HISTORY = [
-  {
-    id: "res-demo-1",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-    target_role: "Management Consulting",
-    domain: "consulting",
-    score: 92,
-    feedback: "Exceptional quantification across projects. 2 passive action verbs flagged in Leadership section.",
-    starCompliance: 96,
-    actionVerbs: 88,
-    atsStatus: "100% Parser Compliant"
-  },
-  {
-    id: "res-demo-2",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    target_role: "Software & Systems SWE",
-    domain: "tech",
-    score: 89,
-    feedback: "High technical scope. Slashing latency from 840ms to 92ms provides strong engineering evidence.",
-    starCompliance: 90,
-    actionVerbs: 94,
-    atsStatus: "100% Parser Compliant"
-  },
-  {
-    id: "res-demo-3",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
-    target_role: "Quantitative Finance",
-    domain: "finance",
-    score: 95,
-    feedback: "Sharpe ratio and max drawdown metrics backtested rigorously. Strong Day 1 candidate profile.",
-    starCompliance: 98,
-    actionVerbs: 92,
-    atsStatus: "100% Parser Compliant"
-  },
-  {
-    id: "res-demo-4",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
-    target_role: "Data Science & Analytics",
-    domain: "analytics",
-    score: 86,
-    feedback: "Good pipeline volume metrics. Causal difference-in-differences bullet needs sample size clarification.",
-    starCompliance: 88,
-    actionVerbs: 86,
-    atsStatus: "100% Parser Compliant"
-  }
-];
-
-const DEMO_INTERVIEW_HISTORY = [
-  {
-    id: "int-demo-1",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-    topic: "FMCG Margin Turnaround & Reverse Logistics",
-    domain: "consulting",
-    interview_type: "case",
-    score: "9.6 / 10",
-    verdict: "Strong Hire (Top 1%)",
-    turns: 6,
-    duration: "18 mins",
-    keyHighlight: "MECE structuring was exhaustive. Successfully defended contribution margin against logistics probing."
-  },
-  {
-    id: "int-demo-2",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
-    topic: "Flash Sale Distributed Cache Stampede",
-    domain: "tech",
-    interview_type: "technical",
-    score: "9.8 / 10",
-    verdict: "Senior Level Verified",
-    turns: 8,
-    duration: "24 mins",
-    keyHighlight: "Mutex locks with jittered TTL strategy defended cleanly under 50,000 QPS thread starvation probe."
-  },
-  {
-    id: "int-demo-3",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    topic: "Customer LTV Attribution & CAC Uplift",
-    domain: "analytics",
-    interview_type: "case",
-    score: "9.4 / 10",
-    verdict: "Strong Hire",
-    turns: 5,
-    duration: "16 mins",
-    keyHighlight: "Demonstrated strong difference-in-differences quasi-experimental rigor for cohort segmentation."
-  },
-  {
-    id: "int-demo-4",
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 11).toISOString(),
-    topic: "LBO 3-Statement Free Cash Flow Mechanics",
-    domain: "finance",
-    interview_type: "technical",
-    score: "9.9 / 10",
-    verdict: "Top Quartile Analyst",
-    turns: 7,
-    duration: "21 mins",
-    keyHighlight: "Flawless walkthrough of CapEx vs Depreciation flow-through and debt amortization schedule."
-  }
-];
-
 export default function HistoryPage() {
   const { user, isGuest } = useAuthStore();
   const router = useRouter();
@@ -136,46 +38,59 @@ export default function HistoryPage() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "highest">("newest");
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchHistory = async () => {
       try {
-        if (!user && !isGuest) {
-          setIsLoading(false);
+        setIsLoading(true);
+        // Authoritative active user session from Supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeUser = session?.user || user;
+
+        if (!activeUser) {
+          if (isMounted) {
+            setResumeHistory([]);
+            setInterviewHistory([]);
+          }
           return;
         }
 
-        let fetchedResumes: any[] = [];
-        let fetchedInterviews: any[] = [];
-
-        if (user) {
-          const { data: resumes } = await supabase
+        const [resumesRes, interviewsRes] = await Promise.all([
+          supabase
             .from("resume_analyses")
             .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
-
-          if (resumes && resumes.length > 0) fetchedResumes = resumes;
-
-          const { data: interviews } = await supabase
+            .eq("user_id", activeUser.id)
+            .order("created_at", { ascending: false }),
+          supabase
             .from("interview_sessions")
             .select("*, session_feedback(*)")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
+            .eq("user_id", activeUser.id)
+            .order("created_at", { ascending: false }),
+        ]);
 
-          if (interviews && interviews.length > 0) fetchedInterviews = interviews;
+        if (isMounted) {
+          setResumeHistory(resumesRes.data || []);
+          setInterviewHistory(interviewsRes.data || []);
         }
-
-        // Use real if available, else combine with calibrated demo data so candidate can see structure
-        setResumeHistory(fetchedResumes.length > 0 ? fetchedResumes : DEMO_RESUME_HISTORY);
-        setInterviewHistory(fetchedInterviews.length > 0 ? fetchedInterviews : DEMO_INTERVIEW_HISTORY);
       } catch (err) {
         console.error("Failed to fetch history:", err);
+        if (isMounted) {
+          setResumeHistory([]);
+          setInterviewHistory([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchHistory();
-  }, [user, isGuest]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, supabase]);
 
   // Filtered Lists
   const filteredResumes = useMemo(() => {
@@ -254,7 +169,7 @@ export default function HistoryPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative z-10 space-y-6">
         
-        {/* Guest Mode Demo Notice Banner */}
+        {/* Unauthenticated / Guest Prompt Banner */}
         {(!user || isGuest) && (
           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-card to-blue-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
             <div className="flex items-start gap-3">
@@ -263,17 +178,17 @@ export default function HistoryPage() {
               </div>
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-foreground font-mono-tech block">
-                  DEMO HISTORY ARCHIVE
+                  TRACK YOUR PROGRESS
                 </span>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  You are viewing sample interview transcripts and audit diffs. Sign in with your candidate account to automatically archive and sync your personal prep history.
+                  Sign in to your candidate account to securely save and review all your mock interview sessions and resume scorecards.
                 </p>
               </div>
             </div>
             <Link href="/login" className="w-full sm:w-auto shrink-0">
               <Button size="sm" className="w-full sm:w-auto h-8 px-3.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-mono-tech shadow-xs flex items-center justify-center gap-1.5">
                 <LogIn className="h-3.5 w-3.5" />
-                Sign In to Save
+                Sign In
               </Button>
             </Link>
           </div>
@@ -382,7 +297,7 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        {/* Unified Responsive Grid (No Broken Left Column!) */}
+        {/* Unified Responsive Grid */}
         <div className="space-y-8">
           
           {/* Section: Mock Interview Sessions */}
@@ -399,9 +314,30 @@ export default function HistoryPage() {
               </div>
 
               {filteredInterviews.length === 0 ? (
-                <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40 text-xs font-mono-tech text-muted-foreground">
-                  No mock interview sessions match your current filter.
-                </div>
+                interviewHistory.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card/40 space-y-3">
+                    <div className="h-10 w-10 mx-auto rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                      <Bot className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold font-mono-tech text-foreground">
+                        No Mock Interviews Yet
+                      </h4>
+                      <p className="text-xs text-muted-foreground font-sans max-w-md mx-auto">
+                        Practice case studies and technical problem-solving with our AI interviewer to get live probing and placement scorecards.
+                      </p>
+                    </div>
+                    <Link href="/interview" className="inline-block pt-1">
+                      <Button size="sm" className="h-8 px-3.5 text-xs font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 font-semibold rounded-lg shadow-xs">
+                        + Launch Your First Mock Interview
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40 text-xs font-mono-tech text-muted-foreground">
+                    No mock interview sessions match your current filter.
+                  </div>
+                )
               ) : (
                 <div className="grid md:grid-cols-2 gap-4">
                   {filteredInterviews.map((item) => (
@@ -441,7 +377,7 @@ export default function HistoryPage() {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={() => router.push(item.id.startsWith("int-demo") ? "/interview" : `/interview?id=${item.id}`)}
+                          onClick={() => router.push(`/interview?id=${item.id}`)}
                           className="h-8 text-xs font-mono-tech border-border group-hover:border-emerald-500/40"
                         >
                           View Transcript <ArrowRight className="h-3 w-3 ml-1.5 group-hover:translate-x-0.5 transition-transform" />
@@ -468,9 +404,37 @@ export default function HistoryPage() {
               </div>
 
               {filteredResumes.length === 0 ? (
-                <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40 text-xs font-mono-tech text-muted-foreground">
-                  No resume audits match your current filter.
-                </div>
+                resumeHistory.length === 0 ? (
+                  <div className="p-8 text-center rounded-2xl border border-dashed border-border bg-card/40 space-y-3">
+                    <div className="h-10 w-10 mx-auto rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold font-mono-tech text-foreground">
+                        No Resume Audits Yet
+                      </h4>
+                      <p className="text-xs text-muted-foreground font-sans max-w-md mx-auto">
+                        Upload your master resume PDF to run an audit across line budgets, weak action verbs, quantification metrics, and placement ATS rubrics.
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      <Link href="/resume">
+                        <Button size="sm" className="h-8 px-3.5 text-xs font-mono-tech bg-blue-600 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-400 text-white dark:text-zinc-950 font-semibold rounded-lg shadow-xs">
+                          + Run Resume Intelligence
+                        </Button>
+                      </Link>
+                      <Link href="/ats-checker">
+                        <Button variant="outline" size="sm" className="h-8 px-3.5 text-xs font-mono-tech border-border hover:bg-muted rounded-lg">
+                          ATS Score Studio
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center rounded-xl border border-dashed border-border bg-card/40 text-xs font-mono-tech text-muted-foreground">
+                    No resume audits match your current filter.
+                  </div>
+                )
               ) : (
                 <div className="grid md:grid-cols-2 gap-4">
                   {filteredResumes.map((scan) => {
@@ -521,7 +485,7 @@ export default function HistoryPage() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => router.push(scan.id.startsWith("res-demo") ? "/resume" : `/history/resume/${scan.id}`)}
+                            onClick={() => router.push(`/history/resume/${scan.id}`)}
                             className="h-8 text-xs font-mono-tech border-border group-hover:border-blue-500/40"
                           >
                             View Scorecard <ArrowRight className="h-3 w-3 ml-1.5 group-hover:translate-x-0.5 transition-transform" />

@@ -43,7 +43,7 @@ async def generate_feedback(
             sess_res = supabase.table("interview_sessions").select("user_id, scratchpad_content, interview_type").eq("id", body.session_id).execute()
             if sess_res.data:
                 owner_id = sess_res.data[0].get("user_id")
-                if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                if owner_id and owner_id != "guest" and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
                     raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access feedback for this session.")
                 scratchpad = sess_res.data[0].get("scratchpad_content", "") or scratchpad
                 body.interview_type = sess_res.data[0].get("interview_type", "case")
@@ -103,7 +103,7 @@ async def get_feedback(
             raise HTTPException(status_code=404, detail="Interview session not found.")
             
         owner_id = sess_res.data[0].get("user_id")
-        if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+        if owner_id and owner_id != "guest" and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
             raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to view feedback for this session.")
 
         res = supabase.table("session_feedback").select("*").eq("session_id", session_id).execute()

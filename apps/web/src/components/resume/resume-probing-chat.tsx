@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { MessageSquare, Send, Bot, User, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 interface ResumeProbingChatProps {
   resumeId?: string;
@@ -18,6 +19,7 @@ export function ResumeProbingChat({
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const supabase = createClient();
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isTyping) return;
@@ -29,10 +31,17 @@ export function ResumeProbingChat({
     setIsTyping(true);
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${API_URL}/resume/probe`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           resume_id: resumeId,
           messages: newMessages,

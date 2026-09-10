@@ -65,6 +65,8 @@ export async function fetchEventSourceStream(
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
 
+    let hasDeliveredResult = false;
+
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -87,7 +89,9 @@ export async function fetchEventSourceStream(
         if (trimmed.startsWith("data:")) {
           const dataStr = trimmed.slice(5).trim();
           if (dataStr === "[DONE]") {
-            onDone?.({});
+            if (!hasDeliveredResult) {
+              onDone?.({});
+            }
             return;
           }
 
@@ -117,6 +121,7 @@ export async function fetchEventSourceStream(
                 break;
               case "result":
               case "done":
+                hasDeliveredResult = true;
                 onDone?.(parsed);
                 break;
               case "error":
@@ -134,7 +139,9 @@ export async function fetchEventSourceStream(
         }
       }
     }
-    onDone?.({ isCompleted: true });
+    if (!hasDeliveredResult) {
+      onDone?.({ isCompleted: true });
+    }
   } catch (err: any) {
     if (err.name !== "AbortError") {
       onError?.(err);

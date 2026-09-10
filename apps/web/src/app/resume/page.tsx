@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,6 +45,7 @@ const TARGET_ROLE_OPTIONS = [
 export default function ResumePage() {
   const router = useRouter();
   const { setResumeText, user, isGuest, guestResumeCount, incrementGuestResume } = useAuthStore();
+  const supabase = createClient();
 
   const [file, setFile] = useState<File | null>(null);
   const [resumePhase, setResumePhase] = useState<"internship" | "placement">("internship");
@@ -96,9 +98,17 @@ export default function ResumePage() {
     }
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(`${API_URL}/resume/analyze`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
@@ -148,9 +158,36 @@ export default function ResumePage() {
   const currentRoleLabel =
     TARGET_ROLE_OPTIONS.find((r) => r.value === targetRole)?.label || targetRole;
 
-  const radarScores = analysisResult?.scores || analysisResult?.radar_scores || null;
-  const bulletAnalyses: BulletAnalysis[] =
-    analysisResult?.bullet_analyses || analysisResult?.flagged_bullets || [];
+  const analysisData = analysisResult?.analysis || analysisResult;
+  const radarScores =
+    analysisData?.radar_scores ||
+    analysisData?.scores ||
+    analysisResult?.radar_scores ||
+    analysisResult?.scores ||
+    null;
+
+  const rawBullets: any[] =
+    analysisData?.bullets ||
+    analysisData?.bullet_analyses ||
+    analysisResult?.bullets ||
+    analysisResult?.bullet_analyses ||
+    analysisResult?.flagged_bullets ||
+    [];
+
+  const bulletAnalyses: BulletAnalysis[] = rawBullets.map((b: any) => ({
+    bullet: b.bullet || b.original_bullet || "",
+    section: b.section || b.section_type || "",
+    risk_level:
+      b.risk_level ||
+      (b.severity === "critical"
+        ? "high"
+        : b.severity === "major" || b.severity === "minor"
+        ? "medium"
+        : "low"),
+    likely_questions: b.likely_questions || b.predicted_questions || [],
+    improved_version: b.improved_version || b.suggested_rewrite || "",
+    flagged_claims: b.flagged_claims || b.structural_issues || [],
+  }));
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-24 selection:bg-primary/20">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -41,6 +42,8 @@ import { fetchEventSourceStream } from "@/lib/sse-client";
 export default function ATSCheckerPage() {
   const [file, setFile] = useState<File | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [userResumes, setUserResumes] = useState<any[]>([]);
+  const [selectedResumeId, setSelectedResumeId] = useState<string>("");
 
   // ATS Config
   const [targetRole, setTargetRole] = useState("software");
@@ -67,8 +70,23 @@ export default function ATSCheckerPage() {
   const [fixedBulletResult, setFixedBulletResult] = useState<any | null>(null);
   const [copiedBullet, setCopiedBullet] = useState<string | null>(null);
 
-  const { isGuest, incrementGuestResume } = useAuthStore();
+  const { user, isGuest, incrementGuestResume } = useAuthStore();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    supabase
+      .from("resumes")
+      .select("id, file_name, file_url, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setUserResumes(data);
+        }
+      });
+  }, [user]);
 
   const handleRoleChange = (newRole: string) => {
     setTargetRole(newRole);
@@ -87,6 +105,7 @@ export default function ATSCheckerPage() {
         setPdfUrl(null);
       } else {
         setFile(selectedFile);
+        setSelectedResumeId("");
         setPdfUrl(URL.createObjectURL(selectedFile));
         setError(null);
       }
@@ -99,7 +118,7 @@ export default function ATSCheckerPage() {
     overrideMode?: "iitb_placement" | "global_ats",
     overrideJD?: string
   ) => {
-    if (!file && !atsReport) return;
+    if (!file && !selectedResumeId && !atsReport) return;
 
     setIsScanning(true);
     setError(null);
@@ -109,6 +128,12 @@ export default function ATSCheckerPage() {
       const formData = new FormData();
       if (file) {
         formData.append("file", file);
+      } else if (selectedResumeId) {
+        formData.append("resume_id", selectedResumeId);
+      }
+
+      if (user?.id) {
+        formData.append("user_id", user.id);
       }
 
       formData.append("target_role", overrideRole || targetRole);
@@ -122,8 +147,17 @@ export default function ATSCheckerPage() {
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       await fetchEventSourceStream(`${API_URL}/resume/ats-check/stream`, {
         method: "POST",
+        headers,
         body: formData,
         onProgress: (prog) => {
           if (prog?.percent) {
@@ -131,6 +165,9 @@ export default function ATSCheckerPage() {
           }
         },
         onDone: (data) => {
+          if (!data || data.isCompleted || (data.overall_score === undefined && data.pillars === undefined)) {
+            return;
+          }
           setAtsReport(data);
           setScanProgress(100);
           if (isGuest && !atsReport) {
@@ -271,6 +308,7 @@ export default function ATSCheckerPage() {
                 onClick={() => {
                   setAtsReport(null);
                   setFile(null);
+                  setSelectedResumeId("");
                   setPdfUrl(null);
                 }}
                 className="text-xs border-border hover:bg-muted h-8 rounded-xl cursor-pointer"
@@ -341,6 +379,16 @@ export default function ATSCheckerPage() {
             scanProgress={scanProgress}
             error={error}
             onRunATS={() => handleRunATS()}
+            userResumes={userResumes}
+            selectedResumeId={selectedResumeId}
+            onSelectResume={(id) => {
+              setSelectedResumeId(id);
+              setFile(null);
+              const matched = userResumes.find((r) => r.id === id);
+              if (matched?.file_url) {
+                setPdfUrl(matched.file_url);
+              }
+            }}
           />
         ) : (
           /* SCORECARD RESULTS VIEW */

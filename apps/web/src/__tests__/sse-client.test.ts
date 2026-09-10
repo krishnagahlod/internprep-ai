@@ -110,5 +110,6 @@ describe("Client-Side SSE Stream Consumer", () => {
       overall_score: 88,
       verdict: "STRONG",
     });
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 });

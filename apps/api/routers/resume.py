@@ -1,6 +1,7 @@
 import io
 import os
 import json
+import uuid
 import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Request, Depends
 from fastapi.responses import StreamingResponse
@@ -37,8 +38,22 @@ def extract_pdf_raw_text(pdf_bytes: bytes) -> str:
 router = APIRouter(prefix="/resume", tags=["resume"])
 
 class AnalysisResponse(BaseModel):
+    id: Optional[str] = None
     raw_text: str
     analysis: Dict[str, Any]
+    scores: Optional[Dict[str, Any]] = None
+    radar_scores: Optional[Dict[str, Any]] = None
+    bullets: Optional[List[Dict[str, Any]]] = None
+    bullet_analyses: Optional[List[Dict[str, Any]]] = None
+
+class ProbeRequest(BaseModel):
+    resume_id: Optional[str] = None
+    resume_text: Optional[str] = None
+    messages: List[Dict[str, str]]
+    target_role: Optional[str] = "consulting"
+
+class ProbeResponse(BaseModel):
+    reply: str
 
 class WorkshopMessage(BaseModel):
     role: str
@@ -180,8 +195,8 @@ async def analyze_resume(
     user_id: Optional[str] = Form(None),
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    # Resolve user identity strictly from authenticated token
-    effective_user_id = auth_user.id if auth_user else None
+    # Resolve user identity from authenticated token or form parameter
+    effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
     user_email = auth_user.email if auth_user else None
 
     # Strict PDF Validation
@@ -226,17 +241,29 @@ async def analyze_resume(
         if supabase and effective_user_id:
             try:
                 cached_res = supabase.table("resume_analyses") \
-                    .select("analysis_data") \
+                    .select("id, analysis_data") \
                     .eq("user_id", effective_user_id) \
                     .eq("target_role", target_role) \
                     .eq("resume_text", text) \
                     .order("created_at", desc=True) \
                     .execute()
                 if cached_res.data:
-                    cached_analysis = cached_res.data[0]["analysis_data"]
+                    cached_row = cached_res.data[0]
+                    cached_analysis = cached_row.get("analysis_data")
+                    cached_id = cached_row.get("id")
                     if cached_analysis and cached_analysis.get("bullets"):
                         print("Cache hit! Returning cached analysis.")
-                        return AnalysisResponse(raw_text=text, analysis=cached_analysis)
+                        r_scores = cached_analysis.get("radar_scores") or {}
+                        b_list = cached_analysis.get("bullets") or []
+                        return AnalysisResponse(
+                            id=cached_id,
+                            raw_text=text,
+                            analysis=cached_analysis,
+                            scores=r_scores,
+                            radar_scores=r_scores,
+                            bullets=b_list,
+                            bullet_analyses=b_list
+                        )
                     else:
                         print("Found incomplete cache entry. Bypassing cache.")
             except Exception as e:
@@ -251,20 +278,30 @@ async def analyze_resume(
         analysis_dict = json.loads(analysis_json_str)
         
         # Save to database if user is authenticated and analysis is complete
+        saved_id = str(uuid.uuid4())
         if supabase and effective_user_id and analysis_dict.get("bullets"):
             try:
-                supabase.table("resume_analyses").insert({
+                db_res = supabase.table("resume_analyses").insert({
                     "user_id": effective_user_id,
                     "resume_text": text,
                     "target_role": target_role,
                     "analysis_data": analysis_dict
                 }).execute()
+                if db_res.data and len(db_res.data) > 0:
+                    saved_id = db_res.data[0].get("id", saved_id)
             except Exception as e:
                 print(f"Error saving resume analysis to Supabase: {e}")
         
+        radar_scores = analysis_dict.get("radar_scores") or {}
+        bullets = analysis_dict.get("bullets") or []
         return AnalysisResponse(
+            id=saved_id,
             raw_text=text,
-            analysis=analysis_dict
+            analysis=analysis_dict,
+            scores=radar_scores,
+            radar_scores=radar_scores,
+            bullets=bullets,
+            bullet_analyses=bullets
         )
     
     except asyncio.TimeoutError:
@@ -403,12 +440,14 @@ async def ats_check(
     mode: str = Form("iitb_placement"),
     job_description: Optional[str] = Form(None),
     resume_id: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
     try:
         from agents.ats_engine import compute_full_ats_report
         from dependencies import get_supabase
         supabase = get_supabase()
+        effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
         
         pdf_bytes = None
         if file:
@@ -420,7 +459,7 @@ async def ats_check(
             res = supabase.table("resumes").select("user_id, raw_text, parsed_content").eq("id", resume_id).execute()
             if res.data:
                 owner_id = res.data[0].get("user_id")
-                if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+                if owner_id and (not effective_user_id or (effective_user_id != owner_id and not (auth_user and auth_user.is_admin))):
                     raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to inspect this resume.")
                 raw_text = res.data[0].get("raw_text", "")
                 
@@ -456,6 +495,7 @@ async def ats_check_stream(
     mode: str = Form("iitb_placement"),
     job_description: Optional[str] = Form(None),
     resume_id: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
     """
@@ -464,6 +504,7 @@ async def ats_check_stream(
     from agents.ats_engine import compute_full_ats_report
     from dependencies import get_supabase
     supabase = get_supabase()
+    effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
 
     pdf_bytes = None
     if file:
@@ -475,7 +516,7 @@ async def ats_check_stream(
         res = supabase.table("resumes").select("user_id, raw_text, parsed_content").eq("id", resume_id).execute()
         if res.data:
             owner_id = res.data[0].get("user_id")
-            if owner_id and (not auth_user or (auth_user.id != owner_id and not auth_user.is_admin)):
+            if owner_id and (not effective_user_id or (effective_user_id != owner_id and not (auth_user and auth_user.is_admin))):
                 raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to inspect this resume.")
             raw_text = res.data[0].get("raw_text", "")
 
@@ -554,4 +595,82 @@ async def ats_fix_bullet_endpoint(
     except Exception as e:
         print(f"Error in ats_fix_bullet: {e}")
         raise HTTPException(status_code=500, detail=f"Error refining bullet: {str(e)}")
+
+
+@router.post("/probe", response_model=ProbeResponse)
+@limiter.limit("40/hour")
+async def probe_resume_endpoint(
+    request: Request,
+    body: ProbeRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    """
+    Interactive claim defense & probing agent for resume points.
+    Challenges metrics, technical mechanism, and personal contribution.
+    """
+    resume_context = ""
+    from agents.resume_analyzer import supabase
+    if body.resume_id and supabase:
+        try:
+            r_res = supabase.table("resume_analyses").select("resume_text, analysis_data").eq("id", body.resume_id).execute()
+            if r_res.data:
+                resume_context = r_res.data[0].get("resume_text", "")
+            else:
+                r2 = supabase.table("resumes").select("raw_text").eq("id", body.resume_id).execute()
+                if r2.data:
+                    resume_context = r2.data[0].get("raw_text", "")
+        except Exception as e:
+            print(f"Error fetching resume context for probe: {e}")
+
+    if not resume_context and body.resume_text:
+        resume_context = body.resume_text
+
+    conversation_history = ""
+    for m in body.messages[-6:]:
+        role_label = "Interviewer" if m.get("role") == "assistant" else "Candidate"
+        conversation_history += f"{role_label}: {m.get('content', '')}\n"
+
+    prompt = f"""You are an elite, rigorous Day-1 placement interviewer probing a candidate on their resume claims for domain '{body.target_role or "consulting"}'.
+
+CONTEXT RESUME (if available):
+{resume_context[:2500]}
+
+CONVERSATION SO FAR:
+{conversation_history}
+
+TASK:
+Respond as the interviewer. Probe the candidate's last reply with an incisive, realistic follow-up question.
+- Focus on quantifiable business or system impact, mechanism ("How exactly did you build/verify this?"), trade-offs, or personal vs team contributions.
+- Do NOT be aggressive; be sharp, analytical, and professional.
+- Keep your reply concise: exactly 2 to 3 sentences. No bullet points or pleasantries.
+"""
+
+    try:
+        from services.cerebras_client import cerebras_client
+        reply = await asyncio.to_thread(
+            cerebras_client.generate_chat_completion,
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=200
+        )
+        if reply and reply.strip():
+            return ProbeResponse(reply=reply.strip())
+    except Exception as e:
+        print(f"Cerebras probe fallback to Gemini: {e}")
+
+    try:
+        from services.gemini_client import gemini_client
+        response = await asyncio.to_thread(
+            gemini_client.generate_content,
+            model=os.getenv("ANALYSIS_MODEL", "gemini-2.5-flash"),
+            prompt=prompt
+        )
+        if response and response.text:
+            return ProbeResponse(reply=response.text.strip())
+    except Exception as e2:
+        print(f"Gemini probe fallback: {e2}")
+
+    return ProbeResponse(reply="Understood. What was the exact baseline metric before your intervention, and how did you isolate your contribution from external factors?")
+
 
