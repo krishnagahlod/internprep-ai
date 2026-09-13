@@ -70,3 +70,40 @@ def test_embedded_shortlist_in_company_details():
     assert "interview_shortlists" in res_data
     assert res_data["interview_shortlists"] is not None
     assert res_data["interview_shortlists"]["total_shortlisted"] > 0
+
+
+def test_fashnear_technologies_regression():
+    """Verify fashnear-technologies (Meesho) resolves without missing module errors and displays shortlists."""
+    # 1. Company details endpoint
+    resp = client.get("/placement-analysis/company/fashnear-technologies")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["company"]["name"] == "FASHNEAR TECHNOLOGIES"
+    assert data["interview_shortlists"] is not None
+    assert data["interview_shortlists"]["total_shortlisted"] == 135
+
+    # 2. Dedicated shortlists endpoint
+    resp_sl = client.get("/placement-analysis/company/fashnear-technologies/interview-shortlists")
+    assert resp_sl.status_code == 200
+    data_sl = resp_sl.json()
+    assert data_sl["status"] == "success"
+    assert data_sl["total_shortlisted"] == 135
+    assert len(data_sl["all_candidates"]) == 135
+
+
+def test_company_without_shortlist_graceful_handling():
+    """Verify companies without published interview shortlists return cleanly with 200 without throwing 500 exceptions."""
+    # 1. Company details endpoint
+    resp = client.get("/placement-analysis/company/aarvee-associates")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["interview_shortlists"] is None
+
+    # 2. Dedicated shortlists endpoint
+    resp_sl = client.get("/placement-analysis/company/aarvee-associates/interview-shortlists")
+    assert resp_sl.status_code == 200
+    data_sl = resp_sl.json()
+    assert data_sl["status"] == "success"
+    assert data_sl["total_shortlisted"] == 0
+    assert data_sl["all_candidates"] == []
+

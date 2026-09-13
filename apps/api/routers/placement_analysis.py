@@ -1018,6 +1018,56 @@ async def get_company_details(request: Request, id_or_slug: str):
     }
 
 
+RECRUITER_SLUG_OVERRIDES: Dict[str, str] = {
+    "axxela": "axxela-advisory-services",
+    "axxela-advisory-services": "axxela-advisory-services",
+    "da-vinci": "da-vinci-derivatives-bv",
+    "da-vinci-derivatives": "da-vinci-derivatives-bv",
+    "da-vinci-derivatives-b-v": "da-vinci-derivatives-bv",
+    "da-vinci-derivatives-bv": "da-vinci-derivatives-bv",
+    "tvs-motors": "tvs-motor",
+    "tvs-motor": "tvs-motor",
+    "tvs-motor-company-limited": "tvs-motor",
+    "bajaj-auto": "bajaj-auto-and-bajaj-auto-technology",
+    "bajaj-auto-and-bajaj-auto-technology": "bajaj-auto-and-bajaj-auto-technology",
+    "bajaj-auto-technology-pvt-ltd": "bajaj-auto-and-bajaj-auto-technology",
+    "larsen-and-toubro": "larsen-tubro",
+    "larsen-tubro": "larsen-tubro",
+    "larsen-toubro": "larsen-tubro",
+    "pwc-us": "pwc-us-advisory",
+    "pwc-us-advisory": "pwc-us-advisory",
+    "kla-tencor": "kla",
+    "kla": "kla",
+    "mercedes-benz-research-and-development": "mercedes-benz-r-d",
+    "mercedes-benz-research-and-development-india-private-limited": "mercedes-benz-r-d",
+    "mercedes-benz-r-d": "mercedes-benz-r-d",
+    "deloitte-i-interview-shortlist": "deloitte-india",
+    "deloitte-i": "deloitte-india",
+    "deloitte-india": "deloitte-india",
+    "icici-lombard": "icici-lombard-gic",
+    "icici-lombard-gic": "icici-lombard-gic",
+    "icici-lombard-gic-ltd": "icici-lombard-gic",
+    "glean": "glean-search-technologies-india",
+    "glean-search-technologies-india": "glean-search-technologies-india",
+    "procter-and-gamble-home-products-pvt-ltd": "procter-gamble-p-g",
+    "procter-gamble": "procter-gamble-p-g",
+    "procter-gamble-p-g": "procter-gamble-p-g",
+    "mckinsey-ccn": "mckinsey-company",
+    "mckinsey-company": "mckinsey-company",
+    "samsung-research-institute-delhi": "samsung-research-and-development-institute-india-delhi",
+    "samsung-research-and-development-institute-india-delhi": "samsung-research-and-development-institute-india-delhi",
+    "sbi-fund-management": "sbi-funds-management",
+    "sbi-funds-management": "sbi-funds-management",
+    "intellimation-ai": "intellimationai",
+    "intellimationai": "intellimationai",
+    "intellimation": "intellimationai",
+    "fashnear-technologies": "meesho",
+    "fashnear-technologies-private-limited": "meesho",
+    "meesho": "meesho",
+    "balyasny-asset-management": "balyasny-asset-management",
+}
+
+
 def resolve_interview_shortlist(company: Optional[Dict[str, Any]], target_slug: str) -> Optional[Dict[str, Any]]:
     """Robust lookup for authentic interview shortlists using slug, aliases, and clean names."""
     if company and company.get("interview_shortlists"):
@@ -1025,7 +1075,6 @@ def resolve_interview_shortlist(company: Optional[Dict[str, Any]], target_slug: 
     shortlists_db = get_shortlists_dataset()
     slug_to_lookup = company["slug"] if company else target_slug
 
-    from scripts.extract_interview_shortlists import RECRUITER_SLUG_OVERRIDES
     if slug_to_lookup in shortlists_db:
         return shortlists_db[slug_to_lookup]
     if target_slug in shortlists_db:

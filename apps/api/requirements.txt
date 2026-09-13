@@ -22,3 +22,4 @@ razorpay
 httpx
 numpy
 pypdf
+beautifulsoup4

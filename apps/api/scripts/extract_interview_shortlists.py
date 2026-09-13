@@ -12,7 +12,10 @@ import re
 import json
 from collections import defaultdict
 from typing import Dict, List, Any, Optional, Tuple
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 
 # Reconfigure stdout for utf-8 on Windows
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -73,8 +76,8 @@ RECRUITER_SLUG_OVERRIDES: Dict[str, str] = {
     "intellimation-ai": "intellimationai",
     "intellimationai": "intellimationai",
     "intellimation": "intellimationai",
-    "fashnear-technologies": "fashnear-technologies",
-    "fashnear-technologies-private-limited": "fashnear-technologies",
+    "fashnear-technologies": "meesho",
+    "fashnear-technologies-private-limited": "meesho",
     "meesho": "meesho",
     "balyasny-asset-management": "balyasny-asset-management",
 }
