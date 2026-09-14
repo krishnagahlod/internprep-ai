@@ -417,6 +417,65 @@ export interface RoadmapTrackGuide {
   icon: string;
   core_pillars: string[];
   key_advice: string;
+  sample_companies?: string[];
+  timeline_pattern?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  company: string;
+  company_slug: string;
+  date: string;
+  iso_date: string;
+  day: number;
+  month: number;
+  year: number;
+  month_name: string;
+  category: "ppt" | "jaf" | "assessment" | "shortlist" | "selection" | "slotting" | "general";
+  track: "consulting" | "sde" | "quant" | "core" | "analytics" | "general";
+  is_high_impact: boolean;
+  snippet: string;
+}
+
+export interface MonthOverview {
+  month_name: string;
+  year: number;
+  month_index: number;
+  phase_code: string;
+  title: string;
+  theme: string;
+  events_count: number;
+  key_milestones: { date: string; title: string }[];
+  tactical_guidance: string;
+}
+
+export interface OASurvivalRule {
+  rule: string;
+  action: string;
+}
+
+export interface OAWeekendWindow {
+  window_type: string;
+  golden_rule: string;
+  why: string;
+  best_time_to_start: string;
+}
+
+export interface OAProctoringProfile {
+  platform: string;
+  strictness: string;
+  traps_to_avoid: string[];
+}
+
+export interface OASurvivalGuide {
+  title: string;
+  badge: string;
+  description: string;
+  consecutive_test_strategy: OASurvivalRule[];
+  weekend_window_strategy: OAWeekendWindow[];
+  platform_proctoring_profiles: OAProctoringProfile[];
+  midsem_fatigue_recovery: string[];
 }
 
 export interface SeasonRoadmapData {
@@ -432,7 +491,10 @@ export interface SeasonRoadmapData {
     season_end: string;
     historical_verified_candidates_placed: number;
   };
-  phases: RoadmapPhase[];
+  months_overview: MonthOverview[];
+  calendar_events: CalendarEvent[];
+  days_map: Record<string, CalendarEvent[]>;
+  oa_survival_guide: OASurvivalGuide;
   dday_slotting_playbook: {
     title: string;
     description: string;
@@ -440,5 +502,8 @@ export interface SeasonRoadmapData {
     collision_rules: RoadmapCollisionRule[];
   };
   track_guides: Record<string, RoadmapTrackGuide>;
+  phases?: RoadmapPhase[];
+  phases_summary?: Record<string, any>;
 }
+
 
