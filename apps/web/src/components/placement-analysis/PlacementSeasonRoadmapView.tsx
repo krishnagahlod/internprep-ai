@@ -21,6 +21,7 @@ import {
   Code2,
   Cog,
   BarChart2,
+  BarChart3,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
@@ -85,6 +86,15 @@ export function PlacementSeasonRoadmapView({
   const [vaultSearchQuery, setVaultSearchQuery] = useState("");
   const [showOAPlaybook, setShowOAPlaybook] = useState(false);
   const [showSlottingPlaybook, setShowSlottingPlaybook] = useState(false);
+
+  // Only expand if full content is actually longer than snippet
+  const isExpandable = (evt: CalendarEvent) => {
+    const content = (evt.content || "").trim();
+    const snippet = (evt.snippet || "").trim();
+    if (!content) return false;
+    const cleanSnippet = snippet.replace(/\.\.\.$/, "").trim();
+    return content.length > cleanSnippet.length + 15 && content.length > 170;
+  };
 
   const toggleExpandEvent = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -281,7 +291,7 @@ export function PlacementSeasonRoadmapView({
     return getDayEvents(selectedDateIso);
   }, [selectedDateIso, data, selectedTrack]);
 
-  // Helper for category presentation
+  // Helper for category presentation (No left-border styling)
   const getCategoryDetails = (cat: string) => {
     switch (cat) {
       case "ppt":
@@ -292,8 +302,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
           dotColor: "bg-purple-500",
-          borderAccent: "border-l-purple-500",
-          cardBg: "hover:border-purple-500/40",
         };
       case "jaf":
         return {
@@ -303,8 +311,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
           dotColor: "bg-blue-500",
-          borderAccent: "border-l-blue-500",
-          cardBg: "hover:border-blue-500/40",
         };
       case "assessment":
         return {
@@ -314,8 +320,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
           dotColor: "bg-amber-500",
-          borderAccent: "border-l-amber-500",
-          cardBg: "hover:border-amber-500/40",
         };
       case "shortlist":
         return {
@@ -325,8 +329,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
           dotColor: "bg-emerald-500",
-          borderAccent: "border-l-emerald-500",
-          cardBg: "hover:border-emerald-500/40",
         };
       case "selection":
         return {
@@ -336,8 +338,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30",
           dotColor: "bg-green-500",
-          borderAccent: "border-l-green-500",
-          cardBg: "hover:border-green-500/40",
         };
       case "slotting":
         return {
@@ -347,8 +347,6 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
           dotColor: "bg-rose-500",
-          borderAccent: "border-l-rose-500",
-          cardBg: "hover:border-rose-500/40",
         };
       default:
         return {
@@ -358,54 +356,52 @@ export function PlacementSeasonRoadmapView({
           badgeClass:
             "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30",
           dotColor: "bg-slate-400",
-          borderAccent: "border-l-slate-400",
-          cardBg: "hover:border-slate-500/40",
         };
     }
   };
 
-  // Helper for track presentation
+  // Helper for track presentation with proper Lucide SVG icons (NO EMOJIS)
   const getTrackDetails = (track: string) => {
     switch (track) {
       case "consulting":
         return {
           label: "Consulting",
-          icon: "💼",
+          icon: <Briefcase className="h-3.5 w-3.5" />,
           badgeClass:
             "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
         };
       case "sde":
         return {
           label: "SDE / Software",
-          icon: "💻",
+          icon: <Code2 className="h-3.5 w-3.5" />,
           badgeClass:
             "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
         };
       case "quant":
         return {
           label: "Quant / HFT",
-          icon: "📈",
+          icon: <TrendingUp className="h-3.5 w-3.5" />,
           badgeClass:
             "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
         };
       case "core":
         return {
           label: "Core Eng",
-          icon: "⚙️",
+          icon: <Cog className="h-3.5 w-3.5" />,
           badgeClass:
             "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
         };
       case "analytics":
         return {
           label: "Product & ML",
-          icon: "📊",
+          icon: <BarChart3 className="h-3.5 w-3.5" />,
           badgeClass:
             "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30",
         };
       default:
         return {
           label: "General",
-          icon: "📢",
+          icon: <Bell className="h-3.5 w-3.5" />,
           badgeClass: "bg-muted text-muted-foreground border-border",
         };
     }
@@ -449,7 +445,7 @@ export function PlacementSeasonRoadmapView({
                 variant="outline"
                 className="text-xs border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 font-bold"
               >
-                📍 TODAY: {todayFormatted} ({currentPhaseCode})
+                TODAY: {todayFormatted} ({currentPhaseCode})
               </Badge>
               <Badge
                 variant="outline"
@@ -470,10 +466,10 @@ export function PlacementSeasonRoadmapView({
             </p>
           </div>
 
-          {/* D-Day Countdown Card */}
+          {/* D-Day Countdown Card (NO EMOJIS) */}
           <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 flex items-center gap-4 shrink-0 shadow-xs">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg font-mono-tech">
-              ⏳
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+              <CalendarClock className="h-6 w-6 text-primary" />
             </div>
             <div>
               <div className="text-[10px] uppercase font-mono-tech font-bold text-muted-foreground tracking-wider">
@@ -490,7 +486,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       </div>
 
-      {/* 2. TRACK HUB: DOMAIN-SPECIFIC FILTERING */}
+      {/* 2. TRACK HUB: DOMAIN-SPECIFIC FILTERING (SVG ICONS - NO EMOJIS) */}
       <div className="space-y-2">
         <div className="flex justify-between items-center px-1">
           <span className="text-xs font-mono-tech font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -504,33 +500,55 @@ export function PlacementSeasonRoadmapView({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 font-mono-tech">
           {[
-            { id: "all", label: "All Tracks", icon: "🌐", count: 2584 },
+            {
+              id: "all",
+              label: "All Tracks",
+              icon: <Globe className="h-5 w-5 text-current" />,
+              count: 2584,
+            },
             {
               id: "consulting",
               label: "Consulting",
-              icon: "💼",
+              icon: <Briefcase className="h-5 w-5 text-current" />,
               count: 124,
             },
-            { id: "sde", label: "SDE / Tech", icon: "💻", count: 540 },
-            { id: "quant", label: "Quant / HFT", icon: "📈", count: 131 },
-            { id: "core", label: "Core Eng", icon: "⚙️", count: 415 },
+            {
+              id: "sde",
+              label: "SDE / Tech",
+              icon: <Code2 className="h-5 w-5 text-current" />,
+              count: 540,
+            },
+            {
+              id: "quant",
+              label: "Quant / HFT",
+              icon: <TrendingUp className="h-5 w-5 text-current" />,
+              count: 131,
+            },
+            {
+              id: "core",
+              label: "Core Eng",
+              icon: <Cog className="h-5 w-5 text-current" />,
+              count: 415,
+            },
             {
               id: "analytics",
               label: "Product & ML",
-              icon: "📊",
+              icon: <BarChart3 className="h-5 w-5 text-current" />,
               count: 726,
             },
           ].map((t) => (
             <button
               key={t.id}
               onClick={() => setSelectedTrack(t.id as any)}
-              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                 selectedTrack === t.id
                   ? "bg-primary text-primary-foreground border-primary shadow-md"
                   : "bg-card hover:bg-muted/50 border-border text-foreground"
               }`}
             >
-              <div className="text-xl mb-1">{t.icon}</div>
+              <div className="mb-2 p-1.5 rounded-xl bg-background/50 border border-border/40 inline-flex w-fit">
+                {t.icon}
+              </div>
               <div className="text-xs font-extrabold truncate">{t.label}</div>
               <div
                 className={`text-[10px] mt-0.5 ${
@@ -546,7 +564,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       </div>
 
-      {/* 3. THIS WEEK IN PLACEMENTS LIVE RADAR */}
+      {/* 3. THIS WEEK IN PLACEMENTS LIVE RADAR (PREMIUM CARD DESIGN, NO LEFT GRADIENT LINE) */}
       <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-card to-primary/5 border border-emerald-500/30 space-y-4 shadow-xs">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="space-y-0.5">
@@ -576,7 +594,7 @@ export function PlacementSeasonRoadmapView({
           </Badge>
         </div>
 
-        {/* Radar Event Badges */}
+        {/* Radar Event Cards (Premium styling, no left gradient line) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {thisWeekEvents.length === 0 ? (
             <div className="col-span-3 py-4 text-center text-xs text-muted-foreground font-mono-tech">
@@ -592,13 +610,15 @@ export function PlacementSeasonRoadmapView({
                 <div
                   key={evt.id}
                   onClick={() => setSelectedDateIso(evt.iso_date)}
-                  className={`p-3.5 rounded-2xl bg-card border border-border/80 ${catDetails.cardBg} hover:shadow-sm transition-all cursor-pointer space-y-2 border-l-4 ${catDetails.borderAccent} group`}
+                  className="p-4 rounded-2xl bg-card border border-border/80 hover:border-primary/50 hover:shadow-md transition-all duration-200 cursor-pointer space-y-2.5 group"
                 >
                   <div className="flex justify-between items-center text-[10px] font-mono-tech">
-                    <span className="font-bold text-foreground">{evt.date}</span>
+                    <span className="font-bold text-foreground flex items-center gap-1 text-muted-foreground">
+                      <Calendar className="h-3 w-3" /> {evt.date}
+                    </span>
                     <Badge
                       variant="outline"
-                      className={`text-[9px] uppercase px-1.5 py-0 flex items-center gap-1 ${catDetails.badgeClass}`}
+                      className={`text-[9px] uppercase px-1.5 py-0.5 flex items-center gap-1 font-bold ${catDetails.badgeClass}`}
                     >
                       {catDetails.icon}
                       <span>{catDetails.shortLabel}</span>
@@ -613,9 +633,10 @@ export function PlacementSeasonRoadmapView({
                     {evt.snippet}
                   </p>
 
-                  <div className="flex justify-between items-center pt-1 border-t border-border/40 text-[10px] font-mono-tech">
-                    <span className="text-muted-foreground">
-                      {trackDetails.icon} {trackDetails.label}
+                  <div className="flex justify-between items-center pt-2 border-t border-border/40 text-[10px] font-mono-tech">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      {trackDetails.icon}
+                      <span>{trackDetails.label}</span>
                     </span>
                     <span className="text-primary font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                       View Day <ChevronRight className="h-3 w-3" />
@@ -761,7 +782,7 @@ export function PlacementSeasonRoadmapView({
             </div>
           </div>
 
-          {/* 7-Column Day Calendar Grid */}
+          {/* 7-Column Day Calendar Grid (FLUSH CELLS, NO OVERLAPPING BOUNDARIES) */}
           <div className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-sm">
             {/* Weekday Headers */}
             <div className="grid grid-cols-7 border-b border-border/80 bg-muted/40 font-mono-tech text-xs font-extrabold text-muted-foreground text-center py-3">
@@ -796,41 +817,51 @@ export function PlacementSeasonRoadmapView({
                   <div
                     key={cell.isoDate}
                     onClick={() => setSelectedDateIso(cell.isoDate)}
-                    className={`min-h-[115px] p-2.5 transition-all cursor-pointer flex flex-col justify-between group rounded-lg ${
+                    className={`relative min-h-[115px] p-2.5 transition-colors cursor-pointer flex flex-col justify-between group ${
                       isSelectedDay
-                        ? "bg-primary/10 ring-2 ring-primary inset-0 z-10 shadow-sm"
+                        ? "bg-primary/10"
                         : isToday
-                        ? "bg-emerald-500/10 ring-2 ring-emerald-500/50 hover:bg-emerald-500/15"
-                        : "hover:bg-muted/40"
+                        ? "bg-emerald-500/5 hover:bg-emerald-500/10"
+                        : "hover:bg-muted/30"
                     }`}
                   >
-                    <div className="flex justify-between items-center">
+                    {/* Flush inset indicator lines to prevent boundary overlap */}
+                    {isToday && (
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500 z-10" />
+                    )}
+                    {isSelectedDay && !isToday && (
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-primary z-10" />
+                    )}
+
+                    {/* Cell Header: Clear distinction between Day Number (left) and Announcement Count (right) */}
+                    <div className="flex justify-between items-start">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`text-xs font-mono-tech font-black ${
+                          className={`font-display font-black leading-none ${
                             isToday
-                              ? "h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs"
-                              : "text-foreground group-hover:text-primary transition-colors"
+                              ? "h-6 w-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs shadow-xs"
+                              : "text-sm text-foreground/90 group-hover:text-primary transition-colors"
                           }`}
                         >
                           {cell.dayNumber}
                         </span>
                         {isToday && (
-                          <span className="text-[9px] font-mono-tech font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                            Today
+                          <span className="text-[9px] font-mono-tech font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                            TODAY
                           </span>
                         )}
                       </div>
 
+                      {/* Explicitly labeled announcement count (Never confused with day number) */}
                       {dayEvents.length > 0 && (
-                        <span className="text-[10px] font-mono-tech font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          {dayEvents.length}
+                        <span className="text-[9px] font-mono-tech font-semibold tracking-tight text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md border border-border/40 group-hover:border-primary/30 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                          {dayEvents.length} {dayEvents.length === 1 ? "post" : "posts"}
                         </span>
                       )}
                     </div>
 
                     {/* Event Badges in Day Cell */}
-                    <div className="space-y-1 mt-1 font-mono-tech">
+                    <div className="space-y-1 mt-1.5 font-mono-tech">
                       {dayEvents.slice(0, 2).map((evt) => {
                         const catDetails = getCategoryDetails(evt.category);
                         return (
@@ -862,7 +893,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       )}
 
-      {/* 6. VIEW B: CHRONOLOGICAL TRACK TIMELINE */}
+      {/* 6. VIEW B: CHRONOLOGICAL TRACK TIMELINE (PREMIUM CARD DESIGN, NO LEFT GRADIENT LINE) */}
       {viewMode === "timeline" && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-card border border-border/80 flex justify-between items-center text-xs font-mono-tech shadow-xs">
@@ -880,16 +911,18 @@ export function PlacementSeasonRoadmapView({
               const catDetails = getCategoryDetails(evt.category);
               const trackDetails = getTrackDetails(evt.track);
               const isExpanded = expandedEventIds.has(evt.id);
+              const expandable = isExpandable(evt);
 
               return (
                 <div
                   key={evt.id}
-                  className={`relative z-10 p-5 rounded-2xl bg-card border border-border/80 border-l-4 ${catDetails.borderAccent} ${catDetails.cardBg} hover:shadow-md transition-all space-y-3 group`}
+                  className="relative z-10 p-5 rounded-2xl bg-card border border-border/80 hover:border-primary/50 hover:shadow-md transition-all duration-200 space-y-3 group"
                 >
-                  {/* Card Header */}
+                  {/* Card Header (Clean badges, NO left gradient line) */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-black text-foreground font-mono-tech">
+                      <span className="text-xs font-bold text-foreground font-mono-tech flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                         {evt.date}
                       </span>
                       <Badge
@@ -899,8 +932,9 @@ export function PlacementSeasonRoadmapView({
                         {catDetails.icon}
                         <span>{catDetails.label}</span>
                       </Badge>
-                      <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
-                        {trackDetails.icon} {trackDetails.label}
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50 flex items-center gap-1">
+                        {trackDetails.icon}
+                        <span>{trackDetails.label}</span>
                       </span>
                       {evt.company && (
                         <Badge
@@ -925,7 +959,7 @@ export function PlacementSeasonRoadmapView({
                     {evt.title}
                   </h4>
 
-                  {/* Announcement Content with Expand / Collapse */}
+                  {/* Announcement Content (Expand button ONLY shown if actually expandable) */}
                   <div className="text-xs text-foreground/90 leading-relaxed font-sans">
                     <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}>
                       {isExpanded
@@ -933,20 +967,22 @@ export function PlacementSeasonRoadmapView({
                         : evt.snippet}
                     </p>
 
-                    <button
-                      onClick={(e) => toggleExpandEvent(evt.id, e)}
-                      className="mt-1.5 text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                    >
-                      {isExpanded ? (
-                        <>
-                          <ChevronUp className="h-3.5 w-3.5" /> Show Less
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
-                        </>
-                      )}
-                    </button>
+                    {expandable && (
+                      <button
+                        onClick={(e) => toggleExpandEvent(evt.id, e)}
+                        className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-3.5 w-3.5" /> Show Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* External Links attached to this announcement */}
@@ -967,7 +1003,7 @@ export function PlacementSeasonRoadmapView({
                     </div>
                   )}
 
-                  {/* Verified Recruiter Dossier Button (ONLY rendered if verified company dossier exists!) */}
+                  {/* Verified Recruiter Dossier Button */}
                   {evt.has_dossier && evt.company_slug && onSelectCompany && (
                     <div className="pt-2 border-t border-border/40 flex justify-end">
                       <Button
@@ -990,7 +1026,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       )}
 
-      {/* 7. DAY-DETAIL SLIDE-OVER DRAWER */}
+      {/* 7. DAY-DETAIL SLIDE-OVER DRAWER (PREMIUM DESIGN, NO LEFT GRADIENT LINE) */}
       {selectedDateIso && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex justify-end animate-in fade-in duration-200">
           <div className="w-full max-w-xl h-full bg-card border-l border-border p-6 sm:p-7 overflow-y-auto space-y-6 shadow-2xl">
@@ -1022,11 +1058,12 @@ export function PlacementSeasonRoadmapView({
                 const catDetails = getCategoryDetails(evt.category);
                 const trackDetails = getTrackDetails(evt.track);
                 const isExpanded = expandedEventIds.has(evt.id);
+                const expandable = isExpandable(evt);
 
                 return (
                   <div
                     key={evt.id}
-                    className={`p-5 rounded-2xl bg-muted/30 border border-border/70 border-l-4 ${catDetails.borderAccent} space-y-3`}
+                    className="p-5 rounded-2xl bg-muted/20 border border-border/80 hover:border-primary/40 transition-all space-y-3"
                   >
                     <div className="flex justify-between items-center gap-2 flex-wrap">
                       <Badge
@@ -1036,8 +1073,9 @@ export function PlacementSeasonRoadmapView({
                         {catDetails.icon}
                         <span>{catDetails.label}</span>
                       </Badge>
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                        {trackDetails.icon} {trackDetails.label}
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+                        {trackDetails.icon}
+                        <span>{trackDetails.label}</span>
                       </span>
                     </div>
 
@@ -1045,7 +1083,7 @@ export function PlacementSeasonRoadmapView({
                       {evt.title}
                     </div>
 
-                    {/* Announcement text with expandable view */}
+                    {/* Announcement text with expandable view (ONLY if expandable) */}
                     <div className="text-xs text-foreground/90 leading-relaxed font-sans">
                       <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-3"}>
                         {isExpanded
@@ -1053,20 +1091,22 @@ export function PlacementSeasonRoadmapView({
                           : evt.snippet}
                       </p>
 
-                      <button
-                        onClick={(e) => toggleExpandEvent(evt.id, e)}
-                        className="mt-1.5 text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        {isExpanded ? (
-                          <>
-                            <ChevronUp className="h-3.5 w-3.5" /> Show Less
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
-                          </>
-                        )}
-                      </button>
+                      {expandable && (
+                        <button
+                          onClick={(e) => toggleExpandEvent(evt.id, e)}
+                          className="mt-2 text-xs font-bold text-primary hover:underline cursor-pointer inline-flex items-center gap-1"
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="h-3.5 w-3.5" /> Show Less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
                     {/* External links if attached to announcement */}
@@ -1118,7 +1158,8 @@ export function PlacementSeasonRoadmapView({
             <div className="flex justify-between items-start gap-4">
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black text-foreground">
+                  <span className="text-xs font-black text-foreground flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                     {selectedAnnouncementPopup.date}
                   </span>
                   <Badge
@@ -1135,9 +1176,9 @@ export function PlacementSeasonRoadmapView({
                       }
                     </span>
                   </Badge>
-                  <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50 uppercase">
-                    {getTrackDetails(selectedAnnouncementPopup.track).icon}{" "}
-                    {getTrackDetails(selectedAnnouncementPopup.track).label}
+                  <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50 uppercase flex items-center gap-1">
+                    {getTrackDetails(selectedAnnouncementPopup.track).icon}
+                    <span>{getTrackDetails(selectedAnnouncementPopup.track).label}</span>
                   </span>
                 </div>
 
@@ -1289,7 +1330,7 @@ export function PlacementSeasonRoadmapView({
               </div>
             </div>
 
-            {/* Weekend Window Tactics */}
+            {/* Weekend Window Tactics (NO EMOJIS) */}
             <div className="space-y-2.5">
               <h4 className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <ShieldAlert className="h-4 w-4 text-rose-500" /> 24-Hour
@@ -1303,12 +1344,14 @@ export function PlacementSeasonRoadmapView({
                   <div className="font-bold text-rose-600 dark:text-rose-400 font-mono-tech">
                     {w.window_type}
                   </div>
-                  <div className="font-extrabold text-foreground">
-                    ⚠️ {w.golden_rule}
+                  <div className="font-extrabold text-foreground flex items-center gap-1.5">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                    <span>{w.golden_rule}</span>
                   </div>
                   <p className="text-muted-foreground">{w.why}</p>
-                  <div className="pt-1 text-emerald-600 dark:text-emerald-400 font-bold font-mono-tech">
-                    ✅ Recommended Window: {w.best_time_to_start}
+                  <div className="pt-1 text-emerald-600 dark:text-emerald-400 font-bold font-mono-tech flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <span>Recommended Window: {w.best_time_to_start}</span>
                   </div>
                 </div>
               ))}
@@ -1333,7 +1376,7 @@ export function PlacementSeasonRoadmapView({
                       <ul className="space-y-1 text-muted-foreground text-[11px] font-sans">
                         {p.traps_to_avoid.map((trap, tIdx) => (
                           <li key={tIdx} className="flex items-start gap-1.5">
-                            <span className="text-primary font-bold">›</span>
+                            <ChevronRight className="h-3 w-3 text-primary shrink-0 mt-0.5" />
                             <span>{trap}</span>
                           </li>
                         ))}
@@ -1436,7 +1479,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       )}
 
-      {/* 11. SEARCHABLE ALL-ANNOUNCEMENTS VAULT */}
+      {/* 11. SEARCHABLE ALL-ANNOUNCEMENTS VAULT (PREMIUM CARD DESIGN, NO LEFT GRADIENT LINE) */}
       <div className="p-6 rounded-3xl bg-card border border-border/80 space-y-4 shadow-xs">
         <div className="flex justify-between items-center flex-wrap gap-2">
           <div className="space-y-0.5">
@@ -1477,10 +1520,12 @@ export function PlacementSeasonRoadmapView({
                   <div
                     key={evt.id}
                     onClick={() => setSelectedAnnouncementPopup(evt)}
-                    className={`p-4 rounded-2xl bg-muted/30 border border-border/70 hover:border-primary/60 border-l-4 ${catDetails.borderAccent} hover:shadow-md transition-all cursor-pointer space-y-2 group`}
+                    className="p-4 rounded-2xl bg-muted/20 border border-border/70 hover:border-primary/60 hover:shadow-md transition-all duration-200 cursor-pointer space-y-2 group"
                   >
                     <div className="flex justify-between items-center text-[10px]">
-                      <span className="font-bold text-foreground">{evt.date}</span>
+                      <span className="font-bold text-foreground flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3 w-3" /> {evt.date}
+                      </span>
                       <Badge
                         variant="outline"
                         className={`text-[9px] uppercase px-1.5 py-0 flex items-center gap-1 ${catDetails.badgeClass}`}
@@ -1498,9 +1543,10 @@ export function PlacementSeasonRoadmapView({
                       {evt.snippet}
                     </p>
 
-                    <div className="flex justify-between items-center pt-1 border-t border-border/40 text-[10px]">
-                      <span className="text-muted-foreground">
-                        {trackDetails.icon} {trackDetails.label}
+                    <div className="flex justify-between items-center pt-2 border-t border-border/40 text-[10px]">
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        {trackDetails.icon}
+                        <span>{trackDetails.label}</span>
                       </span>
                       <span className="text-primary font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
                         Open Details <ArrowRight className="h-3 w-3" />
