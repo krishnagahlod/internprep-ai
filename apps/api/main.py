@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 load_dotenv()
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -131,7 +131,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["X-Correlation-ID"],
 )
@@ -210,12 +210,21 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 import time
 STARTUP_TIME = time.time()
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     return {"status": "ok", "message": "AI Interview Coach API is running"}
 
-@app.get("/health")
-@app.get("/api/health")
+@app.head("/")
+def head_root():
+    return Response(status_code=200)
+
+@app.head("/health")
+@app.head("/api/health")
+def head_health():
+    return Response(status_code=200)
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     """
     Comprehensive operational health and telemetry diagnostics endpoint.
