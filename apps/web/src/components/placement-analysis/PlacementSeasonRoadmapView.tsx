@@ -23,6 +23,8 @@ import {
   BarChart2,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   ShieldAlert,
   Sparkles,
   ExternalLink,
@@ -32,6 +34,12 @@ import {
   X,
   Zap,
   Info,
+  Laptop,
+  FileText,
+  Users,
+  Bell,
+  Globe,
+  ArrowRight,
 } from "lucide-react";
 import {
   SeasonRoadmapData,
@@ -64,10 +72,29 @@ export function PlacementSeasonRoadmapView({
   // Selected date for the Day-Detail Drawer
   const [selectedDateIso, setSelectedDateIso] = useState<string | null>(null);
 
+  // Dedicated announcement popup modal (for search results or quick inspecting)
+  const [selectedAnnouncementPopup, setSelectedAnnouncementPopup] =
+    useState<CalendarEvent | null>(null);
+
+  // Set of expanded event IDs for "Read more / Show less" toggle
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(
+    new Set()
+  );
+
   // Search vault query
   const [vaultSearchQuery, setVaultSearchQuery] = useState("");
   const [showOAPlaybook, setShowOAPlaybook] = useState(false);
   const [showSlottingPlaybook, setShowSlottingPlaybook] = useState(false);
+
+  const toggleExpandEvent = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Fetch season roadmap data from backend
   useEffect(() => {
@@ -94,22 +121,31 @@ export function PlacementSeasonRoadmapView({
   }, []);
 
   // Compute "Where We Are Today" & Countdown to D-Day
-  const { currentMonthNum, currentDayNum, daysToDDay, todayFormatted, currentPhaseCode } = useMemo(() => {
+  const {
+    currentMonthNum,
+    currentDayNum,
+    daysToDDay,
+    todayFormatted,
+    currentPhaseCode,
+  } = useMemo(() => {
     const now = new Date();
     const month = now.getMonth(); // 0-indexed: 6 = July, 7 = Aug, 8 = Sept, 9 = Oct, 10 = Nov, 11 = Dec
     const date = now.getDate();
 
     let phase = "Phase 1A";
     if (month === 6) phase = "Phase 0 (Kickoff & CVs)";
-    else if (month === 7 || month === 8) phase = "Phase 1A (PPTs & Diagnostic Tests)";
+    else if (month === 7 || month === 8)
+      phase = "Phase 1A (PPTs & Diagnostic Tests)";
     else if (month === 9) phase = "Phase 1B (The OA Blitz)";
     else if (month === 10) phase = "Phase 1C (Shortlist Drops & Slotting)";
-    else if (month === 11 && date <= 15) phase = "Phase 1D (D-Day Interviews)";
+    else if (month === 11 && date <= 15)
+      phase = "Phase 1D (D-Day Interviews)";
     else phase = "Phase 2 (Spring Wave)";
 
     // Target: Next December 1
     const currentYear = now.getFullYear();
-    const dDayYear = month === 11 && date > 15 ? currentYear + 1 : currentYear;
+    const dDayYear =
+      month === 11 && date > 15 ? currentYear + 1 : currentYear;
     const dDay = new Date(dDayYear, 11, 1, 7, 0, 0); // Dec 1, 7:00 AM
     const diffTime = dDay.getTime() - now.getTime();
     const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
@@ -141,15 +177,21 @@ export function PlacementSeasonRoadmapView({
   // "This Week Last Year" Events Radar (Around current day in current month)
   const thisWeekEvents = useMemo(() => {
     if (!data?.calendar_events) return [];
-    return data.calendar_events.filter((evt) => {
-      if (evt.month !== currentMonthNum) return false;
-      const dayDiff = Math.abs(evt.day - currentDayNum);
-      if (dayDiff > 4) return false;
-      if (selectedTrack !== "all" && evt.track !== selectedTrack && evt.track !== "general") {
-        return false;
-      }
-      return true;
-    }).slice(0, 6);
+    return data.calendar_events
+      .filter((evt) => {
+        if (evt.month !== currentMonthNum) return false;
+        const dayDiff = Math.abs(evt.day - currentDayNum);
+        if (dayDiff > 4) return false;
+        if (
+          selectedTrack !== "all" &&
+          evt.track !== selectedTrack &&
+          evt.track !== "general"
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .slice(0, 6);
   }, [data, currentMonthNum, currentDayNum, selectedTrack]);
 
   // Filtered Calendar Events based on active month & selected track
@@ -193,7 +235,9 @@ export function PlacementSeasonRoadmapView({
     if (!isoDate || !data?.days_map) return [];
     const rawList = data.days_map[isoDate] || [];
     if (selectedTrack === "all") return rawList;
-    return rawList.filter((e) => e.track === selectedTrack || e.track === "general");
+    return rawList.filter(
+      (e) => e.track === selectedTrack || e.track === "general"
+    );
   };
 
   // Filtered events for Timeline View
@@ -201,7 +245,11 @@ export function PlacementSeasonRoadmapView({
     if (!data?.calendar_events) return [];
     return data.calendar_events
       .filter((e) => {
-        if (selectedTrack !== "all" && e.track !== selectedTrack && e.track !== "general") {
+        if (
+          selectedTrack !== "all" &&
+          e.track !== selectedTrack &&
+          e.track !== "general"
+        ) {
           return false;
         }
         return e.month >= 7 && e.month <= 12; // Focus Phase 1
@@ -221,10 +269,11 @@ export function PlacementSeasonRoadmapView({
         return (
           e.company.toLowerCase().includes(q) ||
           e.title.toLowerCase().includes(q) ||
-          e.snippet.toLowerCase().includes(q)
+          e.snippet.toLowerCase().includes(q) ||
+          (e.content && e.content.toLowerCase().includes(q))
         );
       })
-      .slice(0, 20);
+      .slice(0, 24);
   }, [data, vaultSearchQuery]);
 
   // Active date's detail drawer events
@@ -232,12 +281,143 @@ export function PlacementSeasonRoadmapView({
     return getDayEvents(selectedDateIso);
   }, [selectedDateIso, data, selectedTrack]);
 
+  // Helper for category presentation
+  const getCategoryDetails = (cat: string) => {
+    switch (cat) {
+      case "ppt":
+        return {
+          label: "Pre-Placement Talk",
+          shortLabel: "PPT",
+          icon: <Presentation className="h-3 w-3" />,
+          badgeClass:
+            "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+          dotColor: "bg-purple-500",
+          borderAccent: "border-l-purple-500",
+          cardBg: "hover:border-purple-500/40",
+        };
+      case "jaf":
+        return {
+          label: "JAF Announcement",
+          shortLabel: "JAF",
+          icon: <FileText className="h-3 w-3" />,
+          badgeClass:
+            "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+          dotColor: "bg-blue-500",
+          borderAccent: "border-l-blue-500",
+          cardBg: "hover:border-blue-500/40",
+        };
+      case "assessment":
+        return {
+          label: "Online Assessment",
+          shortLabel: "OA / Test",
+          icon: <Laptop className="h-3 w-3" />,
+          badgeClass:
+            "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+          dotColor: "bg-amber-500",
+          borderAccent: "border-l-amber-500",
+          cardBg: "hover:border-amber-500/40",
+        };
+      case "shortlist":
+        return {
+          label: "Interview Shortlist",
+          shortLabel: "Shortlist",
+          icon: <Users className="h-3 w-3" />,
+          badgeClass:
+            "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+          dotColor: "bg-emerald-500",
+          borderAccent: "border-l-emerald-500",
+          cardBg: "hover:border-emerald-500/40",
+        };
+      case "selection":
+        return {
+          label: "Selection & Offer",
+          shortLabel: "Selection",
+          icon: <Award className="h-3 w-3" />,
+          badgeClass:
+            "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30",
+          dotColor: "bg-green-500",
+          borderAccent: "border-l-green-500",
+          cardBg: "hover:border-green-500/40",
+        };
+      case "slotting":
+        return {
+          label: "Day Slot Matrix",
+          shortLabel: "Slotting",
+          icon: <ShieldAlert className="h-3 w-3" />,
+          badgeClass:
+            "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30",
+          dotColor: "bg-rose-500",
+          borderAccent: "border-l-rose-500",
+          cardBg: "hover:border-rose-500/40",
+        };
+      default:
+        return {
+          label: "Campus Notice",
+          shortLabel: "Notice",
+          icon: <Bell className="h-3 w-3" />,
+          badgeClass:
+            "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30",
+          dotColor: "bg-slate-400",
+          borderAccent: "border-l-slate-400",
+          cardBg: "hover:border-slate-500/40",
+        };
+    }
+  };
+
+  // Helper for track presentation
+  const getTrackDetails = (track: string) => {
+    switch (track) {
+      case "consulting":
+        return {
+          label: "Consulting",
+          icon: "💼",
+          badgeClass:
+            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+        };
+      case "sde":
+        return {
+          label: "SDE / Software",
+          icon: "💻",
+          badgeClass:
+            "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30",
+        };
+      case "quant":
+        return {
+          label: "Quant / HFT",
+          icon: "📈",
+          badgeClass:
+            "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+        };
+      case "core":
+        return {
+          label: "Core Eng",
+          icon: "⚙️",
+          badgeClass:
+            "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
+        };
+      case "analytics":
+        return {
+          label: "Product & ML",
+          icon: "📊",
+          badgeClass:
+            "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30",
+        };
+      default:
+        return {
+          label: "General",
+          icon: "📢",
+          badgeClass: "bg-muted text-muted-foreground border-border",
+        };
+    }
+  };
+
   if (loading) {
     return (
       <div className="py-24 text-center space-y-4">
         <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" />
         <p className="text-sm text-muted-foreground font-mono-tech">
-          Synthesizing 2,584 blog announcements into recruitment calendar & timeline...
+          Synthesizing 2,584 blog announcements into recruitment calendar &
+          timeline...
         </p>
       </div>
     );
@@ -248,252 +428,276 @@ export function PlacementSeasonRoadmapView({
       <div className="p-8 rounded-3xl bg-destructive/10 border border-destructive/20 text-center space-y-3">
         <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
         <h3 className="text-base font-bold text-foreground">
-          Unable to load Placement Season Calendar
+          Season Roadmap Unavailable
         </h3>
-        <p className="text-xs text-muted-foreground font-mono-tech">
-          {error || "Calendar data is currently unavailable."}
-        </p>
+        <p className="text-xs text-muted-foreground">{error}</p>
       </div>
     );
   }
 
-  const getCategoryBadgeClass = (cat: string) => {
-    switch (cat) {
-      case "ppt":
-        return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30";
-      case "jaf":
-        return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30";
-      case "assessment":
-        return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30";
-      case "shortlist":
-        return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold";
-      case "selection":
-      case "slotting":
-        return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold";
-      default:
-        return "bg-muted text-muted-foreground border-border/60";
-    }
-  };
-
-  const getCategoryDotColor = (cat: string) => {
-    switch (cat) {
-      case "ppt":
-        return "bg-purple-500";
-      case "jaf":
-        return "bg-blue-500";
-      case "assessment":
-        return "bg-amber-500";
-      case "shortlist":
-        return "bg-emerald-500";
-      case "selection":
-      case "slotting":
-        return "bg-rose-500";
-      default:
-        return "bg-muted-foreground";
-    }
-  };
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      {/* 1. TOP HERO & RECRUITMENT PULSE RADAR */}
-      <div className="p-6 sm:p-7 rounded-3xl bg-card border border-border/80 shadow-xs space-y-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <Badge
-                variant="outline"
-                className="bg-primary/10 text-primary border-primary/30 font-mono-tech text-[10px] font-bold px-2.5 py-0.5"
-              >
-                EMPIRICAL BLOG INTELLIGENCE (2025–26)
+    <div className="space-y-8 animate-in fade-in duration-300">
+      {/* 1. HERO COMMAND & TELEMETRY BAR */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-card via-card/95 to-primary/5 p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex items-center gap-2 flex-wrap font-mono-tech">
+              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs font-bold flex items-center gap-1.5 py-1 px-3">
+                <CalendarClock className="h-3.5 w-3.5" /> 2025–26 SEASON CHRONOLOGY
               </Badge>
               <Badge
                 variant="outline"
-                className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-mono-tech text-[10px] font-bold px-2.5 py-0.5"
+                className="text-xs border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 font-bold"
               >
-                2,584 VERIFIED ANNOUNCEMENTS
+                📍 TODAY: {todayFormatted} ({currentPhaseCode})
               </Badge>
-              <span className="text-[11px] font-mono-tech text-muted-foreground">
-                Today: <strong className="text-foreground">{todayFormatted}</strong> • Phase: <strong className="text-primary">{currentPhaseCode}</strong>
-              </span>
+              <Badge
+                variant="outline"
+                className="text-xs border-blue-500/40 text-blue-600 dark:text-blue-400 bg-blue-500/5 font-bold"
+              >
+                2,584 Blog Broadcasts Indexed
+              </Badge>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-foreground font-display tracking-tight flex items-center gap-2.5">
-              <CalendarClock className="h-7 w-7 text-primary shrink-0" />
-              IIT Bombay Recruitment Calendar & Track Timeline
+
+            <h2 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight font-display">
+              Placement Season Recruitment Calendar & Track Timeline
             </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground font-mono-tech max-w-3xl">
-              Chronological day-by-day record of when PPTs occurred, JAFs opened, OAs were held, and shortlists dropped last year. Know exactly what to expect this week.
+
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Explore day-by-day recruitment announcements, corporate PPTs, JAF
+              openings, and online assessments from last year. Filter strictly by
+              your career domain to see what to anticipate at each stage of the season.
             </p>
           </div>
 
-          {/* D-Day Countdown & Playbook Quick Launch */}
-          <div className="flex items-center gap-3 w-full lg:w-auto">
-            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center sm:text-right flex-1 sm:flex-initial min-w-[140px]">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 font-mono-tech block">
-                Countdown to Day 1.1
-              </span>
-              <div className="text-2xl font-black text-foreground font-mono-tech">
-                {daysToDDay} <span className="text-xs font-normal text-muted-foreground">Days</span>
+          {/* D-Day Countdown Card */}
+          <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 flex items-center gap-4 shrink-0 shadow-xs">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg font-mono-tech">
+              ⏳
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono-tech font-bold text-muted-foreground tracking-wider">
+                Countdown to D-Day (Dec 1)
               </div>
-              <span className="text-[9px] text-muted-foreground font-mono-tech block">
-                Dec 1 • 07:00 AM IST
-              </span>
+              <div className="text-2xl font-black text-foreground font-display">
+                {daysToDDay} Days Left
+              </div>
+              <div className="text-[11px] text-muted-foreground font-mono-tech">
+                Day 1.1 Slot: Dec 1, 07:00 AM IST
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOAPlaybook(true)}
-              className="h-14 rounded-2xl border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono-tech text-xs font-bold flex flex-col items-center justify-center gap-1 cursor-pointer px-3.5"
+      {/* 2. TRACK HUB: DOMAIN-SPECIFIC FILTERING */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-xs font-mono-tech font-extrabold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <Compass className="h-3.5 w-3.5 text-primary" /> Sector / Track Focus
+          </span>
+          <span className="text-xs font-mono-tech text-muted-foreground">
+            Selecting a track re-renders the calendar and timeline specifically
+            for that industry.
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 font-mono-tech">
+          {[
+            { id: "all", label: "All Tracks", icon: "🌐", count: 2584 },
+            {
+              id: "consulting",
+              label: "Consulting",
+              icon: "💼",
+              count: 124,
+            },
+            { id: "sde", label: "SDE / Tech", icon: "💻", count: 540 },
+            { id: "quant", label: "Quant / HFT", icon: "📈", count: 131 },
+            { id: "core", label: "Core Eng", icon: "⚙️", count: 415 },
+            {
+              id: "analytics",
+              label: "Product & ML",
+              icon: "📊",
+              count: 726,
+            },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTrack(t.id as any)}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                selectedTrack === t.id
+                  ? "bg-primary text-primary-foreground border-primary shadow-md"
+                  : "bg-card hover:bg-muted/50 border-border text-foreground"
+              }`}
             >
-              <Zap className="h-4 w-4" />
-              <span>OA Overlap Guide</span>
-            </Button>
-          </div>
+              <div className="text-xl mb-1">{t.icon}</div>
+              <div className="text-xs font-extrabold truncate">{t.label}</div>
+              <div
+                className={`text-[10px] mt-0.5 ${
+                  selectedTrack === t.id
+                    ? "text-primary-foreground/80"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {t.count} Events
+              </div>
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* 2. TRACK HUB SELECTOR BAR */}
-        <div className="space-y-2 pt-2 border-t border-border/50">
-          <div className="flex justify-between items-center text-xs font-mono-tech">
-            <span className="font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Compass className="h-3.5 w-3.5 text-primary" /> Select Your Preparation Domain:
-            </span>
-            <span className="text-muted-foreground text-[11px]">
-              Filters all calendar events, test dates & milestones
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            {[
-              { id: "all", label: "All Tracks", icon: Layers, count: "2,584" },
-              { id: "consulting", label: "Consulting & Strategy", icon: Briefcase, count: "116" },
-              { id: "sde", label: "Software & Systems", icon: Code2, count: "540" },
-              { id: "quant", label: "Quant & HFT", icon: TrendingUp, count: "131" },
-              { id: "core", label: "Core Engg & FMCG", icon: Cog, count: "416" },
-              { id: "analytics", label: "Product & ML", icon: BarChart2, count: "729" },
-            ].map((trk) => {
-              const IconComp = trk.icon;
-              const isSelected = selectedTrack === trk.id;
-
-              return (
-                <button
-                  key={trk.id}
-                  onClick={() => setSelectedTrack(trk.id as any)}
-                  className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between gap-1.5 cursor-pointer ${
-                    isSelected
-                      ? "bg-primary/10 border-primary ring-2 ring-primary/20 text-foreground shadow-xs"
-                      : "bg-card/60 border-border/70 hover:border-border hover:bg-card text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <div className="flex justify-between items-center">
-                    <IconComp className={`h-4 w-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className="text-[10px] font-mono-tech font-bold opacity-80">
-                      {trk.count}
-                    </span>
-                  </div>
-                  <div className="text-xs font-extrabold font-display leading-tight truncate">
-                    {trk.label}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 3. "THIS WEEK IN PLACEMENTS" LIVE RADAR */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-muted/40 border border-border/70 space-y-3 font-mono-tech">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+      {/* 3. THIS WEEK IN PLACEMENTS LIVE RADAR */}
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-500/10 via-card to-primary/5 border border-emerald-500/30 space-y-4 shadow-xs">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-extrabold text-foreground uppercase tracking-wider">
-                What Happened Last Year During This Exact Week:
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
               </span>
-              <Badge variant="outline" className="text-[10px] font-bold bg-background">
-                {activeMonthOverview?.month_name} {Math.max(1, currentDayNum - 3)}–{Math.min(30, currentDayNum + 4)}
-              </Badge>
+              <h3 className="text-base font-extrabold text-foreground font-display flex items-center gap-2">
+                This Week in Placements (What Happened Last Year)
+              </h3>
             </div>
-            <span className="text-[11px] text-muted-foreground">
-              Anchored to today's date ({todayFormatted})
-            </span>
+            <p className="text-xs text-muted-foreground font-mono-tech">
+              Historical broadcasts around September {currentDayNum} for{" "}
+              <strong className="text-foreground">
+                {selectedTrack.toUpperCase()}
+              </strong>
+            </p>
           </div>
 
-          {/* This Week's Pinned Events */}
-          {thisWeekEvents.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {thisWeekEvents.map((evt) => (
+          <Badge
+            variant="outline"
+            className="bg-background/80 text-foreground border-border text-xs font-bold font-mono-tech"
+          >
+            Sept {Math.max(1, currentDayNum - 3)} – Sept{" "}
+            {Math.min(30, currentDayNum + 3)}
+          </Badge>
+        </div>
+
+        {/* Radar Event Badges */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {thisWeekEvents.length === 0 ? (
+            <div className="col-span-3 py-4 text-center text-xs text-muted-foreground font-mono-tech">
+              No historical announcements recorded for {selectedTrack} during
+              this exact window. Switch to &ldquo;All Tracks&rdquo; to see
+              campus-wide events.
+            </div>
+          ) : (
+            thisWeekEvents.map((evt) => {
+              const catDetails = getCategoryDetails(evt.category);
+              const trackDetails = getTrackDetails(evt.track);
+              return (
                 <div
                   key={evt.id}
                   onClick={() => setSelectedDateIso(evt.iso_date)}
-                  className="p-3 rounded-xl bg-card border border-border/60 hover:border-primary/50 transition-all cursor-pointer space-y-1 group"
+                  className={`p-3.5 rounded-2xl bg-card border border-border/80 ${catDetails.cardBg} hover:shadow-sm transition-all cursor-pointer space-y-2 border-l-4 ${catDetails.borderAccent} group`}
                 >
-                  <div className="flex justify-between items-center text-[10px]">
+                  <div className="flex justify-between items-center text-[10px] font-mono-tech">
                     <span className="font-bold text-foreground">{evt.date}</span>
-                    <Badge variant="outline" className={`text-[9px] uppercase px-1 py-0 ${getCategoryBadgeClass(evt.category)}`}>
-                      {evt.category}
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] uppercase px-1.5 py-0 flex items-center gap-1 ${catDetails.badgeClass}`}
+                    >
+                      {catDetails.icon}
+                      <span>{catDetails.shortLabel}</span>
                     </Badge>
                   </div>
-                  <div className="text-xs font-extrabold text-foreground truncate group-hover:text-primary transition-colors">
+
+                  <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors line-clamp-1">
                     {evt.title}
                   </div>
-                  <div className="text-[11px] text-muted-foreground line-clamp-1">
+
+                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                     {evt.snippet}
+                  </p>
+
+                  <div className="flex justify-between items-center pt-1 border-t border-border/40 text-[10px] font-mono-tech">
+                    <span className="text-muted-foreground">
+                      {trackDetails.icon} {trackDetails.label}
+                    </span>
+                    <span className="text-primary font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                      View Day <ChevronRight className="h-3 w-3" />
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground italic py-1">
-              No specific events for the {selectedTrack} track occurred during this exact 7-day window last year.
-            </div>
+              );
+            })
           )}
+        </div>
 
-          {/* Tactical Advice for Current Month */}
-          <div className="pt-2 border-t border-border/40 flex items-start gap-2 text-xs text-foreground/90">
-            <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-primary font-bold">This Month's Survival Focus: </strong>
-              {activeMonthOverview?.tactical_guidance}
-            </div>
+        {/* Pinned Tactical Guidance */}
+        <div className="p-3.5 rounded-2xl bg-background/70 border border-border/60 flex items-center gap-3 text-xs font-mono-tech">
+          <Zap className="h-4 w-4 text-amber-500 shrink-0" />
+          <div className="text-muted-foreground">
+            <strong className="text-foreground">Tactical Rule:</strong> Attendance
+            at Pre-Placement Talks (PPTs) for firms like Kearney or Flipkart is
+            often logged by the Placement Cell and used as a hard filter for CV
+            shortlisting consideration.
           </div>
         </div>
       </div>
 
       {/* 4. VIEW CONTROLS & MONTH SELECTOR BAR */}
-      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 border-b border-border/70 pb-4">
-        {/* Month Selector Pills (July - December) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none font-mono-tech">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border/80 pb-4">
+        {/* Month Selector Buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 font-mono-tech">
           {[
-            { index: 7, name: "July" },
-            { index: 8, name: "August" },
-            { index: 9, name: "September" },
-            { index: 10, name: "October" },
-            { index: 11, name: "November" },
-            { index: 12, name: "December" },
+            { num: 7, label: "July" },
+            { num: 8, label: "August" },
+            { num: 9, label: "September" },
+            { num: 10, label: "October" },
+            { num: 11, label: "November" },
+            { num: 12, label: "December" },
           ].map((m) => {
-            const isSelected = selectedMonthIndex === m.index;
-            const isCurrent = currentMonthNum === m.index;
-
+            const isCurrent = m.num === currentMonthNum;
+            const isSelected = m.num === selectedMonthIndex;
             return (
               <button
-                key={m.index}
-                onClick={() => setSelectedMonthIndex(m.index)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                key={m.num}
+                onClick={() => {
+                  setSelectedMonthIndex(m.num);
+                  setViewMode("calendar");
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                   isSelected
-                    ? "bg-primary text-primary-foreground shadow-xs"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-foreground text-background shadow-xs"
+                    : isCurrent
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                    : "bg-card text-muted-foreground hover:text-foreground border border-border/60"
                 }`}
               >
-                {m.name}
                 {isCurrent && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 )}
+                {m.label}
               </button>
             );
           })}
         </div>
 
-        {/* View Switcher: Calendar vs Timeline */}
-        <div className="flex items-center gap-2 font-mono-tech">
-          <div className="p-1 rounded-xl bg-muted/60 border border-border/70 flex">
+        {/* View Switcher & Playbook Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowOAPlaybook(true)}
+            className="rounded-xl text-xs font-bold border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 flex items-center gap-1 cursor-pointer"
+          >
+            <Flame className="h-3.5 w-3.5 text-amber-500" /> October OA Survival
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSlottingPlaybook(true)}
+            className="rounded-xl text-xs font-bold border-border/80 flex items-center gap-1 cursor-pointer"
+          >
+            <Award className="h-3.5 w-3.5 text-primary" /> D-Day Slots
+          </Button>
+
+          <div className="flex items-center p-1 rounded-xl bg-muted border border-border">
             <button
               onClick={() => setViewMode("calendar")}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -515,15 +719,6 @@ export function PlacementSeasonRoadmapView({
               <Clock className="h-3.5 w-3.5" /> Track Timeline
             </button>
           </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSlottingPlaybook(true)}
-            className="rounded-xl text-xs font-bold border-border/80 flex items-center gap-1 cursor-pointer"
-          >
-            <Award className="h-3.5 w-3.5 text-primary" /> D-Day Slots
-          </Button>
         </div>
       </div>
 
@@ -531,7 +726,7 @@ export function PlacementSeasonRoadmapView({
       {viewMode === "calendar" && activeMonthOverview && (
         <div className="space-y-4">
           {/* Month Header Banner */}
-          <div className="p-5 rounded-2xl bg-card border border-border/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="p-5 rounded-3xl bg-gradient-to-r from-card via-card to-primary/5 border border-border/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 shadow-xs">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <Badge className="bg-primary text-primary-foreground text-[10px] font-mono-tech font-bold">
@@ -546,30 +741,30 @@ export function PlacementSeasonRoadmapView({
               </p>
             </div>
 
-            {/* Legend Chips */}
+            {/* Legend Chips with Icons */}
             <div className="flex items-center gap-2 flex-wrap font-mono-tech text-[10px]">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-purple-500" /> PPT
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-500/20 font-bold">
+                <Presentation className="h-3 w-3" /> PPT
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-blue-500" /> JAF
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 font-bold">
+                <FileText className="h-3 w-3" /> JAF
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-500" /> OA (Test)
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-bold">
+                <Laptop className="h-3 w-3" /> OA (Test)
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> Shortlist
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-bold">
+                <Users className="h-3 w-3" /> Shortlist
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-rose-500" /> D-Day Slot
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 font-bold">
+                <Award className="h-3 w-3" /> D-Day Slot
               </span>
             </div>
           </div>
 
           {/* 7-Column Day Calendar Grid */}
-          <div className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xs">
+          <div className="rounded-3xl border border-border/80 bg-card overflow-hidden shadow-sm">
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 border-b border-border/80 bg-muted/30 font-mono-tech text-xs font-extrabold text-muted-foreground text-center py-2.5">
+            <div className="grid grid-cols-7 border-b border-border/80 bg-muted/40 font-mono-tech text-xs font-extrabold text-muted-foreground text-center py-3">
               <div>MON</div>
               <div>TUE</div>
               <div>WED</div>
@@ -586,7 +781,7 @@ export function PlacementSeasonRoadmapView({
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="min-h-[105px] p-2 bg-muted/10"
+                      className="min-h-[110px] p-2 bg-muted/10"
                     />
                   );
                 }
@@ -601,26 +796,34 @@ export function PlacementSeasonRoadmapView({
                   <div
                     key={cell.isoDate}
                     onClick={() => setSelectedDateIso(cell.isoDate)}
-                    className={`min-h-[110px] p-2 transition-all cursor-pointer flex flex-col justify-between group ${
+                    className={`min-h-[115px] p-2.5 transition-all cursor-pointer flex flex-col justify-between group rounded-lg ${
                       isSelectedDay
-                        ? "bg-primary/5 ring-2 ring-primary inset-0 z-10"
+                        ? "bg-primary/10 ring-2 ring-primary inset-0 z-10 shadow-sm"
                         : isToday
-                        ? "bg-emerald-500/5 hover:bg-emerald-500/10"
+                        ? "bg-emerald-500/10 ring-2 ring-emerald-500/50 hover:bg-emerald-500/15"
                         : "hover:bg-muted/40"
                     }`}
                   >
                     <div className="flex justify-between items-center">
-                      <span
-                        className={`text-xs font-mono-tech font-black ${
-                          isToday
-                            ? "h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs"
-                            : "text-foreground group-hover:text-primary transition-colors"
-                        }`}
-                      >
-                        {cell.dayNumber}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-xs font-mono-tech font-black ${
+                            isToday
+                              ? "h-6 w-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs"
+                              : "text-foreground group-hover:text-primary transition-colors"
+                          }`}
+                        >
+                          {cell.dayNumber}
+                        </span>
+                        {isToday && (
+                          <span className="text-[9px] font-mono-tech font-bold uppercase text-emerald-600 dark:text-emerald-400">
+                            Today
+                          </span>
+                        )}
+                      </div>
+
                       {dayEvents.length > 0 && (
-                        <span className="text-[10px] font-mono-tech text-muted-foreground">
+                        <span className="text-[10px] font-mono-tech font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                           {dayEvents.length}
                         </span>
                       )}
@@ -628,22 +831,26 @@ export function PlacementSeasonRoadmapView({
 
                     {/* Event Badges in Day Cell */}
                     <div className="space-y-1 mt-1 font-mono-tech">
-                      {dayEvents.slice(0, 2).map((evt) => (
-                        <div
-                          key={evt.id}
-                          className={`text-[9px] px-1.5 py-0.5 rounded truncate font-semibold border flex items-center gap-1 ${getCategoryBadgeClass(
-                            evt.category
-                          )}`}
-                          title={evt.title}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${getCategoryDotColor(evt.category)}`} />
-                          <span className="truncate">{evt.company || evt.title}</span>
-                        </div>
-                      ))}
+                      {dayEvents.slice(0, 2).map((evt) => {
+                        const catDetails = getCategoryDetails(evt.category);
+                        return (
+                          <div
+                            key={evt.id}
+                            className={`text-[9px] px-1.5 py-0.5 rounded-md truncate font-semibold border flex items-center gap-1 shadow-2xs ${catDetails.badgeClass}`}
+                            title={evt.title}
+                          >
+                            <span className="shrink-0">{catDetails.icon}</span>
+                            <span className="truncate">
+                              {evt.company || evt.title}
+                            </span>
+                          </div>
+                        );
+                      })}
 
                       {dayEvents.length > 2 && (
-                        <div className="text-[9px] text-muted-foreground font-bold pl-1">
-                          +{dayEvents.length - 2} more
+                        <div className="text-[9px] text-muted-foreground font-extrabold pl-1 flex items-center gap-1">
+                          <span className="h-1 w-1 rounded-full bg-muted-foreground" />
+                          <span>+{dayEvents.length - 2} more</span>
                         </div>
                       )}
                     </div>
@@ -658,60 +865,127 @@ export function PlacementSeasonRoadmapView({
       {/* 6. VIEW B: CHRONOLOGICAL TRACK TIMELINE */}
       {viewMode === "timeline" && (
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-card border border-border/80 flex justify-between items-center text-xs font-mono-tech">
-            <span className="font-extrabold text-foreground uppercase tracking-wider">
-              Chronological Sequence of Events for {selectedTrack.toUpperCase()}:
+          <div className="p-4 rounded-2xl bg-card border border-border/80 flex justify-between items-center text-xs font-mono-tech shadow-xs">
+            <span className="font-extrabold text-foreground uppercase tracking-wider flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> Chronological Sequence
+              of Events for {selectedTrack.toUpperCase()}:
             </span>
             <span className="text-muted-foreground">
-              {timelineEvents.length} Total Events Recorded
+              {timelineEvents.length} Total Announcements Recorded
             </span>
           </div>
 
-          <div className="space-y-3 font-mono-tech">
-            {timelineEvents.map((evt) => (
-              <div
-                key={evt.id}
-                onClick={() => setSelectedDateIso(evt.iso_date)}
-                className="p-4 rounded-2xl bg-card border border-border/70 hover:border-primary/50 transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 group"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-foreground font-mono-tech">
-                      {evt.date}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] uppercase px-1.5 py-0 ${getCategoryBadgeClass(evt.category)}`}
+          <div className="space-y-3 font-mono-tech relative before:absolute before:inset-0 before:left-3 sm:before:left-5 before:w-0.5 before:bg-border/60 before:z-0">
+            {timelineEvents.map((evt) => {
+              const catDetails = getCategoryDetails(evt.category);
+              const trackDetails = getTrackDetails(evt.track);
+              const isExpanded = expandedEventIds.has(evt.id);
+
+              return (
+                <div
+                  key={evt.id}
+                  className={`relative z-10 p-5 rounded-2xl bg-card border border-border/80 border-l-4 ${catDetails.borderAccent} ${catDetails.cardBg} hover:shadow-md transition-all space-y-3 group`}
+                >
+                  {/* Card Header */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black text-foreground font-mono-tech">
+                        {evt.date}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase px-2 py-0.5 flex items-center gap-1 font-bold ${catDetails.badgeClass}`}
+                      >
+                        {catDetails.icon}
+                        <span>{catDetails.label}</span>
+                      </Badge>
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50">
+                        {trackDetails.icon} {trackDetails.label}
+                      </span>
+                      {evt.company && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-bold bg-primary/5 text-primary border-primary/25"
+                        >
+                          {evt.company}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedDateIso(evt.iso_date)}
+                      className="text-[11px] font-bold text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
                     >
-                      {evt.category}
-                    </Badge>
-                    <span className="text-[10px] uppercase text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
-                      {evt.track}
-                    </span>
+                      <Calendar className="h-3 w-3" /> View Day Broadcasts
+                    </button>
                   </div>
-                  <h4 className="text-sm font-extrabold text-foreground group-hover:text-primary transition-colors">
+
+                  {/* Title */}
+                  <h4 className="text-sm sm:text-base font-black text-foreground group-hover:text-primary transition-colors leading-snug">
                     {evt.title}
                   </h4>
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                    {evt.snippet}
-                  </p>
-                </div>
 
-                {evt.company && onSelectCompany && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectCompany(evt.company_slug);
-                    }}
-                    className="shrink-0 text-xs font-bold text-primary hover:text-primary cursor-pointer flex items-center gap-1"
-                  >
-                    Explore Dossier <ChevronRight className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            ))}
+                  {/* Announcement Content with Expand / Collapse */}
+                  <div className="text-xs text-foreground/90 leading-relaxed font-sans">
+                    <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}>
+                      {isExpanded
+                        ? evt.content || evt.snippet
+                        : evt.snippet}
+                    </p>
+
+                    <button
+                      onClick={(e) => toggleExpandEvent(evt.id, e)}
+                      className="mt-1.5 text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="h-3.5 w-3.5" /> Show Less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* External Links attached to this announcement */}
+                  {evt.external_links && evt.external_links.length > 0 && (
+                    <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2">
+                      {evt.external_links.map((link, lIdx) => (
+                        <a
+                          key={lIdx}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold hover:bg-blue-500/20 transition-colors"
+                        >
+                          <Globe className="h-3.5 w-3.5" /> Open Broadcast Portal Link{" "}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Verified Recruiter Dossier Button (ONLY rendered if verified company dossier exists!) */}
+                  {evt.has_dossier && evt.company_slug && onSelectCompany && (
+                    <div className="pt-2 border-t border-border/40 flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectCompany(evt.company_slug);
+                        }}
+                        className="rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/30 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        Open {evt.company} Intelligence Dossier{" "}
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -729,7 +1003,8 @@ export function PlacementSeasonRoadmapView({
                   {selectedDateIso}
                 </h3>
                 <p className="text-xs text-muted-foreground font-mono-tech">
-                  {selectedDateEvents.length} Official Placement Blog Broadcast(s) on this date
+                  {selectedDateEvents.length} Official Placement Blog Broadcast(s)
+                  recorded on this date
                 </p>
               </div>
 
@@ -743,53 +1018,228 @@ export function PlacementSeasonRoadmapView({
 
             {/* List of announcements on this day */}
             <div className="space-y-4 font-mono-tech">
-              {selectedDateEvents.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="p-5 rounded-2xl bg-muted/30 border border-border/70 space-y-3"
-                >
-                  <div className="flex justify-between items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] uppercase px-1.5 py-0.5 ${getCategoryBadgeClass(evt.category)}`}
-                    >
-                      {evt.category}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground uppercase">
-                      Track: {evt.track}
-                    </span>
-                  </div>
+              {selectedDateEvents.map((evt) => {
+                const catDetails = getCategoryDetails(evt.category);
+                const trackDetails = getTrackDetails(evt.track);
+                const isExpanded = expandedEventIds.has(evt.id);
 
-                  <div className="text-sm font-black text-foreground leading-snug">
-                    {evt.title}
-                  </div>
-
-                  <p className="text-xs text-foreground/90 leading-relaxed">
-                    {evt.snippet}
-                  </p>
-
-                  {evt.company && onSelectCompany && (
-                    <div className="pt-2 border-t border-border/40 flex justify-end">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDateIso(null);
-                          onSelectCompany(evt.company_slug);
-                        }}
-                        className="rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                return (
+                  <div
+                    key={evt.id}
+                    className={`p-5 rounded-2xl bg-muted/30 border border-border/70 border-l-4 ${catDetails.borderAccent} space-y-3`}
+                  >
+                    <div className="flex justify-between items-center gap-2 flex-wrap">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase px-2 py-0.5 flex items-center gap-1 font-bold ${catDetails.badgeClass}`}
                       >
-                        Open {evt.company} Recruiter Dossier <ExternalLink className="h-3 w-3" />
-                      </Button>
+                        {catDetails.icon}
+                        <span>{catDetails.label}</span>
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                        {trackDetails.icon} {trackDetails.label}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    <div className="text-sm font-black text-foreground leading-snug">
+                      {evt.title}
+                    </div>
+
+                    {/* Announcement text with expandable view */}
+                    <div className="text-xs text-foreground/90 leading-relaxed font-sans">
+                      <p className={isExpanded ? "whitespace-pre-wrap" : "line-clamp-3"}>
+                        {isExpanded
+                          ? evt.content || evt.snippet
+                          : evt.snippet}
+                      </p>
+
+                      <button
+                        onClick={(e) => toggleExpandEvent(evt.id, e)}
+                        className="mt-1.5 text-xs font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        {isExpanded ? (
+                          <>
+                            <ChevronUp className="h-3.5 w-3.5" /> Show Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3.5 w-3.5" /> Read Full Announcement
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* External links if attached to announcement */}
+                    {evt.external_links && evt.external_links.length > 0 && (
+                      <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2">
+                        {evt.external_links.map((link, lIdx) => (
+                          <a
+                            key={lIdx}
+                            href={link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold hover:bg-blue-500/20 transition-colors"
+                          >
+                            <Globe className="h-3.5 w-3.5" /> Official Broadcast Link{" "}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Working Recruiter Dossier Link (ONLY rendered if verified company dossier exists!) */}
+                    {evt.has_dossier && evt.company_slug && onSelectCompany && (
+                      <div className="pt-2 border-t border-border/40 flex justify-end">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDateIso(null);
+                            onSelectCompany(evt.company_slug);
+                          }}
+                          className="rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          Open {evt.company} Recruiter Dossier{" "}
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* 8. OCTOBER OA OVERLAP & FATIGUE SURVIVAL PLAYBOOK MODAL */}
+      {/* 8. DEDICATED ANNOUNCEMENT POPUP MODAL (Solves search redirect issue!) */}
+      {selectedAnnouncementPopup && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-full max-w-2xl bg-card border border-border rounded-3xl p-6 sm:p-7 overflow-y-auto max-h-[88vh] space-y-5 shadow-2xl font-mono-tech">
+            <div className="flex justify-between items-start gap-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-foreground">
+                    {selectedAnnouncementPopup.date}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[9px] uppercase px-2 py-0.5 flex items-center gap-1 font-bold ${getCategoryDetails(
+                      selectedAnnouncementPopup.category
+                    ).badgeClass}`}
+                  >
+                    {getCategoryDetails(selectedAnnouncementPopup.category).icon}
+                    <span>
+                      {
+                        getCategoryDetails(selectedAnnouncementPopup.category)
+                          .label
+                      }
+                    </span>
+                  </Badge>
+                  <span className="text-[10px] font-bold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-md border border-border/50 uppercase">
+                    {getTrackDetails(selectedAnnouncementPopup.track).icon}{" "}
+                    {getTrackDetails(selectedAnnouncementPopup.track).label}
+                  </span>
+                </div>
+
+                <h3 className="text-lg sm:text-xl font-black text-foreground font-display leading-snug">
+                  {selectedAnnouncementPopup.title}
+                </h3>
+              </div>
+
+              <button
+                onClick={() => setSelectedAnnouncementPopup(null)}
+                className="h-8 w-8 rounded-full border border-border/80 flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Full announcement body */}
+            <div className="p-4 rounded-2xl bg-muted/30 border border-border/70 space-y-3 font-sans">
+              <div className="text-xs font-mono-tech font-bold text-muted-foreground uppercase tracking-wider">
+                Full Announcement Broadcast:
+              </div>
+              <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                {selectedAnnouncementPopup.content ||
+                  selectedAnnouncementPopup.snippet}
+              </p>
+            </div>
+
+            {/* External Links if attached */}
+            {selectedAnnouncementPopup.external_links &&
+              selectedAnnouncementPopup.external_links.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-muted-foreground">
+                    Attached Official Links:
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedAnnouncementPopup.external_links.map(
+                      (link, lIdx) => (
+                        <a
+                          key={lIdx}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold hover:bg-blue-500/20 transition-colors"
+                        >
+                          <Globe className="h-3.5 w-3.5" /> Open Form / Submission
+                          Portal <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+            {/* Action Footer */}
+            <div className="pt-3 border-t border-border/60 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = selectedAnnouncementPopup.iso_date;
+                  setSelectedAnnouncementPopup(null);
+                  setSelectedDateIso(date);
+                }}
+                className="w-full sm:w-auto rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+              >
+                <Calendar className="h-3.5 w-3.5 text-primary" /> View All Broadcasts
+                for This Day
+              </Button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                {selectedAnnouncementPopup.has_dossier &&
+                  selectedAnnouncementPopup.company_slug &&
+                  onSelectCompany && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const slug = selectedAnnouncementPopup.company_slug;
+                        setSelectedAnnouncementPopup(null);
+                        onSelectCompany(slug);
+                      }}
+                      className="w-full sm:w-auto rounded-xl text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      Open {selectedAnnouncementPopup.company} Dossier{" "}
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedAnnouncementPopup(null)}
+                  className="rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. OCTOBER OA OVERLAP & FATIGUE SURVIVAL PLAYBOOK MODAL */}
       {showOAPlaybook && data?.oa_survival_guide && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-3xl max-h-[85vh] bg-card border border-border rounded-3xl p-6 sm:p-8 overflow-y-auto space-y-6 shadow-2xl font-mono-tech">
@@ -817,43 +1267,47 @@ export function PlacementSeasonRoadmapView({
             {/* Consecutive Test Rules */}
             <div className="space-y-3">
               <h4 className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Flame className="h-4 w-4 text-amber-500" /> Back-to-Back Test Strategy (8:00 PM & 9:45 PM):
+                <Flame className="h-4 w-4 text-amber-500" /> Back-to-Back Test
+                Strategy (8:00 PM & 9:45 PM):
               </h4>
               <div className="space-y-2.5">
-                {data.oa_survival_guide.consecutive_test_strategy.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-2xl bg-muted/40 border border-border/70 space-y-1"
-                  >
-                    <div className="text-xs font-bold text-primary">
-                      {item.rule}
+                {data.oa_survival_guide.consecutive_test_strategy.map(
+                  (item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-2xl bg-muted/40 border border-border/70 space-y-1"
+                    >
+                      <div className="text-xs font-bold text-primary">
+                        {item.rule}
+                      </div>
+                      <p className="text-xs text-foreground/90 leading-relaxed font-sans">
+                        {item.action}
+                      </p>
                     </div>
-                    <p className="text-xs text-foreground/90 leading-relaxed">
-                      {item.action}
-                    </p>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
 
             {/* Weekend Window Tactics */}
             <div className="space-y-2.5">
               <h4 className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldAlert className="h-4 w-4 text-rose-500" /> 24-Hour Weekend Open Window Strategy:
+                <ShieldAlert className="h-4 w-4 text-rose-500" /> 24-Hour
+                Weekend Open Window Strategy:
               </h4>
               {data.oa_survival_guide.weekend_window_strategy.map((w, idx) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/25 space-y-1.5 text-xs"
+                  className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/25 space-y-1.5 text-xs font-sans"
                 >
-                  <div className="font-bold text-rose-600 dark:text-rose-400">
+                  <div className="font-bold text-rose-600 dark:text-rose-400 font-mono-tech">
                     {w.window_type}
                   </div>
                   <div className="font-extrabold text-foreground">
                     ⚠️ {w.golden_rule}
                   </div>
                   <p className="text-muted-foreground">{w.why}</p>
-                  <div className="pt-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <div className="pt-1 text-emerald-600 dark:text-emerald-400 font-bold font-mono-tech">
                     ✅ Recommended Window: {w.best_time_to_start}
                   </div>
                 </div>
@@ -863,27 +1317,30 @@ export function PlacementSeasonRoadmapView({
             {/* Platform Proctoring Profiles */}
             <div className="space-y-2.5">
               <h4 className="text-sm font-extrabold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <Terminal className="h-4 w-4 text-primary" /> Platform Proctoring Quirks & Disqualification Traps:
+                <Terminal className="h-4 w-4 text-primary" /> Platform
+                Proctoring Quirks & Disqualification Traps:
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {data.oa_survival_guide.platform_proctoring_profiles.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-2xl bg-muted/30 border border-border/60 space-y-2 text-xs"
-                  >
-                    <div className="font-extrabold text-foreground flex justify-between items-center">
-                      <span>{p.platform}</span>
+                {data.oa_survival_guide.platform_proctoring_profiles.map(
+                  (p, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-2xl bg-muted/30 border border-border/60 space-y-2 text-xs"
+                    >
+                      <div className="font-extrabold text-foreground flex justify-between items-center">
+                        <span>{p.platform}</span>
+                      </div>
+                      <ul className="space-y-1 text-muted-foreground text-[11px] font-sans">
+                        {p.traps_to_avoid.map((trap, tIdx) => (
+                          <li key={tIdx} className="flex items-start gap-1.5">
+                            <span className="text-primary font-bold">›</span>
+                            <span>{trap}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <ul className="space-y-1 text-muted-foreground text-[11px]">
-                      {p.traps_to_avoid.map((trap, tIdx) => (
-                        <li key={tIdx} className="flex items-start gap-1.5">
-                          <span className="text-primary font-bold">›</span>
-                          <span>{trap}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
 
@@ -899,7 +1356,7 @@ export function PlacementSeasonRoadmapView({
         </div>
       )}
 
-      {/* 9. D-DAY SLOTTING PLAYBOOK MODAL */}
+      {/* 10. D-DAY SLOTTING PLAYBOOK MODAL */}
       {showSlottingPlaybook && data?.dday_slotting_playbook && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-4xl max-h-[85vh] bg-card border border-border rounded-3xl p-6 sm:p-8 overflow-y-auto space-y-6 shadow-2xl font-mono-tech">
@@ -939,7 +1396,7 @@ export function PlacementSeasonRoadmapView({
                     </span>
                   </div>
 
-                  <p className="text-xs text-foreground/90 leading-relaxed">
+                  <p className="text-xs text-foreground/90 leading-relaxed font-sans">
                     {slot.characteristics}
                   </p>
 
@@ -948,21 +1405,19 @@ export function PlacementSeasonRoadmapView({
                       Recruiters:
                     </span>
                     <div className="flex flex-wrap gap-1">
-                      {slot.historical_recruiters.map((rec, rIdx) => (
+                      {slot.historical_recruiters.map((r, rIdx) => (
                         <span
                           key={rIdx}
-                          className="text-[10px] bg-card text-foreground px-1.5 py-0.5 rounded border border-border/60"
+                          className="px-2 py-0.5 rounded-md bg-card border border-border text-[10px] font-bold text-foreground"
                         >
-                          {rec}
+                          {r}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-foreground/90">
-                    <strong className="text-amber-600 dark:text-amber-400 block mb-0.5">
-                      Sequencing Strategy:
-                    </strong>
+                  <div className="p-3 rounded-xl bg-background/80 border border-border/60 text-[11px] text-muted-foreground font-sans">
+                    <strong className="text-foreground">Collision Strategy:</strong>{" "}
                     {slot.collision_strategy}
                   </div>
                 </div>
@@ -974,23 +1429,24 @@ export function PlacementSeasonRoadmapView({
                 onClick={() => setShowSlottingPlaybook(false)}
                 className="rounded-xl text-xs font-bold cursor-pointer"
               >
-                Close Slotting Playbook
+                Close Playbook
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 10. SEARCHABLE ALL-ANNOUNCEMENTS VAULT DRAWER */}
-      <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-xs space-y-4 font-mono-tech">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div>
-            <h4 className="text-lg font-black text-foreground font-display flex items-center gap-2">
-              <Search className="h-5 w-5 text-primary" />
-              Searchable Placement Blog Vault (2,584 Announcements)
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              Search any company (e.g. Flipkart, Kearney, Jane Street) to see their full recruitment lifecycle.
+      {/* 11. SEARCHABLE ALL-ANNOUNCEMENTS VAULT */}
+      <div className="p-6 rounded-3xl bg-card border border-border/80 space-y-4 shadow-xs">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <div className="space-y-0.5">
+            <h3 className="text-base font-extrabold text-foreground font-display flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" /> Searchable Placement
+              Blog Vault (2,584 Announcements)
+            </h3>
+            <p className="text-xs text-muted-foreground font-mono-tech">
+              Search any company (e.g. Flipkart, Kearney, Jane Street) or keyword to
+              instantly view the full announcement details in a popup.
             </p>
           </div>
         </div>
@@ -1001,39 +1457,58 @@ export function PlacementSeasonRoadmapView({
             value={vaultSearchQuery}
             onChange={(e) => setVaultSearchQuery(e.target.value)}
             placeholder="Search company name, test format, shortlist announcement (e.g., 'Flipkart', 'HackerRank', 'Shortlist')..."
-            className="pl-10 h-11 rounded-2xl bg-muted/40 border-border/80 text-xs font-mono-tech"
+            className="pl-10 h-11 rounded-2xl bg-muted/30 border-border text-sm font-mono-tech"
           />
         </div>
 
         {vaultSearchQuery.trim() && (
-          <div className="space-y-2 pt-2">
-            <div className="text-xs font-bold text-muted-foreground">
-              Found {vaultSearchResults.length} matching announcements:
+          <div className="space-y-3 font-mono-tech pt-2">
+            <div className="text-xs font-bold text-muted-foreground flex justify-between items-center">
+              <span>Found {vaultSearchResults.length} matching announcements:</span>
+              <span className="text-[11px]">Click any card to open full details</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
-              {vaultSearchResults.map((evt) => (
-                <div
-                  key={evt.id}
-                  onClick={() => setSelectedDateIso(evt.iso_date)}
-                  className="p-4 rounded-2xl bg-muted/30 border border-border/70 hover:border-primary transition-all cursor-pointer space-y-1.5"
-                >
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="font-bold text-foreground">{evt.date}</span>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] uppercase px-1 py-0 ${getCategoryBadgeClass(evt.category)}`}
-                    >
-                      {evt.category}
-                    </Badge>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[460px] overflow-y-auto pr-1">
+              {vaultSearchResults.map((evt) => {
+                const catDetails = getCategoryDetails(evt.category);
+                const trackDetails = getTrackDetails(evt.track);
+
+                return (
+                  <div
+                    key={evt.id}
+                    onClick={() => setSelectedAnnouncementPopup(evt)}
+                    className={`p-4 rounded-2xl bg-muted/30 border border-border/70 hover:border-primary/60 border-l-4 ${catDetails.borderAccent} hover:shadow-md transition-all cursor-pointer space-y-2 group`}
+                  >
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-foreground">{evt.date}</span>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase px-1.5 py-0 flex items-center gap-1 ${catDetails.badgeClass}`}
+                      >
+                        {catDetails.icon}
+                        <span>{catDetails.shortLabel}</span>
+                      </Badge>
+                    </div>
+
+                    <div className="text-xs font-black text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                      {evt.title}
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed font-sans">
+                      {evt.snippet}
+                    </p>
+
+                    <div className="flex justify-between items-center pt-1 border-t border-border/40 text-[10px]">
+                      <span className="text-muted-foreground">
+                        {trackDetails.icon} {trackDetails.label}
+                      </span>
+                      <span className="text-primary font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                        Open Details <ArrowRight className="h-3 w-3" />
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-xs font-extrabold text-foreground truncate">
-                    {evt.title}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground line-clamp-2">
-                    {evt.snippet}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

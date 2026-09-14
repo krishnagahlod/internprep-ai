@@ -65,14 +65,139 @@ def categorize_post(title: str, content: str) -> str:
     return "general"
 
 
-def extract_company_name(title: str) -> str:
-    if "|" in title:
-        parts = title.split("|")
-        return parts[0].strip()
-    if "-" in title and not title.startswith("Day"):
-        parts = title.split("-")
-        return parts[0].strip()
-    return ""
+def build_canonical_index():
+    intel_path = os.path.join(ROOT_DIR, "apps", "api", "data", "placement_intelligence.json")
+    if not os.path.exists(intel_path):
+        return {}, {}
+    with open(intel_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    slug_map = {}
+    name_clean_map = {}
+
+    for c in data.get("companies", []):
+        slug = c["slug"]
+        name = c["name"]
+        slug_map[slug] = (name, slug)
+
+        clean = re.sub(r"[^a-z0-9]", "", name.lower())
+        name_clean_map[clean] = (name, slug)
+
+        simplified = re.sub(r"\b(pvt|ltd|limited|private|llc|inc|corp|corporation|technologies|solutions|india|group|holdings)\b", "", name.lower())
+        simplified_clean = re.sub(r"[^a-z0-9]", "", simplified)
+        if len(simplified_clean) >= 3:
+            name_clean_map[simplified_clean] = (name, slug)
+
+    aliases = {
+        "flipkart": ("Flipkart", "flipkart"),
+        "kearney": ("Kearney", "kearney"),
+        "mckinsey": ("McKinsey & Company", "mckinsey-and-company"),
+        "bcg": ("Boston Consulting Group (BCG)", "boston-consulting-group-bcg"),
+        "bain": ("Bain & Company", "bain-and-company"),
+        "baincompany": ("Bain & Company", "bain-and-company"),
+        "davinci": ("Da Vinci Derivatives BV", "da-vinci-derivatives-bv"),
+        "janestreet": ("Jane Street", "jane-street"),
+        "optiver": ("Optiver", "optiver"),
+        "graviton": ("Graviton Research Capital", "graviton-research-capital"),
+        "quadeye": ("Quadeye", "quadeye"),
+        "squarepoint": ("Squarepoint Capital", "squarepoint-capital"),
+        "nksecurities": ("NK Securities", "nk-securities"),
+        "google": ("Google", "google"),
+        "googleindia": ("Google", "google"),
+        "microsoft": ("Microsoft", "microsoft"),
+        "apple": ("Apple", "apple"),
+        "uber": ("Uber", "uber"),
+        "qualcomm": ("Qualcomm", "qualcomm"),
+        "rubrik": ("Rubrik", "rubrik"),
+        "glean": ("Glean", "glean"),
+        "sprinklr": ("Sprinklr", "sprinklr"),
+        "tatamotors": ("Tata Motors", "tata-motors"),
+        "reliance": ("Reliance Industries", "reliance-industries"),
+        "slb": ("SLB (Schlumberger)", "slb-schlumberger"),
+        "schlumberger": ("SLB (Schlumberger)", "slb-schlumberger"),
+        "procter": ("Procter & Gamble (P&G)", "procter-and-gamble-p-and-g"),
+        "pg": ("Procter & Gamble (P&G)", "procter-and-gamble-p-and-g"),
+        "sbifund": ("SBI Funds Management", "sbi-funds-management"),
+        "sbifunds": ("SBI Funds Management", "sbi-funds-management"),
+        "sony": ("Sony Group", "sony-group"),
+        "sonyjapan": ("Sony Group", "sony-group"),
+        "goldmansachs": ("Goldman Sachs", "goldman-sachs"),
+        "morganstanley": ("Morgan Stanley", "morgan-stanley"),
+        "jpmorgan": ("JPMorgan Chase", "jpmorgan-chase"),
+        "jpmc": ("JPMorgan Chase", "jpmorgan-chase"),
+        "itc": ("ITC Limited", "itc-limited"),
+        "hul": ("Hindustan Unilever Limited (HUL)", "hindustan-unilever-limited-hul"),
+        "airbus": ("Airbus", "airbus"),
+        "siemens": ("Siemens", "siemens"),
+        "texasinstruments": ("Texas Instruments", "texas-instruments"),
+        "micron": ("Micron Technology", "micron-technology"),
+        "bajajauto": ("Bajaj Auto", "bajaj-auto"),
+        "maruti": ("Maruti Suzuki", "maruti-suzuki"),
+        "honda": ("Honda R&D", "honda-r-d"),
+        "zomato": ("Zomato", "zomato"),
+        "meesho": ("Meesho", "meesho"),
+        "americanexpress": ("American Express", "american-express"),
+        "capitalone": ("Capital One", "capital-one"),
+        "exl": ("EXL Service", "exl-service"),
+    }
+    for k, v in aliases.items():
+        name_clean_map[re.sub(r"[^a-z0-9]", "", k.lower())] = v
+
+    return slug_map, name_clean_map
+
+
+NON_COMPANY_TRIGGERS = [
+    "preparatory", "welcome to", "placement season", "timeline", "query form",
+    "degree conversion", "formal suit", "incentive points", "knowledge session", "guidelines",
+    "important update", "general notice", "slot matrix", "orientation", "cantilever labs",
+    "idc day", "resume-making", "resume making", "career fair", "formal attire",
+    "day 1", "day 2", "day 3", "day 4", "day 5", "day 6", "day 7", "day 8", "day 9",
+    "day 10", "day 11", "day 12", "day 13", "day 14", "day 15"
+]
+
+
+def match_canonical_company(title: str, content: str, slug_map, name_clean_map):
+    prefix = title.split("|")[0].strip() if "|" in title else (title.split("-")[0].strip() if "-" in title else title.strip())
+    p_lower = prefix.lower()
+
+    if any(trigger in p_lower for trigger in NON_COMPANY_TRIGGERS):
+        return "", "", False
+
+    clean_p = re.sub(r"[^a-z0-9]", "", p_lower)
+
+    # 1. Exact match
+    if clean_p in name_clean_map:
+        name, slug = name_clean_map[clean_p]
+        return name, slug, True
+
+    # 2. Check if clean_p starts with any known key
+    for k, (name, slug) in name_clean_map.items():
+        if len(k) >= 4:
+            if clean_p == k or clean_p.startswith(k) or (k.startswith(clean_p) and len(clean_p) >= 4):
+                return name, slug, True
+
+    # 3. Check if company name appears in title with word boundaries
+    t_clean = re.sub(r"[^a-z0-9]", " ", title.lower())
+    words = set(t_clean.split())
+    for k, (name, slug) in name_clean_map.items():
+        if len(k) >= 5 and k in words:
+            return name, slug, True
+
+    return "", "", False
+
+
+def extract_external_links(raw_text: str) -> list:
+    if not raw_text:
+        return []
+    urls = re.findall(r"https?://[^\s<>\"'\)]+", raw_text)
+    clean_urls = []
+    seen = set()
+    for u in urls:
+        cu = re.sub(r"[\.,;\)\]]+$", "", u).strip()
+        if cu and "schema.org" not in cu and "w3.org" not in cu and cu not in seen:
+            clean_urls.append(cu)
+            seen.add(cu)
+    return clean_urls
 
 
 def assign_track(title: str, content: str, company: str) -> str:
@@ -155,6 +280,9 @@ def main():
 
     print(f"Loaded {len(posts)} posts. Parsing and indexing into Calendar & Timeline...")
 
+    slug_map, name_clean_map = build_canonical_index()
+    print(f"Indexed {len(slug_map)} canonical companies with {len(name_clean_map)} search keys.")
+
     calendar_events = []
     days_map = defaultdict(list)
     track_events = defaultdict(list)
@@ -176,10 +304,11 @@ def main():
         title = p.get("title", "").strip()
         content = clean_html(p.get("content_text") or p.get("content_html") or "")
         cat = categorize_post(title, content)
-        comp = extract_company_name(title)
-        track = assign_track(title, content, comp)
-        is_high = is_high_impact_event(comp, title, cat)
-        snippet = content[:280] + ("..." if len(content) > 280 else "")
+        comp_name, comp_slug, has_dossier = match_canonical_company(title, content, slug_map, name_clean_map)
+        track = assign_track(title, content, comp_name)
+        is_high = is_high_impact_event(comp_name, title, cat)
+        snippet = content[:160] + ("..." if len(content) > 160 else "")
+        ext_links = extract_external_links(p.get("content_text") or p.get("content_html") or "")
 
         iso_date = dt.strftime("%Y-%m-%d") if dt else "2025-11-01"
         month_name = dt.strftime("%B") if dt else "November"
@@ -190,8 +319,9 @@ def main():
         evt = {
             "id": f"evt-{idx}",
             "title": title,
-            "company": comp,
-            "company_slug": comp.lower().replace(" ", "-").replace("&", "and") if comp else "",
+            "company": comp_name,
+            "company_slug": comp_slug,
+            "has_dossier": has_dossier,
             "date": date_str,
             "iso_date": iso_date,
             "day": day_num,
@@ -202,6 +332,8 @@ def main():
             "track": track,
             "is_high_impact": is_high,
             "snippet": snippet,
+            "content": content[:2500],
+            "external_links": ext_links,
         }
 
         calendar_events.append(evt)

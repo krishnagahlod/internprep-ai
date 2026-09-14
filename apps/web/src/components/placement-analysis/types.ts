@@ -426,6 +426,7 @@ export interface CalendarEvent {
   title: string;
   company: string;
   company_slug: string;
+  has_dossier?: boolean;
   date: string;
   iso_date: string;
   day: number;
@@ -436,6 +437,8 @@ export interface CalendarEvent {
   track: "consulting" | "sde" | "quant" | "core" | "analytics" | "general";
   is_high_impact: boolean;
   snippet: string;
+  content?: string;
+  external_links?: string[];
 }
 
 export interface MonthOverview {
