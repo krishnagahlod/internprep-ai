@@ -66,20 +66,44 @@ export function Footer() {
             <div className="font-mono-tech text-foreground text-xs font-semibold uppercase">Trust & Policies</div>
             <ul className="space-y-2 text-muted-foreground">
               <li>
-                <button 
-                  onClick={() => setModalType("privacy")} 
-                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors text-left"
+                <Link 
+                  href="/privacy" 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors"
                 >
-                  Privacy Policy
-                </button>
+                  Privacy Policy (DPDP & GDPR)
+                </Link>
               </li>
               <li>
-                <button 
-                  onClick={() => setModalType("terms")} 
-                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors text-left"
+                <Link 
+                  href="/terms" 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors"
                 >
-                  Terms of Service
-                </button>
+                  Terms of Service & Disclaimers
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/cookies" 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors"
+                >
+                  Cookie Policy
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/refund" 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors"
+                >
+                  Refund & Cancellation
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  href="/contact" 
+                  className="hover:text-foreground focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none rounded transition-colors"
+                >
+                  Contact & Support
+                </Link>
               </li>
               <li>
                 <button 
@@ -95,15 +119,28 @@ export function Footer() {
 
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono-tech text-muted-foreground">
-          <div>
-            © {new Date().getFullYear()} InternPrep AI. Engineered for competitive placements.
+        {/* Corporate Entity & Grievance Bar */}
+        <div className="pt-6 border-t border-border space-y-3 text-[11px] font-mono-tech text-muted-foreground">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-foreground/80">
+            <div>
+              <strong>Krishna Gahlod</strong> • Founder & Operator of InternPrep AI • Mumbai, Maharashtra, India
+            </div>
+            <div className="flex items-center gap-3">
+              <span>Grievance Officer: <a href="mailto:krishnagahlod@gmail.com" className="text-emerald-600 dark:text-emerald-400 hover:underline">krishnagahlod@gmail.com</a></span>
+              <span>•</span>
+              <span>Support: <a href="mailto:krishnagahlod@gmail.com" className="text-emerald-600 dark:text-emerald-400 hover:underline">krishnagahlod@gmail.com</a></span>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span>IIT BOMBAY PLACEMENTS EDITION</span>
-            <span>•</span>
-            <span>SECURE 256-BIT SSL CHECKOUT</span>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-border/40 text-[10px]">
+            <div>
+              © {new Date().getFullYear()} Krishna Gahlod / InternPrep AI. All rights reserved. Independent educational platform not affiliated with any campus placement cell.
+            </div>
+            <div className="flex items-center gap-4">
+              <span>DPDPA 2023 COMPLIANT</span>
+              <span>•</span>
+              <span>PCI-DSS SSL SECURED</span>
+            </div>
           </div>
         </div>
 

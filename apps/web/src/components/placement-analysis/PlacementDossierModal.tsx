@@ -103,8 +103,6 @@ export function PlacementDossierModal({
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
   const [selectedDegreeFilter, setSelectedDegreeFilter] = useState<string>("all");
   const [copiedRoll, setCopiedRoll] = useState<string | null>(null);
-  const [showBranchStudentsDeepDive, setShowBranchStudentsDeepDive] = useState<boolean>(true);
-  const [selectedBranchDeepDive, setSelectedBranchDeepDive] = useState<string>("all");
 
   const handleCopyRoll = (roll: string) => {
     navigator.clipboard.writeText(roll);
@@ -167,377 +165,12 @@ export function PlacementDossierModal({
     });
   }, [allCandidates, selectedBranchFilter, selectedDegreeFilter, shortlistSearch]);
 
-  const groupedByBranch = useMemo(() => {
-    const groups: { [branch: string]: ShortlistedCandidate[] } = {};
-    for (const c of filteredCandidates) {
-      if (!groups[c.branch]) {
-        groups[c.branch] = [];
-      }
-      groups[c.branch].push(c);
-    }
-    return groups;
-  }, [filteredCandidates]);
-
-  const deepDiveCandidates = useMemo(() => {
-    return allCandidates.filter((c) => {
-      if (selectedBranchDeepDive !== "all" && c.branch !== selectedBranchDeepDive) {
-        return false;
-      }
-      if (shortlistSearch.trim()) {
-        const q = shortlistSearch.toLowerCase().trim();
-        const matchName = c.name?.toLowerCase().includes(q);
-        const matchRoll = c.roll_number?.toLowerCase().includes(q);
-        const matchRole = c.role?.toLowerCase().includes(q);
-        const matchBranch = c.branch?.toLowerCase().includes(q);
-        if (!matchName && !matchRoll && !matchRole && !matchBranch) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [allCandidates, selectedBranchDeepDive, shortlistSearch]);
-
-  const renderBranchShortlistSection = (titlePrefix?: string) => {
-    const funnel =
-      companyDetails?.hiring_funnel_intelligence ||
-      companyDetails?.company?.hiring_funnel_intelligence;
-
-    let branches: [string, number][] = Object.entries(
-      funnel?.demographics?.branch_distribution || {}
-    ).slice(0, 8) as [string, number][];
-
-    if (branches.length === 0 && branchesList.length > 0) {
-      const tot = totalShortlisted || allCandidates.length || 1;
-      branches = branchesList.map((b) => [
-        b.branch,
-        Math.round((b.count / tot) * 1000) / 10,
-      ]);
-    }
-
-    if (branches.length === 0 && allCandidates.length > 0) {
-      const branchCounts: Record<string, number> = {};
-      for (const c of allCandidates) {
-        branchCounts[c.branch] = (branchCounts[c.branch] || 0) + 1;
-      }
-      const tot = allCandidates.length || 1;
-      branches = Object.entries(branchCounts).map(([bName, count]) => [
-        bName,
-        Math.round((count / tot) * 1000) / 10,
-      ]);
-    }
-
-    const degrees: [string, number][] = Object.entries(
-      funnel?.demographics?.degree_distribution || interviewShortlists?.degrees_breakdown || {}
-    ).slice(0, 4) as [string, number][];
-
-    const displayCount =
-      totalShortlisted ||
-      allCandidates.length ||
-      funnel?.conversion_funnel?.interview_shortlisted_count ||
-      0;
-
-    if (branches.length === 0 && displayCount === 0 && allCandidates.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="p-5 rounded-2xl bg-card border border-border/80 shadow-xs space-y-4 font-mono-tech">
-        {/* Header */}
-        <div className="flex justify-between items-center text-[11px] flex-wrap gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-extrabold text-foreground flex items-center gap-1.5 text-xs">
-              <PieChart className="h-4 w-4 text-primary" />
-              {titlePrefix ? `${titlePrefix} ` : ""}Verified Branch Shortlist Breakdown
-            </span>
-            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 font-bold">
-              {displayCount} Interview Shortlists
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {degrees.length > 0 && (
-              <span className="text-muted-foreground text-[10px]">
-                {degrees.map(([deg, pct]) => `${deg}: ${pct}%`).join(" • ")}
-              </span>
-            )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowBranchStudentsDeepDive(!showBranchStudentsDeepDive)}
-              className={`h-7 px-2.5 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                showBranchStudentsDeepDive
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-xs"
-              }`}
-            >
-              <Users className="h-3.5 w-3.5" />
-              {showBranchStudentsDeepDive ? "Hide Shortlisted Students ▲" : `👥 Dive Deep: View Shortlisted Students (${displayCount}) ▾`}
-            </Button>
-          </div>
-        </div>
-
-        {/* Visual Progress Bar */}
-        {branches.length > 0 && (
-          <div
-            className="h-2.5 w-full bg-muted rounded-full overflow-hidden flex cursor-pointer"
-            title="Click any department below to filter shortlisted students"
-          >
-            {branches.map(([branch, pct], bIdx) => {
-              const colors = [
-                "bg-blue-500",
-                "bg-indigo-500",
-                "bg-emerald-500",
-                "bg-amber-500",
-                "bg-purple-500",
-                "bg-pink-500",
-                "bg-teal-500",
-                "bg-rose-500",
-              ];
-              return (
-                <div
-                  key={bIdx}
-                  onClick={() => {
-                    setSelectedBranchDeepDive(branch);
-                    setShowBranchStudentsDeepDive(true);
-                  }}
-                  style={{ width: `${pct}%` }}
-                  className={`${colors[bIdx % colors.length]} hover:opacity-85 transition-all`}
-                  title={`${branch}: ${pct}% - Click to view shortlisted students`}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* Interactive Clickable Branch Chips */}
-        <div className="space-y-1.5">
-          <div className="text-[10px] text-muted-foreground font-semibold flex items-center justify-between flex-wrap gap-1">
-            <span>Click any department chip to filter & dive deep into who all were shortlisted:</span>
-            {showBranchStudentsDeepDive && selectedBranchDeepDive !== "all" && (
-              <button
-                type="button"
-                onClick={() => setSelectedBranchDeepDive("all")}
-                className="text-primary hover:underline text-[10px] font-bold cursor-pointer"
-              >
-                Clear filter (show all departments)
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedBranchDeepDive("all");
-                setShowBranchStudentsDeepDive(true);
-              }}
-              className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
-                showBranchStudentsDeepDive && selectedBranchDeepDive === "all"
-                  ? "bg-primary text-primary-foreground border-primary font-bold shadow-xs scale-[1.02]"
-                  : "bg-muted/70 hover:bg-muted text-foreground border-border/50 hover:border-primary/40"
-              }`}
-            >
-              All Departments ({displayCount})
-            </button>
-            {branches.map(([branch, pct], bIdx) => {
-              const isSelected =
-                showBranchStudentsDeepDive && selectedBranchDeepDive === branch;
-              return (
-                <button
-                  key={bIdx}
-                  type="button"
-                  onClick={() => {
-                    if (
-                      showBranchStudentsDeepDive &&
-                      selectedBranchDeepDive === branch
-                    ) {
-                      setSelectedBranchDeepDive("all");
-                    } else {
-                      setSelectedBranchDeepDive(branch);
-                      setShowBranchStudentsDeepDive(true);
-                    }
-                  }}
-                  className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isSelected
-                      ? "bg-blue-600 text-white border-blue-600 font-bold shadow-xs scale-[1.03]"
-                      : "bg-muted/70 hover:bg-muted text-foreground border-border/50 hover:border-primary/40"
-                  }`}
-                  title={`Click to view students shortlisted from ${branch}`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      bIdx === 0
-                        ? "bg-blue-500"
-                        : bIdx === 1
-                        ? "bg-indigo-500"
-                        : bIdx === 2
-                        ? "bg-emerald-500"
-                        : bIdx === 3
-                        ? "bg-amber-500"
-                        : "bg-purple-500"
-                    }`}
-                  />
-                  <span>{branch}</span>
-                  <strong className="font-bold opacity-90">{String(pct)}%</strong>
-                  <span className="text-[9px] opacity-75 underline ml-0.5">view 👥</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* INLINE DEEP-DIVE CANDIDATE ROSTER PANEL */}
-        {showBranchStudentsDeepDive && (
-          <div className="mt-3 p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-3.5 animate-in fade-in-50 duration-200 shadow-inner">
-            <div className="flex justify-between items-center flex-wrap gap-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h5 className="text-xs font-extrabold text-foreground flex items-center gap-1.5">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  Shortlisted Students ({deepDiveCandidates.length})
-                  {selectedBranchDeepDive !== "all" && (
-                    <span className="text-primary font-bold">in {selectedBranchDeepDive}</span>
-                  )}
-                </h5>
-                <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold">
-                  Strictly Interview Shortlists
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveDossierTab("shortlists")}
-                  className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer flex items-center gap-0.5"
-                >
-                  Open in dedicated tab →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowBranchStudentsDeepDive(false)}
-                  className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer font-bold"
-                >
-                  ▲ Close
-                </button>
-              </div>
-            </div>
-
-            {/* Live Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <input
-                type="text"
-                value={shortlistSearch}
-                onChange={(e) => setShortlistSearch(e.target.value)}
-                placeholder="Search shortlisted student by name, roll number, or role..."
-                className="w-full pl-8.5 pr-8 py-1.5 text-xs rounded-xl bg-card border border-border/70 focus:border-primary focus:outline-hidden text-foreground placeholder:text-muted-foreground font-mono-tech transition-colors"
-              />
-              {shortlistSearch && (
-                <button
-                  type="button"
-                  onClick={() => setShortlistSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Candidates Grid */}
-            {deepDiveCandidates.length === 0 ? (
-              <div className="py-8 text-center bg-card rounded-xl border border-dashed border-border text-muted-foreground text-xs font-mono-tech space-y-1">
-                <p className="font-semibold text-foreground">
-                  {allCandidates.length === 0
-                    ? `Branch breakdown recorded from verified announcements (${displayCount} candidates across departments).`
-                    : "No interview shortlists matched current filter."}
-                </p>
-                <p className="text-[11px]">
-                  {allCandidates.length === 0
-                    ? "Individual roll roster was published in internal notices."
-                    : shortlistSearch
-                    ? "Try searching another keyword or roll number."
-                    : "Only strict interview stage candidates are recorded."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
-                {deepDiveCandidates.map((c, cIdx) => (
-                  <div
-                    key={`${c.roll_number}-${cIdx}`}
-                    className="p-3 rounded-xl bg-card border border-border/70 hover:border-primary/40 text-xs space-y-2 shadow-2xs transition-all"
-                  >
-                    {/* Candidate Top Row: Avatar + Name + Roll Number with Copy */}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex items-center gap-2 min-w-0 font-display">
-                        <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-[10px] shrink-0">
-                          {c.name ? c.name.charAt(0).toUpperCase() : "S"}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-bold text-foreground text-xs block truncate" title={c.name}>
-                            {c.name}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-mono-tech block truncate">
-                            {c.branch}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 1-Click Copy Roll Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleCopyRoll(c.roll_number)}
-                        className="px-1.5 py-0.5 rounded bg-muted/80 hover:bg-primary/10 hover:text-primary text-[10px] font-mono-tech font-bold text-foreground border border-border/60 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                        title="Click to copy roll number"
-                      >
-                        <span>{c.roll_number}</span>
-                        {copiedRoll === c.roll_number ? (
-                          <Check className="h-2.5 w-2.5 text-emerald-500" />
-                        ) : (
-                          <Copy className="h-2.5 w-2.5 text-muted-foreground" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Role & Stage Row */}
-                    <div className="p-1.5 rounded-lg bg-muted/30 border border-border/30 space-y-0.5 text-[10px] font-mono-tech">
-                      <div className="flex items-center gap-1 text-foreground truncate">
-                        <Briefcase className="h-2.5 w-2.5 text-primary shrink-0" />
-                        <span className="text-muted-foreground">Role:</span>
-                        <span className="font-bold truncate text-primary">{c.role}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[9px] text-muted-foreground pt-0.5">
-                        <span>{c.degree || "B.Tech"} • {c.cluster || "Core/Tech"}</span>
-                        {c.round && (
-                          <span className="font-bold text-blue-600 dark:text-blue-400">
-                            {c.round}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quick Navigation Footer */}
-        <div className="pt-2 flex items-center justify-between flex-wrap gap-2 border-t border-border/30">
-          <span className="text-[11px] text-muted-foreground">
-            {showBranchStudentsDeepDive
-              ? `Viewing ${deepDiveCandidates.length} candidate profiles above`
-              : `Want to dive deep into candidate names & roll numbers?`}
-          </span>
-          <Button
-            size="sm"
-            onClick={() => setShowBranchStudentsDeepDive(!showBranchStudentsDeepDive)}
-            className="h-7 px-3 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-sm font-mono-tech cursor-pointer"
-          >
-            <Users className="h-3.5 w-3.5" />
-            {showBranchStudentsDeepDive
-              ? "▲ Hide Shortlisted Students"
-              : `Dive Deep: View Names & Roll Numbers (${displayCount}) ▾`}
-          </Button>
-        </div>
-      </div>
+  // Sort all filtered candidates strictly in alphabetical order by student name (A -> Z)
+  const sortedCandidates = useMemo(() => {
+    return [...filteredCandidates].sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
     );
-  };
+  }, [filteredCandidates]);
 
   if (!selectedCompanySlug) return null;
 
@@ -1307,21 +940,6 @@ export function PlacementDossierModal({
                 const interviewCount = funnel?.conversion_funnel?.interview_shortlisted_count || totalShortlisted || 0;
                 const walkinCount = funnel?.conversion_funnel?.walkin_extended_shortlists_count || 0;
                 const convPct = funnel?.conversion_funnel?.oa_to_interview_conversion_pct;
-                let branches: [string, number][] = Object.entries(
-                  funnel?.demographics?.branch_distribution || {}
-                ).slice(0, 8) as [string, number][];
-
-                if (branches.length === 0 && branchesList.length > 0) {
-                  const tot = totalShortlisted || 1;
-                  branches = branchesList.map((b) => [
-                    b.branch,
-                    Math.round((b.count / tot) * 1000) / 10,
-                  ]);
-                }
-
-                const degrees: [string, number][] = Object.entries(
-                  funnel?.demographics?.degree_distribution || {}
-                ).slice(0, 4) as [string, number][];
 
                 return (
                   <div className="p-5 rounded-2xl bg-card border border-border/80 shadow-xs space-y-4">
@@ -1396,13 +1014,15 @@ export function PlacementDossierModal({
                           ) : (
                             <span>Standard Interview Rounds</span>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setShowBranchStudentsDeepDive(!showBranchStudentsDeepDive)}
-                            className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 pt-0.5 cursor-pointer text-left"
-                          >
-                            {showBranchStudentsDeepDive ? "▲ Hide Candidates" : `View ${totalShortlisted || interviewCount} Candidate Profiles ▾`}
-                          </button>
+                          {totalShortlisted > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveDossierTab("shortlists")}
+                              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 pt-0.5 cursor-pointer text-left"
+                            >
+                              <span>View {totalShortlisted} Shortlisted Candidates →</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -1424,276 +1044,6 @@ export function PlacementDossierModal({
                         </div>
                       </div>
                     </div>
-
-                    {/* Department Distribution Progress Bar & Inline Deep-Dive */}
-                    {(branches.length > 0 || totalShortlisted > 0) && (
-                      <div className="space-y-3 pt-3 border-t border-border/50 font-mono-tech">
-                        <div className="flex justify-between items-center text-[11px] flex-wrap gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-extrabold text-foreground flex items-center gap-1.5 text-xs">
-                              <PieChart className="h-4 w-4 text-primary" />
-                              Verified Branch Shortlist Breakdown
-                            </span>
-                            <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 font-bold">
-                              {totalShortlisted || interviewCount} Interview Shortlists
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {degrees.length > 0 && (
-                              <span className="text-muted-foreground text-[10px]">
-                                {degrees.map(([deg, pct]) => `${deg}: ${pct}%`).join(" • ")}
-                              </span>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setShowBranchStudentsDeepDive(!showBranchStudentsDeepDive)}
-                              className={`h-7 px-2.5 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                                showBranchStudentsDeepDive
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-xs"
-                              }`}
-                            >
-                              <Users className="h-3.5 w-3.5" />
-                              {showBranchStudentsDeepDive ? "Hide Shortlisted Students ▲" : `👥 Dive Deep: View Shortlisted Students (${totalShortlisted || interviewCount}) ▾`}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Visual Progress Bar */}
-                        {branches.length > 0 && (
-                          <div
-                            className="h-2.5 w-full bg-muted rounded-full overflow-hidden flex cursor-pointer"
-                            title="Click any department below to view shortlisted students"
-                          >
-                            {branches.map(([branch, pct], bIdx) => {
-                              const colors = ["bg-blue-500", "bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-purple-500", "bg-pink-500", "bg-teal-500", "bg-rose-500"];
-                              return (
-                                <div
-                                  key={bIdx}
-                                  onClick={() => {
-                                    setSelectedBranchDeepDive(branch);
-                                    setShowBranchStudentsDeepDive(true);
-                                  }}
-                                  style={{ width: `${pct}%` }}
-                                  className={`${colors[bIdx % colors.length]} hover:opacity-85 transition-all`}
-                                  title={`${branch}: ${pct}% - Click to view shortlisted students`}
-                                />
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Interactive Clickable Branch Chips */}
-                        <div className="space-y-1.5">
-                          <div className="text-[10px] text-muted-foreground font-semibold flex items-center justify-between flex-wrap gap-1">
-                            <span>Click any department chip to filter & see who all were shortlisted:</span>
-                            {showBranchStudentsDeepDive && selectedBranchDeepDive !== "all" && (
-                              <button
-                                onClick={() => setSelectedBranchDeepDive("all")}
-                                className="text-primary hover:underline text-[10px] font-bold cursor-pointer"
-                              >
-                                Clear filter (show all departments)
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedBranchDeepDive("all");
-                                setShowBranchStudentsDeepDive(true);
-                              }}
-                              className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
-                                showBranchStudentsDeepDive && selectedBranchDeepDive === "all"
-                                  ? "bg-primary text-primary-foreground border-primary font-bold shadow-xs scale-[1.02]"
-                                  : "bg-muted/70 hover:bg-muted text-foreground border-border/50 hover:border-primary/40"
-                              }`}
-                            >
-                              All Departments ({totalShortlisted || interviewCount})
-                            </button>
-                            {branches.map(([branch, pct], bIdx) => {
-                              const isSelected = showBranchStudentsDeepDive && selectedBranchDeepDive === branch;
-                              return (
-                                <button
-                                  key={bIdx}
-                                  type="button"
-                                  onClick={() => {
-                                    if (showBranchStudentsDeepDive && selectedBranchDeepDive === branch) {
-                                      setSelectedBranchDeepDive("all");
-                                    } else {
-                                      setSelectedBranchDeepDive(branch);
-                                      setShowBranchStudentsDeepDive(true);
-                                    }
-                                  }}
-                                  className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer ${
-                                    isSelected
-                                      ? "bg-blue-600 text-white border-blue-600 font-bold shadow-xs scale-[1.03]"
-                                      : "bg-muted/70 hover:bg-muted text-foreground border-border/50 hover:border-primary/40"
-                                  }`}
-                                  title={`Click to view students shortlisted from ${branch}`}
-                                >
-                                  <span
-                                    className={`w-1.5 h-1.5 rounded-full ${
-                                      bIdx === 0
-                                        ? "bg-blue-500"
-                                        : bIdx === 1
-                                        ? "bg-indigo-500"
-                                        : bIdx === 2
-                                        ? "bg-emerald-500"
-                                        : bIdx === 3
-                                        ? "bg-amber-500"
-                                        : "bg-purple-500"
-                                    }`}
-                                  />
-                                  <span>{branch}</span>
-                                  <strong className="font-bold opacity-90">{String(pct)}%</strong>
-                                  <span className="text-[9px] opacity-75 underline ml-0.5">view 👥</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* INLINE DEEP-DIVE CANDIDATE ROSTER PANEL */}
-                        {showBranchStudentsDeepDive && (
-                          <div className="mt-3 p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-3.5 animate-in fade-in-50 duration-200 shadow-inner">
-                            <div className="flex justify-between items-center flex-wrap gap-2">
-                              <div className="flex items-center gap-2">
-                                <h5 className="text-xs font-extrabold text-foreground flex items-center gap-1.5">
-                                  <Users className="h-4 w-4 text-blue-500" />
-                                  Shortlisted Students ({deepDiveCandidates.length})
-                                  {selectedBranchDeepDive !== "all" && (
-                                    <span className="text-primary font-bold">in {selectedBranchDeepDive}</span>
-                                  )}
-                                </h5>
-                                <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold">
-                                  Strictly Interview Shortlists
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setActiveDossierTab("shortlists")}
-                                  className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer flex items-center gap-0.5"
-                                >
-                                  Open in dedicated tab →
-                                </button>
-                                <button
-                                  onClick={() => setShowBranchStudentsDeepDive(false)}
-                                  className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer font-bold"
-                                >
-                                  ▲ Close
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Live Search Input */}
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                              <input
-                                type="text"
-                                value={shortlistSearch}
-                                onChange={(e) => setShortlistSearch(e.target.value)}
-                                placeholder="Search shortlisted student by name, roll number, or role..."
-                                className="w-full pl-8.5 pr-8 py-1.5 text-xs rounded-xl bg-card border border-border/70 focus:border-primary focus:outline-hidden text-foreground placeholder:text-muted-foreground font-mono-tech transition-colors"
-                              />
-                              {shortlistSearch && (
-                                <button
-                                  onClick={() => setShortlistSearch("")}
-                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs font-bold cursor-pointer"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Candidate Cards Grid */}
-                            {deepDiveCandidates.length === 0 ? (
-                              <div className="text-center py-6 px-4 text-xs text-muted-foreground bg-card/60 rounded-xl border border-border/40">
-                                {totalShortlisted === 0 ? (
-                                  <div className="space-y-1">
-                                    <p className="font-bold text-foreground">
-                                      Interview calls for {companyDetails?.company?.name} were notified directly to candidate inboxes.
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground">
-                                      No public blog shortlist roster was published for this recruiter.
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <p>No candidates match the selected department or search query.</p>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-96 overflow-y-auto custom-scrollbar pr-1">
-                                {deepDiveCandidates.map((cand, idx) => (
-                                  <div
-                                    key={`${cand.roll_number}-${idx}`}
-                                    className="p-3 rounded-xl bg-card border border-border/70 hover:border-primary/50 text-xs space-y-1.5 shadow-2xs transition-all"
-                                  >
-                                    <div className="flex justify-between items-start gap-1.5">
-                                      <div className="flex items-center gap-1.5 font-display">
-                                        <span className="w-5 h-5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-[10px] shrink-0 font-sans">
-                                          {cand.name ? cand.name.charAt(0).toUpperCase() : "S"}
-                                        </span>
-                                        <span className="font-bold text-foreground text-xs leading-tight font-sans">
-                                          {cand.name}
-                                        </span>
-                                      </div>
-                                      <button
-                                        onClick={() => handleCopyRoll(cand.roll_number)}
-                                        className="px-1.5 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary text-[10px] font-bold border border-border/60 flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
-                                        title="Click to copy roll number"
-                                      >
-                                        <span>{cand.roll_number}</span>
-                                        {copiedRoll === cand.roll_number ? (
-                                          <Check className="h-2.5 w-2.5 text-emerald-500" />
-                                        ) : (
-                                          <Copy className="h-2.5 w-2.5 text-muted-foreground" />
-                                        )}
-                                      </button>
-                                    </div>
-
-                                    <div className="text-[10px] text-muted-foreground flex justify-between items-center pt-0.5 border-t border-border/30">
-                                      <span className="truncate max-w-[180px] font-medium text-foreground">
-                                        {cand.branch}
-                                      </span>
-                                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-muted/80">
-                                        {cand.degree || "B.Tech"}
-                                      </Badge>
-                                    </div>
-
-                                    <div className="text-[10px] bg-muted/40 p-1.5 rounded-lg border border-border/30 flex items-center gap-1 text-foreground">
-                                      <Briefcase className="h-3 w-3 text-primary shrink-0" />
-                                      <span className="text-muted-foreground">Role:</span>
-                                      <span className="font-bold truncate text-primary">{cand.role}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Always-visible Quick Navigation Bar */}
-                        <div className="pt-2.5 flex items-center justify-between flex-wrap gap-2 border-t border-border/30">
-                          <span className="text-[11px] text-muted-foreground">
-                            {showBranchStudentsDeepDive
-                              ? `Viewing ${deepDiveCandidates.length} candidate profiles above`
-                              : `Want to dive deep into candidate names & roll numbers?`}
-                          </span>
-                          <Button
-                            size="sm"
-                            onClick={() => setShowBranchStudentsDeepDive(!showBranchStudentsDeepDive)}
-                            className="h-7 px-3 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 shadow-sm font-mono-tech cursor-pointer"
-                          >
-                            <Users className="h-3.5 w-3.5" />
-                            {showBranchStudentsDeepDive
-                              ? "▲ Hide Shortlisted Students"
-                              : `Dive Deep: View Names & Roll Numbers (${totalShortlisted || interviewCount}) ▾`}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })()}
@@ -1970,86 +1320,81 @@ export function PlacementDossierModal({
                       No shortlisted candidates match the selected filters or search query.
                     </div>
                   ) : (
-                    /* Branch-wise Groups */
-                    <div className="space-y-6">
-                      {Object.entries(groupedByBranch).map(([branchName, candidates]) => {
-                        const branchPct = Math.round((candidates.length / totalShortlisted) * 100);
-                        return (
-                          <div key={branchName} className="space-y-3">
-                            {/* Branch Group Header */}
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/60 font-mono-tech">
-                              <div className="flex items-center gap-2">
-                                <Building2 className="h-4 w-4 text-primary" />
-                                <h4 className="text-xs font-extrabold text-foreground tracking-wide">
-                                  {branchName}
-                                </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {sortedCandidates.map((c, cIdx) => (
+                        <div
+                          key={`${c.roll_number}-${cIdx}`}
+                          className="p-4 rounded-2xl bg-card border border-border/70 hover:border-primary/50 text-xs space-y-3 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between"
+                        >
+                          {/* Candidate Header: Avatar, Name, Degree/Cluster, Roll Number with Copy */}
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0 font-display">
+                              <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0 font-sans border border-blue-500/20">
+                                {c.name ? c.name.charAt(0).toUpperCase() : "S"}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
-                                  {candidates.length} {candidates.length === 1 ? "Student" : "Students"} ({branchPct}%)
-                                </span>
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-foreground text-xs sm:text-sm leading-snug truncate" title={c.name}>
+                                  {c.name}
+                                </h5>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap font-mono-tech">
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4.5 font-bold bg-muted/80 text-foreground border-border/60">
+                                    {c.degree || "B.Tech"}
+                                  </Badge>
+                                  {c.cluster && (
+                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4.5 font-medium">
+                                      {c.cluster}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            {/* Candidate Cards Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {candidates.map((c, cIdx) => (
-                                <div
-                                  key={`${c.roll_number}-${cIdx}`}
-                                  className="p-3.5 rounded-2xl bg-card border border-border/70 hover:border-primary/50 text-xs space-y-2.5 shadow-2xs hover:shadow-xs transition-all"
-                                >
-                                  {/* Candidate Header: Name & Roll Number */}
-                                  <div className="flex justify-between items-start gap-2">
-                                    <div className="flex items-center gap-2 font-display">
-                                      <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0">
-                                        {c.name ? c.name.charAt(0).toUpperCase() : "S"}
-                                      </div>
-                                      <div>
-                                        <h5 className="font-bold text-foreground text-xs leading-snug">
-                                          {c.name}
-                                        </h5>
-                                        <span className="text-[10px] text-muted-foreground font-mono-tech block">
-                                          {c.branch}
-                                        </span>
-                                      </div>
-                                    </div>
+                            {/* Roll Number with 1-Click Copy */}
+                            <button
+                              type="button"
+                              onClick={() => handleCopyRoll(c.roll_number)}
+                              className="px-2 py-1 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary text-[11px] font-mono-tech font-bold text-foreground border border-border/70 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
+                              title="Click to copy roll number"
+                            >
+                              <span>{c.roll_number}</span>
+                              {copiedRoll === c.roll_number ? (
+                                <Check className="h-3 w-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
 
-                                    {/* Roll Number with 1-Click Copy */}
-                                    <button
-                                      onClick={() => handleCopyRoll(c.roll_number)}
-                                      className="px-2 py-1 rounded-md bg-muted/80 hover:bg-primary/10 hover:text-primary text-[11px] font-mono-tech font-bold text-foreground border border-border/60 flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                                      title="Click to copy roll number"
-                                    >
-                                      <span>{c.roll_number}</span>
-                                      {copiedRoll === c.roll_number ? (
-                                        <Check className="h-3 w-3 text-emerald-500" />
-                                      ) : (
-                                        <Copy className="h-3 w-3 text-muted-foreground" />
-                                      )}
-                                    </button>
-                                  </div>
-
-                                  {/* Role & Degree Info Badges */}
-                                  <div className="p-2 rounded-xl bg-muted/30 border border-border/40 space-y-1 text-[11px] font-mono-tech">
-                                    <div className="flex items-center gap-1.5 text-foreground">
-                                      <Briefcase className="h-3 w-3 text-primary shrink-0" />
-                                      <span className="text-muted-foreground text-[10px]">Shortlisted Role:</span>
-                                      <span className="font-bold text-foreground truncate">{c.role}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5 border-t border-border/30">
-                                      <span className="flex items-center gap-1">
-                                        <GraduationCap className="h-2.5 w-2.5" />
-                                        {c.degree || "B.Tech"} • {c.cluster || "Core/Tech"}
-                                      </span>
-                                      {c.date && <span>{c.date}</span>}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
+                          {/* Prominent Academic Department / Branch Information Banner */}
+                          <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-900/40 flex items-center justify-between gap-2 font-mono-tech">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Building2 className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                              <span className="text-[10px] text-muted-foreground font-semibold shrink-0">Department:</span>
+                              <span className="font-bold text-[11px] text-foreground truncate" title={c.branch}>
+                                {c.branch}
+                              </span>
                             </div>
                           </div>
-                        );
-                      })}
+
+                          {/* Shortlisted Role & Interview Stage Badges */}
+                          <div className="p-2.5 rounded-xl bg-muted/30 border border-border/40 space-y-1.5 text-[11px] font-mono-tech">
+                            <div className="flex items-center gap-1.5 text-foreground justify-between">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Briefcase className="h-3 w-3 text-primary shrink-0" />
+                                <span className="text-muted-foreground text-[10px]">Role:</span>
+                                <span className="font-bold text-foreground truncate">{c.role}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/30">
+                              <span className="font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                                {c.round || "Interview Call"}
+                              </span>
+                              {c.date && <span>{c.date}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

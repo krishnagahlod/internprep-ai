@@ -1,0 +1,27 @@
+# InternPrep AI
+
+> InternPrep AI is a high-performance interview simulation and resume intelligence platform calibrated to premier campus placements (IIT Bombay) and top-tier corporate recruitment standards.
+
+## Core Capabilities
+- **Live Case & Domain Interview Simulation**: Real-time simulated interviews covering 5 distinct domains (Management Consulting, Software & Systems SWE, Data Science & Analytics, Finance & Valuation, Product Management). Includes dynamic follow-ups, whiteboard calculation parsing, and automated rubric scoring.
+- **Resume Intelligence & ATS Diagnostic Engine**: Sub-second deterministic and neural ATS resume auditing, section-by-section breakdown, metric density calculation, and high-agency action verb enhancement.
+- **Achievement Vault & Point Bank**: Structured STAR-format achievement formulation with automated metric quantification and bullet point refinement.
+- **Placement Analysis & Company Intelligence**: Historical campus placement statistics, shortlisted candidate GPA bands, cutoff profiles, and compensation distributions across 100+ premier recruiters.
+
+## Regulatory & Legal Architecture
+- **Data Fiduciary**: InternPrep AI Technologies Pvt. Ltd., Bandra Kurla Complex (BKC), Mumbai, Maharashtra 400051, India.
+- **Compliance Standards**: India Digital Personal Data Protection (DPDP) Act 2023, EU GDPR, PCI-DSS Level 1 (via Razorpay).
+- **AI Ethics & Privacy**: User resumes, audio transcripts, and interview responses are NEVER used to train foundation models. All inference is stateless and purged post-session.
+- **Grievance Redressal**: Official Grievance Redressal Officer reachable at grievance@internprep.ai.
+- **Customer Support**: support@internprep.ai.
+
+## Key Links & Endpoints
+- [Dashboard](https://internprep.ai/dashboard): Central preparation workspace.
+- [Interview Simulation](https://internprep.ai/interview): Live interviewer agent studio.
+- [Resume Intelligence](https://internprep.ai/resume): Deep ATS analysis and section optimizer.
+- [ATS Scorecard Studio](https://internprep.ai/ats-checker): Quick ATS score checker.
+- [Placement Intelligence](https://internprep.ai/placement-analysis): Company-specific historical cutoffs and salary data.
+- [Privacy Policy](https://internprep.ai/privacy): Statutory privacy disclosures under DPDP Act 2023.
+- [Terms of Service](https://internprep.ai/terms): Platform usage agreement and placement outcome disclaimers.
+- [Cookie Policy](https://internprep.ai/cookies): Breakdown of essential and telemetry storage.
+- [Refund Policy](https://internprep.ai/refund): 7-day unused credit refund policy.

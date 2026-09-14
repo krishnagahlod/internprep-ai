@@ -136,8 +136,44 @@ app.add_middleware(
     expose_headers=["X-Correlation-ID"],
 )
 
+from slowapi.middleware import SlowAPIMiddleware
+app.add_middleware(SlowAPIMiddleware)
+
+# --- Payload Size Limiter Middleware (Denial-of-Wallet & DoS Defense) ---
+MAX_UPLOAD_SIZE = 5 * 1024 * 1024   # 5 MB for resumes & casebooks
+MAX_JSON_SIZE = 2 * 1024 * 1024     # 2 MB for standard JSON payloads
+
+@app.middleware("http")
+async def payload_size_limiter_middleware(request: Request, call_next):
+    if request.method in ["POST", "PUT", "PATCH"]:
+        content_length = request.headers.get("content-length")
+        content_type = request.headers.get("content-type", "").lower()
+        
+        is_upload = "multipart/form-data" in content_type or "/upload" in request.url.path or "/extract" in request.url.path
+        limit = MAX_UPLOAD_SIZE if is_upload else MAX_JSON_SIZE
+
+        if content_length:
+            try:
+                length = int(content_length)
+                if length > limit:
+                    cid = getattr(request.state, "correlation_id", str(uuid.uuid4()))
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": {
+                                "code": "PAYLOAD_TOO_LARGE",
+                                "message": f"Request payload exceeds allowed limit of {limit // (1024 * 1024)}MB.",
+                                "correlation_id": cid
+                            }
+                        },
+                        headers={"X-Correlation-ID": cid}
+                    )
+            except ValueError:
+                pass
+    return await call_next(request)
+
 # --- Routers ---
-from routers import resume, interview, feedback, gratitude, resume_builder, placement_analysis, billing, admin
+from routers import resume, interview, feedback, gratitude, resume_builder, placement_analysis, billing, admin, user_privacy
 
 app.include_router(resume.router)
 app.include_router(resume_builder.router)
@@ -147,6 +183,7 @@ app.include_router(gratitude.router)
 app.include_router(placement_analysis.router)
 app.include_router(billing.router)
 app.include_router(admin.router)
+app.include_router(user_privacy.router)
 
 # Mount Casebooks PDF storage as static files for direct document viewing
 casebooks_dir = os.path.join(os.path.dirname(__file__), "data", "casebooks")

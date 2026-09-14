@@ -84,7 +84,7 @@ async def start_case_endpoint(
     body: StartCaseRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = (auth_user.id if auth_user else None) or (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -194,7 +194,7 @@ async def start_domain_endpoint(
     body: StartDomainRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = (auth_user.id if auth_user else None) or (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         try:
             entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
@@ -207,6 +207,8 @@ async def start_domain_endpoint(
                     units=1,
                     request_id=request.headers.get("x-request-id")
                 )
+        except HTTPException:
+            raise
         except Exception as q_err:
             print(f"Non-fatal quota check in start_domain: {q_err}")
     try:
@@ -217,6 +219,9 @@ async def start_domain_endpoint(
                 res = supabase.table("resumes").select("user_id, raw_text, parsed_content, file_url").eq("id", body.resume_id).execute()
                 if res.data:
                     row = res.data[0]
+                    resume_owner = row.get("user_id")
+                    if resume_owner and (not auth_user or (resume_owner != auth_user.id and not auth_user.is_admin)):
+                        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access this resume.")
                     file_url = row.get("file_url", "")
                     content = row.get("parsed_content") or row.get("raw_text") or ""
                     if isinstance(content, (dict, list)):
@@ -314,7 +319,7 @@ async def chat_endpoint(
     try:
         history = [{"role": m.role, "content": m.content} for m in body.messages]
         user_turns = sum(1 for m in history if m.get("role") == "user")
-        effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+        effective_user_id = auth_user.id if auth_user else None
         
         # Determine user tier
         is_paid = False
@@ -331,50 +336,37 @@ async def chat_endpoint(
                     mock_credits = UsageService.get_topup_balance(auth_user.id, "mock_interview")
                     if mock_credits > 0:
                         is_paid = True
-        elif effective_user_id:
-            ent = EntitlementService.get_active_entitlement(user_id=effective_user_id)
-            pk = ent.get("plan_key", "free")
-            if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
-                is_paid = True
-            else:
-                mock_credits = UsageService.get_topup_balance(effective_user_id, "mock_interview")
-                if mock_credits > 0:
-                    is_paid = True
 
         # 1. Free tier teaser cutoff at 4 questions - NO in-character interviewer paywall chat text!
         if not is_paid and user_turns >= 4:
             return ChatResponse(
                 response="",
-                new_phase="trial_limit_reached",
-                is_paywall_locked=True,
+                phase=body.current_phase,
+                is_complete=False,
+                error_code="free_tier_limit",
                 turn_count=user_turns,
                 max_turns=4
             )
 
         # 2. Paid user cap at 18-20 turns with graceful wrap-up
         if user_turns >= 19:
-            wrapup_reply = (
-                "👏 **Excellent analysis!** We have thoroughly covered the case framework, quantitative estimation, and risk synthesis over our session.\n\n"
-                "We have reached the conclusion of this interview. Please click **'End & Generate Scorecard'** below to receive your comprehensive rubric evaluation and recruiter feedback!"
-            )
             return ChatResponse(
-                response=wrapup_reply,
-                new_phase="conclusion",
-                is_paywall_locked=False,
+                response="Thank you for walking me through this case. We have reached the end of our time for today. Let's proceed to synthesize your overall performance.",
+                phase="conclusion",
+                is_complete=True,
+                error_code="session_limit_reached",
                 turn_count=user_turns,
                 max_turns=20
             )
 
-        dynamic_context = ""
+        combined_context = body.case_context or ""
         latest_user_msg = history[-1]["content"] if history and history[-1]["role"] == "user" else ""
         if body.case_source and latest_user_msg:
             from services.rag import retrieve_context
             dynamic_context = retrieve_context(latest_user_msg, source=body.case_source, top_k=2)
-            
-        combined_context = body.case_context or ""
-        if dynamic_context:
-            combined_context += "\n\nRELEVANT CASEBOOK EXCERPTS FOR CURRENT QUESTION:\n" + dynamic_context
-        
+            if dynamic_context:
+                combined_context = f"{combined_context}\n\nRELEVANT CASE REFERENCE DATA:\n{dynamic_context}"
+
         bot_reply = ""
         new_phase = body.current_phase
         
@@ -382,9 +374,8 @@ async def chat_endpoint(
             bot_reply, new_phase = generate_domain_interview_response(
                 history=history,
                 current_phase=body.current_phase,
-                resume_context=body.resume_context or "No resume provided.",
-                domain=body.domain or "General",
-                company=body.company,
+                resume_context=combined_context,
+                domain=body.domain or "Consulting",
                 target_phase=body.target_phase
             )
         else:
@@ -398,12 +389,11 @@ async def chat_endpoint(
         
         if supabase and body.session_id != "temp_session_id":
             # Verify session ownership to prevent IDOR message injection
-            if auth_user:
-                sess_check = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
-                if sess_check.data and sess_check.data[0].get("user_id"):
-                    session_owner = sess_check.data[0].get("user_id")
-                    if session_owner != auth_user.id and not auth_user.is_admin:
-                        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify this interview session.")
+            sess_check = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
+            if sess_check.data and sess_check.data[0].get("user_id"):
+                session_owner = sess_check.data[0].get("user_id")
+                if session_owner and session_owner != "guest" and (not auth_user or (session_owner != auth_user.id and not auth_user.is_admin)):
+                    raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify this interview session.")
 
             # Save user message
             if latest_user_msg:
@@ -459,7 +449,7 @@ async def chat_stream_endpoint(
     """
     history = [{"role": m.role, "content": m.content} for m in body.messages]
     user_turns = sum(1 for m in history if m.get("role") == "user")
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
 
     # Determine user tier
     is_paid = False
@@ -475,15 +465,6 @@ async def chat_stream_endpoint(
                 mock_credits = UsageService.get_topup_balance(auth_user.id, "mock_interview")
                 if mock_credits > 0:
                     is_paid = True
-    elif effective_user_id:
-        ent = EntitlementService.get_active_entitlement(user_id=effective_user_id)
-        pk = ent.get("plan_key", "free")
-        if pk.startswith("pro") or pk in ["lifetime", "admin"] or ent.get("is_admin") or ent.get("is_iitb"):
-            is_paid = True
-        else:
-            mock_credits = UsageService.get_topup_balance(effective_user_id, "mock_interview")
-            if mock_credits > 0:
-                is_paid = True
 
     # 1. Free tier teaser cutoff at 4 questions
     if not is_paid and user_turns >= 4:
@@ -530,6 +511,12 @@ async def chat_stream_endpoint(
             scratchpad=body.scratchpad,
             target_phase=body.target_phase
         )
+    if supabase and body.session_id != "temp_session_id":
+        sess_check = supabase.table("interview_sessions").select("user_id").eq("id", body.session_id).execute()
+        if sess_check.data and sess_check.data[0].get("user_id"):
+            session_owner = sess_check.data[0].get("user_id")
+            if session_owner and session_owner != "guest" and (not auth_user or (session_owner != auth_user.id and not auth_user.is_admin)):
+                raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify this interview session.")
 
     async def sse_event_stream():
         try:

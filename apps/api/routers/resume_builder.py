@@ -123,9 +123,14 @@ class StrategyRequest(BaseModel):
 async def extract_from_pdf(
     request: Request,
     file: UploadFile = File(...),
-    user_id: str = Form(...),
-    document_type: str = Form("resume")
+    user_id: Optional[str] = Form(None),
+    document_type: str = Form("resume"),
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
+    effective_user_id = auth_user.id if auth_user else (user_id if user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to extract and save achievements.")
+
     if not (file.filename.lower().endswith(".pdf") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
@@ -134,7 +139,7 @@ async def extract_from_pdf(
         
         # Fetch existing vault context, ignoring final_resume dummy containers
         existing_res = safe_execute(
-            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', user_id).neq('source_type', 'final_resume')
+            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', effective_user_id).neq('source_type', 'final_resume')
         )
         existing_vault = existing_res.data if existing_res else []
         
@@ -155,7 +160,7 @@ async def extract_from_pdf(
                 merge_id = ach.get("merge_id")
                 
                 record = {
-                    "user_id": user_id,
+                    "user_id": effective_user_id,
                     "section_type": section_type,
                     "title": ach.get("title", "Untitled"),
                     "parent_experience": parent_experience,
@@ -199,13 +204,21 @@ async def extract_from_pdf(
 
 @router.post("/extract/text")
 @limiter.limit("5/minute")
-async def extract_from_text(request: Request, body: ExtractTextRequest):
+async def extract_from_text(
+    request: Request,
+    body: ExtractTextRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to extract and save achievements.")
+
     try:
         from dependencies import safe_execute
         
         # Fetch existing vault context, ignoring final_resume dummy containers
         existing_res = safe_execute(
-            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', body.user_id).neq('source_type', 'final_resume')
+            lambda s: s.table('achievements').select("id, section_type, parent_experience, title, original_description").eq('user_id', effective_user_id).neq('source_type', 'final_resume')
         )
         existing_vault = existing_res.data if existing_res else []
         
@@ -221,7 +234,7 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
                 merge_id = ach.get("merge_id")
                 
                 record = {
-                    "user_id": body.user_id,
+                    "user_id": effective_user_id,
                     "section_type": section_type,
                     "title": ach.get("title", "Untitled"),
                     "parent_experience": parent_experience,
@@ -263,11 +276,18 @@ async def extract_from_text(request: Request, body: ExtractTextRequest):
 
 # CRUD endpoints
 @router.get("/achievements")
-def get_achievements(user_id: str):
+def get_achievements(
+    user_id: Optional[str] = None,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (user_id if user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required to access achievements.")
+
     from dependencies import safe_execute
     try:
         res = safe_execute(
-            lambda s: s.table('achievements').select("*").eq('user_id', user_id).neq('source_type', 'final_resume').order('created_at', desc=True)
+            lambda s: s.table('achievements').select("*").eq('user_id', effective_user_id).neq('source_type', 'final_resume').order('created_at', desc=True)
         )
         return res.data or []
     except Exception as e:
@@ -275,9 +295,22 @@ def get_achievements(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/achievements/{achievement_id}")
-def update_achievement(achievement_id: str, body: EditAchievementRequest):
+def update_achievement(
+    achievement_id: str,
+    body: EditAchievementRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    if not auth_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
+        check_res = safe_execute(lambda s: s.table('achievements').select('user_id').eq('id', achievement_id))
+        if check_res and check_res.data:
+            owner = check_res.data[0].get('user_id')
+            if owner and owner != auth_user.id and not auth_user.is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: You do not own this achievement.")
+
         res = safe_execute(
             lambda s: s.table('achievements').update({
                 "title": body.title,
@@ -297,12 +330,19 @@ def update_achievement(achievement_id: str, body: EditAchievementRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/achievements")
-def add_achievement(req: ManualAchievementRequest):
+def add_achievement(
+    req: ManualAchievementRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
         res = safe_execute(
             lambda s: s.table('achievements').insert({
-                "user_id": req.user_id,
+                "user_id": effective_user_id,
                 "title": req.title,
                 "parent_experience": req.parent_experience,
                 "timeline": req.timeline,
@@ -319,9 +359,22 @@ def add_achievement(req: ManualAchievementRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/achievements/{ach_id}")
-def edit_achievement(ach_id: str, req: EditAchievementRequest):
+def edit_achievement(
+    ach_id: str,
+    req: EditAchievementRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    if not auth_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
+        check_res = safe_execute(lambda s: s.table('achievements').select('user_id').eq('id', ach_id))
+        if check_res and check_res.data:
+            owner = check_res.data[0].get('user_id')
+            if owner and owner != auth_user.id and not auth_user.is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: You do not own this achievement.")
+
         update_data = {k: v for k, v in req.dict(exclude_unset=True).items() if v is not None}
         if not update_data:
             return {"status": "no changes"}
@@ -329,20 +382,23 @@ def edit_achievement(ach_id: str, req: EditAchievementRequest):
             lambda s: s.table('achievements').update(update_data).eq('id', ach_id)
         )
         return res.data[0] if res.data else None
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/achievements/{ach_id}")
 def delete_achievement(ach_id: str, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
+    if not auth_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
-        # Verify ownership if user is authenticated to prevent IDOR
-        if auth_user:
-            check_res = safe_execute(lambda s: s.table('achievements').select('user_id').eq('id', ach_id))
-            if check_res and check_res.data:
-                owner = check_res.data[0].get('user_id')
-                if owner and owner != auth_user.id and not auth_user.is_admin:
-                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this achievement.")
+        check_res = safe_execute(lambda s: s.table('achievements').select('user_id').eq('id', ach_id))
+        if check_res and check_res.data:
+            owner = check_res.data[0].get('user_id')
+            if owner and owner != auth_user.id and not auth_user.is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: You do not own this achievement.")
 
         # Also delete generated bullets linked to this
         safe_execute(lambda s: s.table('generated_bullets').delete().eq('achievement_id', ach_id))
@@ -439,7 +495,7 @@ async def generate_section_bullets_api(
     req: GenerateSectionRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -480,12 +536,19 @@ async def generate_section_bullets_api(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/point-bank")
-def get_point_bank(user_id: str):
+def get_point_bank(
+    user_id: Optional[str] = None,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (user_id if user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
         # Only return saved bullets with full achievement metadata including section_type
         res = safe_execute(
-            lambda s: s.table('generated_bullets').select("*, achievements(id, title, parent_experience, section_type, timeline, original_description)").eq('user_id', user_id).eq('is_saved', True).order('created_at', desc=True)
+            lambda s: s.table('generated_bullets').select("*, achievements(id, title, parent_experience, section_type, timeline, original_description)").eq('user_id', effective_user_id).eq('is_saved', True).order('created_at', desc=True)
         )
         return res.data or []
     except Exception as e:
@@ -494,12 +557,19 @@ def get_point_bank(user_id: str):
 
 
 @router.post("/save-bullet")
-def save_bullet(req: SaveBulletRequest):
+def save_bullet(
+    req: SaveBulletRequest,
+    auth_user: Optional[AuthUser] = Depends(get_optional_user)
+):
+    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id == "guest" else None)
+    if not effective_user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
         insert_data = {
             "achievement_id": req.achievement_id,
-            "user_id": req.user_id,
+            "user_id": effective_user_id,
             "target_role": req.target_role,
             "bullet_text": req.bullet_text,
             "variant_type": req.variant_type,
@@ -517,15 +587,16 @@ def save_bullet(req: SaveBulletRequest):
 
 @router.delete("/point-bank/{bullet_id}")
 def delete_saved_bullet(bullet_id: str, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
+    if not auth_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
-        # Verify ownership if user is authenticated to prevent IDOR
-        if auth_user:
-            check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
-            if check_res and check_res.data:
-                owner = check_res.data[0].get('user_id')
-                if owner and owner != auth_user.id and not auth_user.is_admin:
-                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
+        check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
+        if check_res and check_res.data:
+            owner = check_res.data[0].get('user_id')
+            if owner and owner != auth_user.id and not auth_user.is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
 
         safe_execute(lambda s: s.table('generated_bullets').delete().eq('id', bullet_id))
         return {"status": "deleted"}
@@ -538,15 +609,16 @@ def delete_saved_bullet(bullet_id: str, auth_user: Optional[AuthUser] = Depends(
 
 @router.put("/point-bank/{bullet_id}")
 def edit_saved_bullet(bullet_id: str, req: EditBulletRequest, auth_user: Optional[AuthUser] = Depends(get_optional_user)):
+    if not auth_user:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     from dependencies import safe_execute
     try:
-        # Verify ownership if user is authenticated to prevent IDOR
-        if auth_user:
-            check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
-            if check_res and check_res.data:
-                owner = check_res.data[0].get('user_id')
-                if owner and owner != auth_user.id and not auth_user.is_admin:
-                    raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
+        check_res = safe_execute(lambda s: s.table('generated_bullets').select('user_id').eq('id', bullet_id))
+        if check_res and check_res.data:
+            owner = check_res.data[0].get('user_id')
+            if owner and owner != auth_user.id and not auth_user.is_admin:
+                raise HTTPException(status_code=403, detail="Forbidden: You do not own this bullet point.")
 
         res = safe_execute(
             lambda s: s.table('generated_bullets').update({
@@ -597,7 +669,7 @@ def refine_bullet(
     req: RefineBulletRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (req.user_id if req.user_id and req.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")

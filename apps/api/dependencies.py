@@ -12,8 +12,8 @@ from services.entitlement_service import EntitlementService, is_iitb_email, is_a
 from services.usage_service import UsageService
 from services.session_service import SessionService
 
-# Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
+# Rate Limiter with default fallback protection against Denial-of-Wallet
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 # PostHog Observability
 posthog_client = None

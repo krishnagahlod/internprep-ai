@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#09090b"/>
+      <stop offset="100%" stop-color="#18181b"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="124" fill="none" stroke="#27272a" stroke-width="8"/>
+
+  <g transform="translate(64, 64)">
+    <circle cx="36" cy="36" r="14" fill="#ef4444" opacity="0.8"/>
+    <circle cx="76" cy="36" r="14" fill="#f59e0b" opacity="0.8"/>
+    <circle cx="116" cy="36" r="14" fill="#10b981" opacity="0.8"/>
+
+    <path d="M 50 140 L 170 230 L 50 320" 
+          fill="none" 
+          stroke="url(#emeraldGrad)" 
+          stroke-width="36" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          filter="url(#glow)"/>
+
+    <rect x="210" y="280" width="130" height="36" rx="8" fill="#10b981" filter="url(#glow)"/>
+    
+    <path d="M 310 110 Q 310 150 270 150 Q 310 150 310 190 Q 310 150 350 150 Q 310 150 310 110 Z" 
+          fill="#34d399" 
+          filter="url(#glow)"/>
+  </g>
+</svg>

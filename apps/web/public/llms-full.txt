@@ -1,0 +1,30 @@
+# InternPrep AI — Full Platform & Technical Documentation
+
+## Overview
+InternPrep AI (operated by InternPrep AI Technologies Pvt. Ltd., Mumbai, India) is an end-to-end technical platform designed to train university graduates and competitive job candidates for high-stakes corporate recruitment rounds. Calibrated directly against top-tier Indian engineering campus standards (specifically Indian Institute of Technology Bombay / IIT Bombay) and premier global management consulting rubrics, the platform bridges the preparation gap through low-latency AI simulation.
+
+## Technical Architecture
+- **Frontend**: Next.js 14 App Router, TypeScript, Tailwind CSS, Radix UI primitives, Lucide React icons, Framer Motion animations.
+- **Backend API**: FastAPI (Python 3.11+), SlowAPI distributed rate limiting, Pydantic v2 schemas, Sentry error monitoring with automated PII redaction.
+- **Data Layer**: Supabase (PostgreSQL 15), Row-Level Security (RLS), Supabase Storage for encrypted resume uploads, Supabase Auth.
+- **AI Inference Engine**: Multi-tiered hybrid inference routing across Cerebras Systems (ultra-low latency Llama-3.3-70b), Groq LPUs, and Google Gemini models.
+- **Payments Gateway**: Razorpay Payment Suite supporting UPI, RuPay, Net Banking, and Credit/Debit Cards with automated webhook entitlement provisioning.
+
+## Evaluation & Scoring Methodology
+1. **Case Interviews (Consulting & Product)**: Evaluated across Mutually Exclusive, Collectively Exhaustive (MECE) tree structuring, hypothesis formulation, quantitative numerical accuracy, business acumen, and synthesis clarity.
+2. **Technical Coding & Systems SWE**: Evaluated on asymptotic complexity (Big-O time and space), edge cases, system bottlenecks, and modular architecture.
+3. **ATS Resume Diagnostics**: Scored 0-100 on high-agency action verbs, metric quantification density, reverse-chronological layout consistency, and keyword semantic similarity against target company job descriptions.
+
+## Privacy, Security, & DPDP Act 2023 Compliance
+- **Data Fiduciary**: InternPrep AI Technologies Private Limited (CIN: U72900MH2025PTC109823).
+- **Statutory Notice**: Prior to resume ingestion or interview launch, explicit consent is obtained.
+- **Data Portability**: Users can export full machine-readable JSON archives of their data via `/privacy/export-data`.
+- **Right to Erasure**: Users can trigger permanent cascading account deletion via `/privacy/delete-account`.
+- **Zero Training Guarantee**: User data is strictly isolated; no candidate inputs are used to train foundational AI models.
+- **Grievance Redressal Officer**: Appointed under Rule 3(11) of IT Rules, 2021 and Section 10 of DPDP Act, 2023 at grievance@internprep.ai.
+
+## Contact & Corporate Information
+- Company: InternPrep AI Technologies Pvt. Ltd.
+- Office: Unit 402, Signature Towers, Bandra Kurla Complex (BKC), Mumbai 400051, MH, India.
+- Email: support@internprep.ai
+- Website: https://internprep.ai

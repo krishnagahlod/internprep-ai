@@ -14,6 +14,7 @@ function LoginContent() {
   const [isLoginView, setIsLoginView] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [acceptedConsent, setAcceptedConsent] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -23,6 +24,11 @@ function LoginContent() {
   const { setUser } = useAuthStore()
 
   const handleAuth = async (action: "login" | "signup") => {
+    if (action === "signup" && !acceptedConsent) {
+      setError("Please agree to the Terms of Service and Privacy Policy to create an account.")
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -62,7 +68,11 @@ function LoginContent() {
         router.push(redirectUrl)
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during authentication")
+      if (action === "login") {
+        setError("Invalid email or password. Please check your credentials and try again.")
+      } else {
+        setError(err.message || "An error occurred during account creation. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -195,9 +205,31 @@ function LoginContent() {
                   className="rounded-md border-border bg-background text-xs h-9 text-foreground placeholder:text-muted-foreground"
                 />
                 {!isLoginView && (
-                  <p className="text-[10px] text-muted-foreground font-mono-tech">
-                    Minimum 6 characters.
-                  </p>
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[10px] text-muted-foreground font-mono-tech">
+                      Minimum 6 characters.
+                    </p>
+                    <div className="flex items-start gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="terms-consent"
+                        checked={acceptedConsent}
+                        onChange={(e) => setAcceptedConsent(e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 rounded border-border text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                      />
+                      <label htmlFor="terms-consent" className="text-[11px] text-muted-foreground leading-tight select-none cursor-pointer">
+                        I agree to the{" "}
+                        <a href="/terms" target="_blank" className="text-emerald-600 dark:text-emerald-400 underline hover:text-emerald-500">
+                          Terms of Service
+                        </a>{" "}
+                        and{" "}
+                        <a href="/privacy" target="_blank" className="text-emerald-600 dark:text-emerald-400 underline hover:text-emerald-500">
+                          Privacy Policy
+                        </a>
+                        , and consent to digital processing under the DPDP Act.
+                      </label>
+                    </div>
+                  </div>
                 )}
               </div>
               
@@ -205,7 +237,7 @@ function LoginContent() {
                 <Button 
                   className="w-full h-9 rounded-md text-xs font-semibold font-mono-tech bg-emerald-600 hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white dark:text-zinc-950 shadow-xs" 
                   onClick={() => handleAuth(isLoginView ? "login" : "signup")}
-                  disabled={isLoading || !email || !password}
+                  disabled={isLoading || !email || !password || (!isLoginView && !acceptedConsent)}
                 >
                   {isLoading ? "Processing..." : (isLoginView ? "Sign In →" : "Create Account →")}
                 </Button>

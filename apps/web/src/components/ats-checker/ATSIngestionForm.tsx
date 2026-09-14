@@ -301,8 +301,8 @@ export function ATSIngestionForm({
 
       <div className="p-3 bg-muted/20 border border-border rounded-xl text-center">
         <p className="text-[11px] font-medium text-muted-foreground font-mono-tech">
-          <ShieldCheck className="inline-block w-3.5 h-3.5 mr-1.5 text-primary mb-0.5" />
-          Privacy First: Your document is processed strictly in-memory and is never permanently stored or shared.
+          <ShieldCheck className="inline-block w-3.5 h-3.5 mr-1.5 text-emerald-500 mb-0.5" />
+          DPDP Act 2023 Compliant: Resumes are processed in isolated transient memory for diagnostic scoring only and are never used to train public AI models.
         </p>
       </div>
     </div>

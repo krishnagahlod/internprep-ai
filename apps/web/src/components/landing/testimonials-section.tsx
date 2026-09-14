@@ -110,6 +110,13 @@ export function TestimonialsSection() {
           </div>
         </div>
 
+        {/* Beta Pilot & Privacy Disclaimer */}
+        <div className="mt-4 text-center">
+          <p className="text-[11px] font-mono-tech text-muted-foreground/75 max-w-3xl mx-auto">
+            * Disclosures: User feedback collected from voluntary campus pilot testers. Surnames abbreviated to protect student privacy under the DPDP Act 2023. InternPrep AI does not guarantee placement shortlists or corporate employment offers.
+          </p>
+        </div>
+
       </div>
     </section>
   );

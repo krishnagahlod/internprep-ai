@@ -116,7 +116,7 @@ async def upload_resume(
             raise HTTPException(status_code=400, detail="Invalid PDF file format. Missing standard %PDF- header.")
 
         import uuid
-        effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
+        effective_user_id = auth_user.id if auth_user else None
         safe_file_name = os.path.basename(file.filename or "resume.pdf").replace("/", "_").replace("\\", "_")
         folder_prefix = effective_user_id or "anonymous"
         file_path = f"{folder_prefix}/{uuid.uuid4()}_{safe_file_name}"
@@ -195,8 +195,8 @@ async def analyze_resume(
     user_id: Optional[str] = Form(None),
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    # Resolve user identity from authenticated token or form parameter
-    effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
+    # Resolve user identity strictly from authenticated token
+    effective_user_id = auth_user.id if auth_user else None
     user_email = auth_user.email if auth_user else None
 
     # Strict PDF Validation
@@ -320,7 +320,7 @@ async def resume_workshop(
     body: WorkshopRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -366,7 +366,7 @@ async def analyze_resume_section(
     body: AnalyzeSectionRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")
@@ -447,7 +447,7 @@ async def ats_check(
         from agents.ats_engine import compute_full_ats_report
         from dependencies import get_supabase
         supabase = get_supabase()
-        effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
+        effective_user_id = auth_user.id if auth_user else None
         
         pdf_bytes = None
         if file:
@@ -504,7 +504,7 @@ async def ats_check_stream(
     from agents.ats_engine import compute_full_ats_report
     from dependencies import get_supabase
     supabase = get_supabase()
-    effective_user_id = (auth_user.id if auth_user else None) or (user_id if user_id and user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
 
     pdf_bytes = None
     if file:
@@ -567,7 +567,7 @@ async def ats_fix_bullet_endpoint(
     body: ATSFixBulletRequest,
     auth_user: Optional[AuthUser] = Depends(get_optional_user)
 ):
-    effective_user_id = auth_user.id if auth_user else (body.user_id if body.user_id and body.user_id != "guest" else None)
+    effective_user_id = auth_user.id if auth_user else None
     if effective_user_id:
         entitlement = EntitlementService.get_active_entitlement(user_id=effective_user_id, user_email=auth_user.email if auth_user else None)
         plan_key = entitlement.get("plan_key", "free")

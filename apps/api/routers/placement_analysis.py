@@ -15,10 +15,12 @@ router = APIRouter(prefix="/placement-analysis", tags=["Placement Analysis & Com
 DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_intelligence.json"))
 ACCESS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_access_whitelist.json"))
 SHORTLISTS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_interview_shortlists.json"))
+ROADMAP_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data/placement_season_roadmap.json"))
 
 _DATASET_CACHE: Optional[Dict[str, Any]] = None
 _ACCESS_CACHE: Optional[Dict[str, Any]] = None
 _SHORTLISTS_CACHE: Optional[Dict[str, Any]] = None
+_ROADMAP_CACHE: Optional[Dict[str, Any]] = None
 
 ADMIN_EMAILS = {"krishnagahlod@gmail.com", "creator@internprep.ai", "admin@internprep.ai", "admin@iitb.ac.in"}
 DEFAULT_MASTER_KEY = "IITB_ADMIN_2026"
@@ -88,6 +90,21 @@ def get_shortlists_dataset() -> Dict[str, Any]:
         else:
             _SHORTLISTS_CACHE = {}
     return _SHORTLISTS_CACHE
+
+
+def get_season_roadmap_dataset() -> Dict[str, Any]:
+    global _ROADMAP_CACHE
+    if _ROADMAP_CACHE is None:
+        if os.path.exists(ROADMAP_PATH):
+            try:
+                with open(ROADMAP_PATH, "r", encoding="utf-8") as f:
+                    _ROADMAP_CACHE = json.load(f)
+            except Exception as e:
+                print(f"[PlacementRoadmap] Failed to load roadmap dataset: {e}")
+                _ROADMAP_CACHE = {}
+        else:
+            _ROADMAP_CACHE = {}
+    return _ROADMAP_CACHE
 
 
 WHITELIST_RECORD_ID = "00000000-0000-0000-0000-000000000001"
@@ -1639,4 +1656,18 @@ async def get_placement_velocity(request: Request):
         "overall_cumulative_velocity": [],
         "department_trajectories": []
     }
+
+
+@router.get("/season-roadmap")
+@limiter.limit("60/minute")
+async def get_placement_season_roadmap(request: Request):
+    """
+    Returns the comprehensive, phase-by-phase IIT Bombay placement season roadmap,
+    authentic blog telemetry, tactical weekly milestones, and D-Day slotting playbook.
+    """
+    data = get_season_roadmap_dataset()
+    if not data:
+        raise HTTPException(status_code=404, detail="Season roadmap dataset not generated or available.")
+    return data
+
 

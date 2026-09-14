@@ -348,3 +348,97 @@ export const DAY_SLOT_OPTIONS = [
   "Day 3–5",
   "Day 6+",
 ];
+
+export interface RoadmapPhaseMilestone {
+  id: string;
+  week_label: string;
+  title: string;
+  tracks: string[];
+  priority: "CRITICAL" | "HIGH" | "MEDIUM";
+  description: string;
+  tasks: string[];
+}
+
+export interface RoadmapFeaturedAnnouncement {
+  title: string;
+  date: string;
+  category: string;
+  company: string;
+  snippet: string;
+  timestamp: string | null;
+}
+
+export interface RoadmapPhaseSummary {
+  total_posts: number;
+  jafs_count: number;
+  oas_count: number;
+  shortlists_count: number;
+  ppts_count: number;
+  selections_count: number;
+  active_companies_count: number;
+  sample_companies: string[];
+  featured_announcements: RoadmapFeaturedAnnouncement[];
+}
+
+export interface RoadmapPhase {
+  id: string;
+  phase_code: string;
+  name: string;
+  subtitle: string;
+  season_group: "phase_1" | "phase_2";
+  date_range: string;
+  duration_weeks: number;
+  urgency_badge: string;
+  accent_color: string;
+  icon: string;
+  summary: RoadmapPhaseSummary;
+  candidate_reality: string;
+  mindset_advice: string;
+  placement_cell_rules: string[];
+  weekly_milestones: RoadmapPhaseMilestone[];
+}
+
+export interface RoadmapSlot {
+  slot_code: string;
+  timing: string;
+  prestige: string;
+  characteristics: string;
+  historical_recruiters: string[];
+  collision_strategy: string;
+}
+
+export interface RoadmapCollisionRule {
+  scenario: string;
+  protocol: string;
+}
+
+export interface RoadmapTrackGuide {
+  title: string;
+  icon: string;
+  core_pillars: string[];
+  key_advice: string;
+}
+
+export interface SeasonRoadmapData {
+  season_overview: {
+    title: string;
+    total_announcements: number;
+    phase1_announcements: number;
+    phase2_announcements: number;
+    kickoff_date: string;
+    dday_start: string;
+    dday_slot_1_start: string;
+    phase1_end: string;
+    season_end: string;
+    historical_verified_candidates_placed: number;
+  };
+  phases: RoadmapPhase[];
+  dday_slotting_playbook: {
+    title: string;
+    description: string;
+    slots: RoadmapSlot[];
+    collision_rules: RoadmapCollisionRule[];
+  };
+  track_guides: Record<string, RoadmapTrackGuide>;
+}
+

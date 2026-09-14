@@ -1,0 +1,17 @@
+{
+  "name": "InternPrep AI — Day 1 Placement & Case Platform",
+  "short_name": "InternPrep AI",
+  "description": "Rigorous case interview simulations and adaptive resume intelligence engineered for Day 1 placements.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

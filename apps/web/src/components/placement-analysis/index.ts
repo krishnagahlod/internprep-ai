@@ -9,3 +9,4 @@ export * from "./PlacementComparisonModal";
 export * from "./PlacementDossierModal";
 export * from "./PlacementCRMView";
 export * from "./PlacementAnalyticsView";
+export * from "./PlacementSeasonRoadmapView";

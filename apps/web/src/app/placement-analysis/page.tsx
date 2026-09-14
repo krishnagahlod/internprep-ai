@@ -24,6 +24,7 @@ import {
   Globe,
   CheckCircle2,
   Key,
+  CalendarClock,
 } from "lucide-react";
 import {
   Company,
@@ -44,6 +45,7 @@ import {
   PlacementDossierModal,
   PlacementCRMView,
   PlacementAnalyticsView,
+  PlacementSeasonRoadmapView,
 } from "@/components/placement-analysis";
 
 export default function PlacementAnalysisPage() {
@@ -51,7 +53,7 @@ export default function PlacementAnalysisPage() {
   const { user, setTargetCompany } = useAuthStore();
 
   // Top Section Switcher
-  const [activeMainTab, setActiveMainTab] = useState<"directory" | "crm" | "analytics">("directory");
+  const [activeMainTab, setActiveMainTab] = useState<"directory" | "roadmap" | "crm" | "analytics">("directory");
 
   // Authorization state
   const [isIITBVerified, setIsIITBVerified] = useState<boolean>(false);
@@ -987,6 +989,7 @@ export default function PlacementAnalysisPage() {
               <SegmentedTabs
                 tabs={[
                   { id: "directory", label: "Company Directory", icon: Building2 },
+                  { id: "roadmap", label: "Season Roadmap", icon: CalendarClock },
                   {
                     id: "crm",
                     label: "Placement CRM",
@@ -997,7 +1000,7 @@ export default function PlacementAnalysisPage() {
                 ]}
                 activeTab={activeMainTab}
                 onChange={(k) =>
-                  setActiveMainTab(k as "directory" | "crm" | "analytics")
+                  setActiveMainTab(k as "directory" | "roadmap" | "crm" | "analytics")
                 }
               />
             </div>
@@ -1169,7 +1172,14 @@ export default function PlacementAnalysisPage() {
           </div>
         )}
 
-        {/* VIEW 2: PERSONAL PLACEMENT CRM */}
+        {/* VIEW 2: PLACEMENT SEASON PREPARATION ROADMAP */}
+        {activeMainTab === "roadmap" && (
+          <PlacementSeasonRoadmapView
+            onSelectCompany={handleOpenCompanyDossier}
+          />
+        )}
+
+        {/* VIEW 3: PERSONAL PLACEMENT CRM */}
         {activeMainTab === "crm" && (
           <PlacementCRMView
             crmItems={crmItems}

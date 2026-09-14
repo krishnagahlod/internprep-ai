@@ -410,15 +410,15 @@ def run_interview_shortlist_extraction():
         sorted_branches = []
         for branch_name, b_cands in sorted(branch_groups_map.items(), key=lambda x: len(x[1]), reverse=True):
             # Sort candidates alphabetically by name
-            b_cands.sort(key=lambda x: x["name"])
+            b_cands.sort(key=lambda x: x["name"].lower())
             sorted_branches.append({
                 "branch": branch_name,
                 "count": len(b_cands),
                 "candidates": b_cands
             })
 
-        # Sort all candidates alphabetically
-        candidates.sort(key=lambda x: (x["branch"], x["name"]))
+        # Sort all candidates strictly in alphabetical order by candidate name (A -> Z)
+        candidates.sort(key=lambda x: x["name"].lower())
 
         output_data[slug] = {
             "company_name": c_data["company_name"],
